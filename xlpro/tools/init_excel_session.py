@@ -20,6 +20,9 @@ try:
 except:
     pass
 
+import time
+time.sleep(0.2)
+
 xlapp = win32com.client.Dispatch("Excel.Application")
 xlapp.Visible = True
 try:

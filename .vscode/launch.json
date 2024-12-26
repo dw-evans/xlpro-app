@@ -15,6 +15,7 @@
             "name": "debugpy: pid",
             "type": "debugpy",
             "request": "attach",
+            // "processId": "${command:pickProcess}"
             "processId": "${command:pickProcess}"
         }
     ]
