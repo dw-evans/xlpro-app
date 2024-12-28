@@ -41,7 +41,7 @@ def _start_background_loop():
 def serve():
     pythoncom.CoInitialize()
     clsid = pywintypes.IID(xlproServerAsync._reg_clsid_)
-    # change the policy to fetch a singleton
+
     BaseDefaultPolicy = win32com.server.policy.DefaultPolicy
     class MyPolicy(BaseDefaultPolicy):
         def _CreateInstance_(self, reqClsid, reqIID):
@@ -49,15 +49,21 @@ def serve():
                 return win32com.server.util.wrap(xlproServerAsync(), reqIID)
             else:
                 return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
+    # class MyPolicy(BaseDefaultPolicy):
+    #     def _CreateInstance_(self, reqClsid, reqIID):
+    #         global singleton
+    #         if reqClsid == clsid:
+    #             singleton = win32com.server.util.wrap(xlproServerAsync(), reqIID)
+    #             return singleton
+    #         else:
+    #             return singleton
 
     win32com.server.policy.DefaultPolicy = MyPolicy
 
-    # Create the class factory and register it
     factory = pythoncom.MakePyFactory(clsid)
 
     clsctx = pythoncom.CLSCTX_LOCAL_SERVER
     flags = pythoncom.REGCLS_MULTIPLEUSE | pythoncom.REGCLS_SUSPENDED
-    # flags = pythoncom.REGCLS_SINGLEUSE | pythoncom.REGCLS_SUSPENDED
     revokeId = pythoncom.CoRegisterClassObject(clsid, factory, clsctx, flags)
 
     pythoncom.EnableQuitMessage(win32api.GetCurrentThreadId())
