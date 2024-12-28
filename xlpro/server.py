@@ -14,7 +14,7 @@ import importlib
 wd = Path(__file__).parent
 # Configure logging to write to a file
 logging.basicConfig(
-    filename= wd / 'my_log_file.log',   # The file where logs will be saved
+    filename= wd / 'log.log',   # The file where logs will be saved
     level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages

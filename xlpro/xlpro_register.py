@@ -1,5 +1,5 @@
 import numpy as np
-from win32com.client import Dispatch
+import win32com.client
 
 def add_numbers(a:float, b:float):
     return a + b + 100.0
@@ -9,3 +9,4 @@ def make_array(n:int, m:int):
 
 def funky_formula(a, b, caller, thiswb):
     return
+

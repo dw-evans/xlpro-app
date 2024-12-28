@@ -7,7 +7,7 @@
             "type": "shell",
             "command": "powershell",
             "args": [
-                "./xlpro/tools/reregister_with_admin.ps1"
+                "./tools_async/reregister_with_admin.ps1"
             ],
             "problemMatcher": []
         },
@@ -16,7 +16,7 @@
             "type": "shell",
             "command": "powershell",
             "args": [
-                "./xlpro/tools/refresh_excel.bat"
+                "./tools_async/refresh_excel.bat"
             ],
             "problemMatcher": [],
         }
