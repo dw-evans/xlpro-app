@@ -29,8 +29,6 @@ wb:xl._Workbook
 VB_DYNAMIC_MODULE_NAME = "xlpro"
 VB_STATIC_MODULE_NAME = "xlpro_static"
 
-
-
 def myfunc(a:float, b:int, c:str, d) -> str:
     """the docstring hehehe"""
     return f"{a}, {b}, {c}, {d}"
@@ -86,6 +84,16 @@ def convert_to_array_if_range(arg:Any):
 
 def test_func(a:int, b:float, c, caller) -> float:
     pass
+
+def wrap_function_with_caller_arg(func):
+    """Modifies the function to take a "caller" argument if it doesn't exist"""
+    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    # XXX todo
+
+    def wrapper(*args, **kwargs):
+        ...
+        
+    return wrapper
 
 def function_template_with_caller(func:Callable):
     """Returns function template string to send to VBA module.
@@ -219,6 +227,21 @@ def load_functions_from_file(module_name, file_path):
         if callable(getattr(module, name))
     }
     return functions
+
+import hashlib
+def hash_function_call(func, *args, **kwargs):
+    # Create a unique string based on the function name and its arguments
+    func_name = func.__name__
+    # Convert arguments to a string (including both positional and keyword arguments)
+    args_str = str(args)
+    kwargs_str = str(kwargs)
+
+    # Combine the function name with its arguments
+    combined = func_name + args_str + kwargs_str
+
+    # Generate a hash using SHA-256 (you can also use MD5 or others depending on your needs)
+    hash_object = hashlib.sha256(combined.encode('utf-8'))
+    return hash_object.hexdigest()
 
 if __name__ == "__main__":
 

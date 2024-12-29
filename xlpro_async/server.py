@@ -5,6 +5,7 @@ from pathlib import Path
 import os
 
 import threading
+import queue
 
 import pythoncom
 import win32com.client
@@ -17,42 +18,93 @@ import numpy as np
 
 import utils
 
+from win32typelibs import excel as xl
+
 wd = Path(__file__).parent
 
+
 logger = logging.getLogger(__name__)
+
+class uuid:
+    count = 0
+    def __new__(cls):
+        cls.count += 1
+        return cls.count
+
 
 class xlproServerAsync:
     _public_methods_ = [
         'getpid',
-        "p",
         "add_data",
-        # "execute_function",
         # "register_functions_in_vba",
         # "register_functions_in_self",
-        # "run_async_worker",
+        # "execute_function_async",
     ]
     _reg_progid_ = 'xlproServerAsync.Application'
     _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
 
     _instance = None  # Singleton instance
+    _instance_initialized = False
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls, *args, **kwargs)
-            cls._instance._data = []  # Initialize state
-            # cls._instance._func_register:dict[str, typing.Callable] = {}
-            # cls._instance._func_register = {}
+            # logger.log(f"__new__ creating new instance")
+            # logger.log(f"__new__ creating new instance. PID: {os.getpid()}, MEMID: {hex(id(cls._instance))}")
         return cls._instance
 
     def __init__(self):
+        if not xlproServerAsync._instance_initialized:
+            logger.info(f"__init__ initializing new instance")
+            self._data = []
+            xlproServerAsync._instance_initialized = True
+
+            # XXX something errors in the init function and closes the server
+            # Debugger is not cut out to catch these errors.
+
+            # self._func_register = {}
+            # self._register_functions_in_self()
+
+            # # store the results uuid: result
+            # self._func_hash_results_map = {}
+            # self._func_hash_results_map_lock = threading.Lock()
+            # self._func_hash_result_iscomplete_map = {}
+
+            # # maps the uid to the caller and function hash
+            # self._func_hash_to_caller_map = {}
+
+            # # map the uuid to the working thread
+            # # self._func_hash_to_working_thread_map = {}
+
+            # self._result_queue = queue.Queue() # stores the results as they come in
+
+            # # results manager handles processing the queue of results as they come in
+            # # and signalling to the client manager to execute commands.
+            # self._results_manager_thread:ResultsManagerThread = ResultsManagerThread(server=self)
+            # self._results_manager_thread.start()
+
+            # self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
+
+            # self._client_manager
+
+
+            # self._wb:xl._Workbook = None
+            # self._client_manager:ClientManager = None
+
+
+        else:
+            logger.info("__init__ called however the singleton already exists and has been initialized.")
         return
     
+    def register_workbook(self, thiswb):
+        """Register the workbook client of the xlpro server."""
+        self._wb = win32com.client.Dispatch(thiswb)
+        # XXX I am concerned about accessing this from a different thread./,K
+        self._client_manager = ClientManager(self)
+
     def getpid(self):
         return os.getpid()
     
-    def p(self):
-        print(f"{datetime.datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - {os.getpid()} - {threading.get_ident()}")
-
     def add_data(self, data):
         self._data.append(data)
         logger.debug(f"add_data caller pid: {os.getpid()}")
@@ -61,100 +113,139 @@ class xlproServerAsync:
         logger.debug(f"self._data = {self._data}")
         return f"self._data is now {self._data}"
     
+    def _register_functions_in_self(self):
+        self._func_register = utils.load_functions_from_file(
+            "xlpro_register", 
+            wd / "xlpro_register.py",
+        )
+        return
+
+    def register_functions_in_vba(self, thisworkbook):
+        wb = win32com.client.Dispatch(thisworkbook)
+        self._register_functions_in_self()
+        funcs = [v for k,v in self._func_register.items()]
+        utils.init_xlpro_vb_dynamic_component(wb, funcs)
+        return
+
+    def execute_function(self, func_name, *args) -> str:
+        try:
+            func = self._func_register.get(func_name)
+            if func:
+                return func(*args)
+            else:
+                return f"Function {func_name} not found."
+        except Exception as e:
+            return str(e)
+
+    def execute_function_async(self, caller, func_name, *args) -> str:
+        try:
+            # fetch the function that is being called.
+            func = self._func_register.get(func_name)
+
+            if not func:
+                return f"Function {func_name} not found."
+            
+            uid = utils.hash_function_call(func, *args)
+
+            # if the hash of the function has been marked complete, return that
+            # avoid computation
+            if self._func_hash_result_iscomplete_map[uid]:
+                return self._func_hash_results_map[uid]
+
+            # Get the caller and convert it to a range to store.
+            # Range object needed to handle dynamic addresses.
+            caller_dispatch = win32com.client.Dispatch(caller)
+            self._func_hash_to_caller_map[uid] = caller_dispatch
+
+            # continue with computing...
+            # create the daemon thread to run the function
+            t = self._create_and_register_async_worker(uid, func, args, kwargs={})
+            t.start()
+
+            # return the result (will be incomplete)
+            return self._func_hash_results_map[uid]
+
+        except Exception as e:
+            return str(e)
+        
+        
+    def _generate_uid(self):
+        return uuid()
+        
+    def _create_and_register_async_worker(self, uid, func, args, kwargs):
+        def func_wrapper():
+            ret = func(*args, **kwargs)
+            # add to queue and wake manager.
+            self._result_queue.put((uid, ret))
+            self._func_hash_result_iscomplete_map = True
+            self._results_manager_thread.wake()
+
+        t = threading.Thread(target=func_wrapper, daemon=True)
+        self._func_hash_results_map[uid] = f"Working on result<{uid}>..."
+        self._func_hash_result_iscomplete_map = False
+        # self._func_hash_to_working_thread_map[uid] = t
+
+        return t
+
+        
+import time
+ 
+class ResultsManagerThread:
+    def __init__(self, server:xlproServerAsync):
+        self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
+        self._thread = threading.Thread(target=self._watch, daemon=True)
+        self._server = server
+
+    def start(self):
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        self._wake_event.set()  # Wake up if sleeping
+        self._thread.join()
+
+    def wake(self):
+        self._wake_event.set()
+
+    def _watch(self):
+        """When awakened, retrieves the result queue and 
+        sends to the server cache."""
+        while not self._stop_event.is_set():
+            print("Watcher is waiting for events or timeout...")
+            self._wake_event.wait(timeout=5)
+            if self._wake_event.is_set():
+                self._wake_event.clear()
+                print("Watcher woke up for an event!")
+               
+                # Process the whole queue once woken up
+                # XXX - could replace while trye with while not stop event.
+                while True:
+                    try:
+                        uid, val = self._server._result_queue.get()
+                    except queue.Empty:
+                        break
+                    
+                    # add the result to the server cache and signal update to client manager
+                    with self._server._func_hash_results_map_lock:
+                        self._server._func_hash_results_map[uid] = val
+                        self._server._client_manager._recalculate_cell(self._server._func_hash_to_caller_map[uid])
+
+                    time.sleep(0.01) # fairness sleep
+
+            if self._stop_event.is_set():
+                break  # Exit if stop event is set
 
 
-    # def register_functions_in_self(self):
-    #     self._func_register = utils.load_functions_from_file(
-    #         "xlpro_register", 
-    #         wd / "xlpro_register.py",
-    #     )
-    #     return
+class ClientManager:
+    """Hooks to the excel client so we can trigger events"""
 
-    # def register_functions_in_vba(self, thisworkbook):
-    #     wb = win32com.client.Dispatch(thisworkbook)
-    #     self.register_functions_in_self()
-    #     funcs = [v for k,v in self._func_register.items()]
-    #     utils.init_xlpro_vb_dynamic_component(wb, funcs)
-    #     return
+    def __init__(self, server):
+        self._server = server
+        pass
 
-    # def execute_function(self, func_name, *args) -> str:
-    #     try:
-    #         func = self._func_register.get(func_name)
-    #         if func:
-    #             return func(*args)
-    #         else:
-    #             return f"Function {func_name} not found."
-    #     except Exception as e:
-    #         return str(e)
-
-    # def run_async_worker(self):
-    #     import threading
-
-    #     def func():
-    #         import time
-    #         logger.debug("waiting for 5 seconds...")
-    #         time.sleep(5.0)
-    #         logger.debug("finished waiting")
-    #         return
-
-    #     new_thread = threading.Thread(target=func, daemon=True)
-    #     new_thread
-
-
-
-
-"""
-Callback structure
-
-write async results to a register
-when a function completes, it has data which signals which cells (callers) need to be recomputed
-
-# when a function is called, the output is given a unique id in the cached results.
-# the cache is filled with the temporary placeholder results until it is complete
-# once the uid has been flagged complete, it looks up
-# the uid can cache a set of arguments func(a, b, c) so we can look up any existing ones in the past (potentially)
-# This caching of results would require a cache clear option to the formulas, maybe with an optional defaulted to no
-# But at the same time we might want to prevent any big calculations from being executed unknowingly 
-
-# Is there an opportunity to have some helper methods that can see which cells are calling the xlpro functions
-
-# Oh and by the way we need to nest everything down a level so each workbook has its own memory space if we are doing
-# the persistent memory option
-
-# How can we issue the callback
-# if a function knows its caller, it can issue a Range.Recalculate callback pretty easily.
-
-# All of this relies on recalculate doing a cache lookup first. and if it misses, deferring the calculation to a background
-# python process
-
-# maps the function uuid to the live result
-results_register = {
-    # "uuid": <T>result,
-    12321453:
-}
-
-# look up the function to the uuid
-function_register = {
-    hash(func): uuid
-}
-
-caller_register = {
-    workbook.sheet.a1: uuid
-}
-
-# an async filler function can be called in the meantime for each life function
-# filler function
-lambda repr, t: f"{repr} has been executing for {t} seconds"
-
-# as these are seen as complete
-completion_register = {
-    uuid: True/False
-}
-
-# when a function is marked complete the called must be ordered to recalculate and points to
-# a cached output of the function 
-
-"""
+    def _recalculate_cell(self, cell:xl.Range):
+        cell.Calculate()
 
 
 
@@ -162,5 +253,3 @@ completion_register = {
 
 if __name__ == '__main__':
     ...
-    # import win32com.server.register
-    # win32com.server.register.UseCommandLine(xlproServerAsync)

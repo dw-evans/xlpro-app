@@ -3,8 +3,14 @@ import datetime, os, threading
 
 from server import xlproServerAsync
 
-xlpro = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
-xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+# xlpro = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+# xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+
+# now works with the progid after registering it in the registry
+xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
+xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
+
+# xlpro and xlpro2 are the same instance :)
 
 print(xlpro.add_data(f"my_pid(1): {os.getpid()}"))
 print(xlpro2.add_data(f"my_pid(2): {os.getpid()}"))
