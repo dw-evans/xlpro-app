@@ -3,21 +3,24 @@ import datetime, os, threading
 
 from server import xlproServerAsync
 
-# xlpro = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+# # now works with the progid after registering it in the registry
+# xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
+# xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
+
+# # xlpro and xlpro2 are the same instance :)
+
 # xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+# print(xlpro.add_data(f"my_pid(1): {os.getpid()}"))
+# print(xlpro2.add_data(f"my_pid(2): {os.getpid()}"))
+# # https://web.archive.org/web/20140917092059/http://www.devshed.com/c/a/Python/Windows-Programming-in-Python-Creating-COM-Servers/
 
-# now works with the progid after registering it in the registry
+
 xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
-xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
+xlpro.register_functions_in_self()
 
-# xlpro and xlpro2 are the same instance :)
+ret1 = xlpro.execute_function("add_numbers", 10, 20)
 
-print(xlpro.add_data(f"my_pid(1): {os.getpid()}"))
-print(xlpro2.add_data(f"my_pid(2): {os.getpid()}"))
+ret2 = xlpro.execute_function_async("")
 
-xlpro2 = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
-print(xlpro.add_data(f"my_pid(1): {os.getpid()}"))
-print(xlpro2.add_data(f"my_pid(2): {os.getpid()}"))
-# https://web.archive.org/web/20140917092059/http://www.devshed.com/c/a/Python/Windows-Programming-in-Python-Creating-COM-Servers/
 
 pass

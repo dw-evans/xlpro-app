@@ -15,6 +15,7 @@ import win32com.server.policy
 
 import datetime
 import numpy as np
+import pywintypes
 
 import utils
 
@@ -36,9 +37,10 @@ class xlproServerAsync:
     _public_methods_ = [
         'getpid',
         "add_data",
-        # "register_functions_in_vba",
-        # "register_functions_in_self",
-        # "execute_function_async",
+        "register_functions_in_vba",
+        "register_functions_in_self",
+        "execute_function",
+        "execute_function_async",
     ]
     _reg_progid_ = 'xlproServerAsync.Application'
     _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
@@ -62,34 +64,32 @@ class xlproServerAsync:
             # XXX something errors in the init function and closes the server
             # Debugger is not cut out to catch these errors.
 
-            # self._func_register = {}
-            # self._register_functions_in_self()
+            self._func_register = {}
+            # self.register_functions_in_self()
 
-            # # store the results uuid: result
-            # self._func_hash_results_map = {}
-            # self._func_hash_results_map_lock = threading.Lock()
-            # self._func_hash_result_iscomplete_map = {}
+            # store the results uuid: result
+            self._func_hash_results_map = {}
+            self._func_hash_results_map_lock = threading.Lock()
+            self._func_hash_result_iscomplete_map = {}
 
-            # # maps the uid to the caller and function hash
-            # self._func_hash_to_caller_map = {}
+            # maps the uid to the caller and function hash
+            self._func_hash_to_caller_map = {}
 
-            # # map the uuid to the working thread
-            # # self._func_hash_to_working_thread_map = {}
+            # map the uuid to the working thread
+            # self._func_hash_to_working_thread_map = {}
 
-            # self._result_queue = queue.Queue() # stores the results as they come in
+            self._result_queue = queue.Queue() # stores the results as they come in
+            self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
 
-            # # results manager handles processing the queue of results as they come in
-            # # and signalling to the client manager to execute commands.
-            # self._results_manager_thread:ResultsManagerThread = ResultsManagerThread(server=self)
-            # self._results_manager_thread.start()
-
-            # self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
-
-            # self._client_manager
-
+            # results manager handles processing the queue of results as they come in
+            # and signalling to the client manager to execute commands.
+            self._results_manager_thread:ResultsManager = ResultsManager(server=self)
+            self._results_manager_thread.start()
 
             # self._wb:xl._Workbook = None
             # self._client_manager:ClientManager = None
+            self._client_manager = ClientManager(server=self)
+            self._client_manager.start()
 
 
         else:
@@ -99,8 +99,8 @@ class xlproServerAsync:
     def register_workbook(self, thiswb):
         """Register the workbook client of the xlpro server."""
         self._wb = win32com.client.Dispatch(thiswb)
-        # XXX I am concerned about accessing this from a different thread./,K
-        self._client_manager = ClientManager(self)
+        # XXX - I am concerned about accessing this from a different thread
+        # self._client_manager = ClientManager(self)
 
     def getpid(self):
         return os.getpid()
@@ -113,7 +113,7 @@ class xlproServerAsync:
         logger.debug(f"self._data = {self._data}")
         return f"self._data is now {self._data}"
     
-    def _register_functions_in_self(self):
+    def register_functions_in_self(self):
         self._func_register = utils.load_functions_from_file(
             "xlpro_register", 
             wd / "xlpro_register.py",
@@ -122,7 +122,7 @@ class xlproServerAsync:
 
     def register_functions_in_vba(self, thisworkbook):
         wb = win32com.client.Dispatch(thisworkbook)
-        self._register_functions_in_self()
+        self.register_functions_in_self()
         funcs = [v for k,v in self._func_register.items()]
         utils.init_xlpro_vb_dynamic_component(wb, funcs)
         return
@@ -137,7 +137,8 @@ class xlproServerAsync:
         except Exception as e:
             return str(e)
 
-    def execute_function_async(self, caller, func_name, *args) -> str:
+    def execute_function_async(self, caller, func_name, *args):
+    # def execute_function_async(self, func_name, *args) -> str:
         try:
             # fetch the function that is being called.
             func = self._func_register.get(func_name)
@@ -149,16 +150,24 @@ class xlproServerAsync:
 
             # if the hash of the function has been marked complete, return that
             # avoid computation
-            if self._func_hash_result_iscomplete_map[uid]:
+            if uid in self._func_hash_result_iscomplete_map.keys():
                 return self._func_hash_results_map[uid]
 
             # Get the caller and convert it to a range to store.
             # Range object needed to handle dynamic addresses.
-            caller_dispatch = win32com.client.Dispatch(caller)
-            self._func_hash_to_caller_map[uid] = caller_dispatch
+            map_to_caller = True
+            if map_to_caller:
+                caller_dispatch = win32com.client.Dispatch(caller)
+                # marshal the thread for threaded use
+                caller_marshal = pythoncom.CoMarshalInterThreadInterfaceInStream(
+                    pythoncom.IID_IDispatch,
+                    # caller_dispatch._oleobj_
+                    caller_dispatch,
+                )
+                self._func_hash_to_caller_map[uid] = caller_marshal
+                pass
 
-            # continue with computing...
-            # create the daemon thread to run the function
+            # create the daemon thread to compute the result
             t = self._create_and_register_async_worker(uid, func, args, kwargs={})
             t.start()
 
@@ -168,7 +177,6 @@ class xlproServerAsync:
         except Exception as e:
             return str(e)
         
-        
     def _generate_uid(self):
         return uuid()
         
@@ -177,12 +185,12 @@ class xlproServerAsync:
             ret = func(*args, **kwargs)
             # add to queue and wake manager.
             self._result_queue.put((uid, ret))
-            self._func_hash_result_iscomplete_map = True
+            self._func_hash_result_iscomplete_map[uid] = True
             self._results_manager_thread.wake()
 
         t = threading.Thread(target=func_wrapper, daemon=True)
         self._func_hash_results_map[uid] = f"Working on result<{uid}>..."
-        self._func_hash_result_iscomplete_map = False
+        self._func_hash_result_iscomplete_map[uid] = False
         # self._func_hash_to_working_thread_map[uid] = t
 
         return t
@@ -190,7 +198,7 @@ class xlproServerAsync:
         
 import time
  
-class ResultsManagerThread:
+class ResultsManager:
     def __init__(self, server:xlproServerAsync):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
@@ -199,6 +207,8 @@ class ResultsManagerThread:
 
     def start(self):
         self._thread.start()
+        self._thread
+        logger.info(f"ResultsManager thread started: tid: {threading.get_native_id()}")
 
     def stop(self):
         self._stop_event.set()
@@ -212,11 +222,11 @@ class ResultsManagerThread:
         """When awakened, retrieves the result queue and 
         sends to the server cache."""
         while not self._stop_event.is_set():
-            print("Watcher is waiting for events or timeout...")
+            logger.info("ResultsManager thread is waiting for events or timeout...")
             self._wake_event.wait(timeout=5)
             if self._wake_event.is_set():
                 self._wake_event.clear()
-                print("Watcher woke up for an event!")
+                logger.info("ResultsManager thread woke up for an event!")
                
                 # Process the whole queue once woken up
                 # XXX - could replace while trye with while not stop event.
@@ -225,11 +235,17 @@ class ResultsManagerThread:
                         uid, val = self._server._result_queue.get()
                     except queue.Empty:
                         break
-                    
+                    pass
                     # add the result to the server cache and signal update to client manager
                     with self._server._func_hash_results_map_lock:
                         self._server._func_hash_results_map[uid] = val
-                        self._server._client_manager._recalculate_cell(self._server._func_hash_to_caller_map[uid])
+                        self._server._recalculate_queue.put((
+                            uid, 
+                            self._server._func_hash_to_caller_map[uid]
+                        ))
+                        self._server._client_manager.wake()
+                        pass
+                        # self._server._client_manager._recalculate_cell(self._server._func_hash_to_caller_map[uid])
 
                     time.sleep(0.01) # fairness sleep
 
@@ -244,12 +260,110 @@ class ClientManager:
         self._server = server
         pass
 
+    def __init__(self, server:xlproServerAsync):
+        self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
+        self._thread = threading.Thread(target=self._watch, daemon=True)
+        self._server = server
+
+    def start(self):
+        self._thread.start()
+        self._thread
+        logger.info(f"ClientManager thread started: tid: {threading.get_native_id()}")
+
+    def stop(self):
+        self._stop_event.set()
+        self._wake_event.set()  # Wake up if sleeping
+        self._thread.join()
+
+    def wake(self):
+        self._wake_event.set()
+
     def _recalculate_cell(self, cell:xl.Range):
         cell.Calculate()
 
+    def comarshal_range(self, range_marshal) -> xl.Range:
+        range_pyidispatch = pythoncom.CoGetInterfaceAndReleaseStream(
+            range_marshal, pythoncom.IID_IDispatch,
+        )
+        range_dispatch = win32com.client.Dispatch(range_pyidispatch)
+        return range_dispatch
+
+    def _process_queue(self):
+        """Process the queue at the current point in time. Any failed attempts get
+        added back into the queue.
+        Probably need to 
+        """
+        # XXX - Warning that qsize() is not thread safe. Shouldn't be an issue.
+        queue_length = self._server._recalculate_queue.qsize()
+        for _ in range(queue_length):
+            try:
+                uid, caller_marshal = self._server._recalculate_queue.get()
+            except queue.Empty:
+                return
+            pass
+
+            # if we fail to dispatch the range, it was probably deleted.
+            # therefore we don't need to replace it in the queue
+            replace_in_queue = True
+            try:
+                caller_dispatch = self.comarshal_range(caller_marshal)
+            except pywintypes.com_error as e:
+                logger.error(f"ClientManager _process_queue() COM Exception: '{e}', uid: '{uid}'")
+                replace_in_queue = True
+
+            # Updates will fail if excel application has a dialogue open for example.
+            # Give it back to the queue to handle later.
+            try:
+                caller_dispatch.__getattr__("Formula2")
+                caller_dispatch.Formula2 = caller_dispatch.Formula2
+            except (AttributeError, pywintypes.com_error) as e:
+                # At this point 
+                # XXX - Marshalling the caller back to the pool (not that we plan on using
+                # this object elsewhere)
+                logger.info(f"Could not recalculate caller_dispatch for uid: '{uid}'")
+                caller_marshalled_back = pythoncom.CoMarshalInterThreadInterfaceInStream(
+                    pythoncom.IID_IDispatch, 
+                    caller_dispatch,
+                )
+                if replace_in_queue:
+                    self._server._recalculate_queue.put((uid, caller_marshalled_back))
+
+            time.sleep(0.01) # fairness sleep
 
 
+    def _watch(self):
+        """When awakened, retrieves the result queue and sends to the server cache.
+        """
+        pythoncom.CoInitialize()
+
+        while not self._stop_event.is_set():
+            # wait for ten seconds for an event, otherwise do a queue process to check for 
+            # outstanding tasks.
+            logger.info("ClientManager thread is waiting for events or timeout...")
+            self._wake_event.wait(timeout=10)
+            if self._wake_event.is_set():
+                self._wake_event.clear()
+                logger.info("ClientManager thread woke up for an event!")
+            self._process_queue()
+
+            # XXX - todo - could check for the exit event during the loop also.
+            if self._stop_event.is_set():
+                break
+
+        pythoncom.CoUninitialize()
+        
+
+def test_server():
+    
+    server = xlproServerAsync()
+    server.register_functions_in_self()
+
+    r1 = server.execute_function_async("dummy", 10, 20)
+    time.sleep(6.0)
+    r2 = server.execute_function_async("dummy", 10, 20)
+    pass
 
 
 if __name__ == '__main__':
-    ...
+    test_server()
