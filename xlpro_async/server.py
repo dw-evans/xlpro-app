@@ -6,6 +6,8 @@ import os
 
 import threading
 import queue
+import multiprocessing
+import time
 
 import pythoncom
 import win32com.client
@@ -21,6 +23,9 @@ import utils
 
 from win32typelibs import excel as xl
 
+import matplotlib.figure
+
+
 wd = Path(__file__).parent
 
 
@@ -31,6 +36,15 @@ class uuid:
     def __new__(cls):
         cls.count += 1
         return cls.count
+
+def load_functions_from_register() -> dict:
+    """Returns a dict of functions found in the xlpro registry module.
+    name: function. Runs all the imports too :)
+    """
+    return utils.load_functions_from_file(
+            "xlpro_register", 
+            wd / "xlpro_register.py",
+        )
 
 
 class xlproServerAsync:
@@ -67,19 +81,32 @@ class xlproServerAsync:
             self._func_register = {}
             # self.register_functions_in_self()
 
-            # store the results uuid: result
-            self._func_hash_results_map = {}
+            self._func_hash_result_display_map = {} # the result to be displayed
+            self._func_hash_result_display_map_lock = threading.Lock()
+
+            self._func_hash_results_map = {} # the actual results
             self._func_hash_results_map_lock = threading.Lock()
             self._func_hash_result_iscomplete_map = {}
 
+            self._func_hash_result_type = {}
+            self._func_hash_result_type_lock = threading.Lock()
+
+            # function types: standard, figure, ...image...? Anything else...
+            # could just tag the results hash map, or create a dict that keeps the func hash and output type
+            # self._func_hash_figure_map = {} # dict that matches func call hash to the output figure.
+
             # maps the uid to the caller and function hash
             self._func_hash_to_caller_map = {}
+            self._func_hash_to_caller_map_lock = threading.Lock() # XXX - todo - not used currently
 
-            # map the uuid to the working thread
-            # self._func_hash_to_working_thread_map = {}
+            # maps the live processes and threads in the background.
+            # self._func_hash_to_thread_map = {} # XXX - not used
+            # self._func_hash_to_process_map = {} # XXX - not used
 
-            self._result_queue = queue.Queue() # stores the results as they come in
+            self._threaded_result_queue = queue.Queue() # stores the results as they come in
             self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
+
+            self._multiprocessing_figure_result_queue = multiprocessing.Queue() # stores the multiprocessing results
 
             # results manager handles processing the queue of results as they come in
             # and signalling to the client manager to execute commands.
@@ -90,7 +117,6 @@ class xlproServerAsync:
             # self._client_manager:ClientManager = None
             self._client_manager = ClientManager(server=self)
             self._client_manager.start()
-
 
         else:
             logger.info("__init__ called however the singleton already exists and has been initialized.")
@@ -114,10 +140,7 @@ class xlproServerAsync:
         return f"self._data is now {self._data}"
     
     def register_functions_in_self(self):
-        self._func_register = utils.load_functions_from_file(
-            "xlpro_register", 
-            wd / "xlpro_register.py",
-        )
+        self._func_register = load_functions_from_register()
         return
 
     def register_functions_in_vba(self, thisworkbook):
@@ -137,7 +160,7 @@ class xlproServerAsync:
         except Exception as e:
             return str(e)
 
-    def execute_function_async(self, caller, func_name, *args):
+    def execute_function_async(self, result_type:ResultType, caller, func_name, *args):
     # def execute_function_async(self, func_name, *args) -> str:
         try:
             # fetch the function that is being called.
@@ -151,7 +174,13 @@ class xlproServerAsync:
             # if the hash of the function has been marked complete, return that
             # avoid computation
             if uid in self._func_hash_result_iscomplete_map.keys():
-                return self._func_hash_results_map[uid]
+                # return self._func_hash_results_map[uid]
+                return self._func_hash_result_display_map[uid]
+
+            # check the result_type is valid.
+            if not result_type in ResultType.as_list():
+                raise Exception(f"ResultType identifier is not valid, v={result_type}, valids={ResultType.as_list()}")
+            self._func_hash_result_type[uid] = result_type
 
             # Get the caller and convert it to a range to store.
             # Range object needed to handle dynamic addresses.
@@ -167,16 +196,27 @@ class xlproServerAsync:
                 self._func_hash_to_caller_map[uid] = caller_marshal
                 pass
 
-            # create the daemon thread to compute the result
-            t = self._create_and_register_async_worker(uid, func, args, kwargs={})
-
-            self._func_hash_results_map[uid] = f"Promise<{uid}>"
+            # self._func_hash_results_map[uid] = f"Promise<{uid}>"
+            self._func_hash_result_display_map[uid] = f"Promise<{uid}>"
             self._func_hash_result_iscomplete_map[uid] = False
 
-            t.start()
+            if result_type == ResultType.default:
+                # create the daemon thread to compute the result
+                t = self._create_and_register_async_worker(uid, func, args, kwargs={})
+                t.start()
+            elif result_type == ResultType.figure:
+                fig_generating_thread = FigureGeneratingThread(
+                    uid=uid,
+                    func_name=func_name,
+                    args=args,
+                    kwargs={},
+                    return_value_queue=self._threaded_result_queue, 
+                    return_event=self._results_manager_thread._wake_event,
+                )
+                fig_generating_thread.start()
 
             # return the result (will be incomplete)
-            return self._func_hash_results_map[uid]
+            return self._func_hash_result_display_map[uid]
 
         except Exception as e:
             return str(e)
@@ -185,23 +225,133 @@ class xlproServerAsync:
         return uuid()
         
     def _create_and_register_async_worker(self, uid, func, args, kwargs):
+        
         def func_wrapper():
             ret = func(*args, **kwargs)
             # add to queue and wake manager.
-            self._result_queue.put((uid, ret))
+            self._threaded_result_queue.put((uid, ret))
             self._func_hash_result_iscomplete_map[uid] = True
             self._results_manager_thread.wake()
 
         t = threading.Thread(target=func_wrapper, daemon=True)
-
-        # self._func_hash_to_working_thread_map[uid] = t
-
         return t
-
+    
+    def _create_and_register_figure_generating_process(self, uid, func, args, kwargs):
+        def func_wrapper():
+            fig = func(*args, **kwargs)
+            
+            fig:matplotlib.figure.Figure
+            exec('matplotlib.use("Agg")')
+            fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
+            fp.mkdir(parents=True, exist_ok=True)
+                
+            fig.savefig(wd / ".xlpro" / "tmp" / f"{uid}",)
+            fig.savefig(fp, dpi=600)
         
-import time
- 
+            # add to queue and wake manager.
+            self._multiprocessing_figure_result_queue.put((uid, fp.resolve()))
+            self._results_manager_thread.wake()
+
+        global _MULTIPROCESS_FUNCTION
+        _MULTIPROCESS_FUNCTION = func_wrapper
+
+        p = multiprocessing.Process(target=_MULTIPROCESS_FUNCTION, daemon=True)
+        return p
+
+
+
+class FigureGeneratingThread:
+    """Class which maintains a thread which waits for a process to finish."""
+    def __init__(self, uid, func_name, args, kwargs, return_value_queue, return_event):
+        self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+        self._return_event = return_event
+        self._return_queue = return_value_queue        
+
+        self._process:multiprocessing.Process = None
+        self._multiprocess_queue = multiprocessing.Queue()
+
+        self._uid = uid
+        self._func_name = func_name
+        self._args = args
+        self._kwargs = kwargs
+
+
+    def start(self):
+        # start the watcher
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        self._wake_event.set()  # Wake up if sleeping
+        self._thread.join()
+
+    def wake(self):
+        self._wake_event.set()
+
+    def _create_process(self) -> multiprocessing.Process:
+
+        p = multiprocessing.Process(
+            target=figure_process_func, 
+            daemon=True,
+            kwargs={
+                "uid": self._uid,
+                "func_name": self._func_name,
+                "args": self._args,
+                "kwargs": self._kwargs,
+                "queue": self._multiprocess_queue,
+            }
+        )
+        return p
+    
+    def _run(self): 
+        # logger.info(f"Starting FigureGeneratingThread process within thread, {threading.get_native_id()}")
+        p = self._create_process()
+
+        p.start()
+        p.join() # once joined, we can check the queue
+
+        # get the uid and value (figure path in this case)
+        uid, val = self._multiprocess_queue.get()
+
+        # send the uid/value combo to the return queue
+        # the return queue should always be the value return queue 
+        self._return_queue.put((uid, val))
+        self._return_event.set()
+
+        pass
+        
+
+def figure_process_func(uid, func_name, args, kwargs, queue):
+    func = setup_scope_and_get_function(func_name)
+    fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fig:matplotlib.figure.Figure = func(*args, **kwargs)
+    fig.savefig(fp, dpi=600)
+    queue.put((uid, fp))
+    pass
+
+def setup_scope_and_get_function(func_name):
+    import sys, os
+    func_map = load_functions_from_register()
+    func = func_map[func_name]
+    return func
+
+
+
+class ResultType:
+    default = 0
+    figure = 1
+    @classmethod
+    def as_list(cls):
+        return [value for key, value in vars(cls).items() if isinstance(value, int)]
+        
+
+
 class ResultsManager:
+
     def __init__(self, server:xlproServerAsync):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
@@ -221,39 +371,64 @@ class ResultsManager:
     def wake(self):
         self._wake_event.set()
 
+    def _set_results_value(self, uid, val):
+        with self._server._func_hash_results_map_lock:
+            self._server._func_hash_results_map[uid] = val
+
+    def _process_queue_element(self, type):
+        """Processes either the multiprocessing or threaded results queues"""
+        # getting the value tells us the result is complete
+        uid, val = self._server._threaded_result_queue.get()
+        self._server._func_hash_result_iscomplete_map[uid] = True
+
+        # with self._server._func_hash_result_type_lock:
+        #     result_type = self._server._func_hash_result_type[uid]
+        # if result_type == ResultType.default:
+        #     # set the results value to the actual value
+        #     self._set_results_value(uid, val)
+        # elif result_type == ResultType.figure:
+        #     # set the result to the file path.... not necessary anymore
+        #     # XXX - todo - redundant, the value is loaded into the queue as it is meant to
+        #     self._set_results_value(uid, val)
+
+        self._set_results_value(uid, val)
+        
+        self._server._recalculate_queue.put(uid)
+
+        # wake the client manager to update the client
+        self._server._client_manager.wake()
+
+    
     def _watch(self):
-        """When awakened, retrieves the result queue and 
-        sends to the server cache."""
+        """When awakened, retrieves the result queue and sends to the server cache.
+        ResultsManager can reliably be woken up so no need for background checking.
+        Unlike the ClientManager
+        """
         while not self._stop_event.is_set():
             logger.info("ResultsManager thread is waiting for events or timeout...")
             self._wake_event.wait(timeout=5)
             if self._wake_event.is_set():
                 self._wake_event.clear()
                 logger.info("ResultsManager thread woke up for an event!")
-               
                 # Process the whole queue once woken up
                 # XXX - could replace while trye with while not stop event.
                 while True:
-                    try:
-                        uid, val = self._server._result_queue.get()
-                    except queue.Empty:
-                        break
-                    pass
-                    # add the result to the server cache and signal update to client manager
-                    with self._server._func_hash_results_map_lock:
-                        self._server._func_hash_results_map[uid] = val
-                        self._server._recalculate_queue.put((
-                            uid, 
-                            self._server._func_hash_to_caller_map[uid]
-                        ))
-                        self._server._client_manager.wake()
-                        pass
-                        # self._server._client_manager._recalculate_cell(self._server._func_hash_to_caller_map[uid])
+                    b1, b2 = False, False
+                    if not b1:
+                        try:
+                            self._process_queue_element("threaded")
+                        except queue.Empty:
+                            b1 = True
+                    if not b2:
+                        try:
+                            self._process_queue_element("process")
+                        except queue.Empty:
+                            b1 = True
 
                     time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
-                break  # Exit if stop event is set
+                break 
 
 
 class ClientManager:
@@ -282,60 +457,122 @@ class ClientManager:
     def wake(self):
         self._wake_event.set()
 
-    def _recalculate_cell(self, cell:xl.Range):
-        cell.Calculate()
-
-    def comarshal_range(self, range_marshal) -> xl.Range:
-        range_pyidispatch = pythoncom.CoGetInterfaceAndReleaseStream(
-            range_marshal, pythoncom.IID_IDispatch,
+    def _comarshal_com_object(self, com_obj_marshal) -> xl.Range:
+        """Convert a comarshalled range to a range dispatch (or any object)"""
+        com_obj_pyidispatch = pythoncom.CoGetInterfaceAndReleaseStream(
+            com_obj_marshal, pythoncom.IID_IDispatch,
         )
-        range_dispatch = win32com.client.Dispatch(range_pyidispatch)
-        return range_dispatch
+        com_obj_dispatch = win32com.client.Dispatch(com_obj_pyidispatch)
+        return com_obj_dispatch
+    
+    def _set_result_display(self, uid, val) -> None:
+        with self._server._func_hash_result_display_map_lock:
+            self._server._func_hash_result_display_map[uid] = val
+
+    def _get_result_display(self, uid):
+        with self._server._func_hash_results_map_lock:
+            return self._server._func_hash_results_map[uid]
+        
+    def _get_value(self, uid):
+        with self._server._func_hash_results_map_lock:
+            return self._server._func_hash_results_map[uid]
+
+
+    def _get_caller(self, uid):
+        with self._server._func_hash_to_caller_map_lock:
+            return self._comarshal_com_object(self._server._func_hash_to_caller_map[uid])
+        
+    def _get_unmarshalled_com_object(com_object):
+        return pythoncom.CoMarshalInterThreadInterfaceInStream(
+            pythoncom.IID_IDispatch, 
+            com_object,
+        )
+    def _unmarshal_com_object(self, com_object):
+        return pythoncom.CoMarshalInterThreadInterfaceInStream(
+            pythoncom.IID_IDispatch, 
+            com_object,
+        )
+        
+
+    def _update_client_default(self, uid) -> None:
+        """Update the data for the default case (row-major arrays, strings, values)"""
+        caller_dispatch = self._get_caller(uid)
+        val = self._get_value(uid)
+        self._set_result_display(uid, val)
+
+        # update by resetting the formula
+        caller_dispatch.Formula2 = caller_dispatch.Formula2
+
+        self._unmarshal_com_object(caller_dispatch)
+
+
+
+    def _update_client_figure(self, uid) -> None:
+        """Update the data for the figure case - add a figure image to the spreadsheet"""
+
+        caller_dispatch = self._get_caller(uid)
+        val:Path = self._get_value(uid)
+
+        self._set_result_display(uid, repr(val))
+
+        caller_adjacent = caller_dispatch.Cells(2,1)
+        xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
+
+        ws = caller_adjacent.Parent
+        ws.Shapes.AddPicture(str(val.resolve()), False, True, xpos, ypos, 1000, 1000)
+
+        self._unmarshal_com_object(caller_dispatch)
+
+        self._update_client_default(uid)
+
 
     def _process_queue(self):
         """Process the queue at the current point in time. Any failed attempts get
-        added back into the queue.
-        Probably need to 
+        added back into the queue if appropriate.
         """
         # XXX - Warning that qsize() is not thread safe. Shouldn't be an issue.
         queue_length = self._server._recalculate_queue.qsize()
         for _ in range(queue_length):
             try:
-                uid, caller_marshal = self._server._recalculate_queue.get()
+                uid = self._server._recalculate_queue.get()
             except queue.Empty:
                 return
             pass
-
+            # fetch the result type so we know how to handle it
+            with self._server._func_hash_result_type_lock:
+                result_type = self._server._func_hash_result_type[uid]
             # if we fail to dispatch the range, it was probably deleted.
             # therefore we don't need to replace it in the queue
             replace_in_queue = True
+
+            # Decide whether to recycle
             try:
-                caller_dispatch = self.comarshal_range(caller_marshal)
+                if result_type == ResultType.default:
+                    self._update_client_default(uid)
+                elif result_type == ResultType.figure:
+                    self._update_client_figure(uid)
+                else:
+                    raise Exception("Result type invalid")
+
+                # XXX - todo - consider removing the uid after this call
+
             except pywintypes.com_error as e:
                 if VBErrorConverter(e) == VBError.xlObjectRequired:
-                    logger.error(f"ClientManager _process_queue() COM Exception: '{e}', uid: '{uid}'")
+                    # Range has been deleted
                     replace_in_queue = False
-                else:
-                    logger.error(f"ClientManager _process_queue() COM Exception: '{e}', uid: '{uid}'")
+                    logger.warning("Object Required. Cell has been deleted. Removing from queue.")
+                    # XXX - todo - if this is dropped from the queue the uid definitely needs to be marked for delete.
 
+                elif VBErrorConverter(e) == VBError.xlCallRejectedByCallee:
+                    # Call rejected - user might be in a dialogue
+                    logger.debug("Call rejected, recycling in queue")
 
-            # Updates will fail if excel application has a dialogue open for example.
-            # Give it back to the queue to handle later.
-            try:
-                caller_dispatch.__getattr__("Formula2")
-                caller_dispatch.Formula2 = caller_dispatch.Formula2
-                # XXX - todo - consider removing the uid after this call.
-            except (AttributeError, pywintypes.com_error) as e:
-                # At this point 
-                # XXX - Marshalling the caller back to the pool (not that we plan on using
-                # this object elsewhere)
+                # XXX - Marshalling the caller back to the pool in case
                 logger.info(f"Could not recalculate caller_dispatch for uid: '{uid}'")
-                caller_marshalled_back = pythoncom.CoMarshalInterThreadInterfaceInStream(
-                    pythoncom.IID_IDispatch, 
-                    caller_dispatch,
-                )
+
+                # if we failed to update, recycle the queue as necessary
                 if replace_in_queue:
-                    self._server._recalculate_queue.put((uid, caller_marshalled_back))
+                    self._server._recalculate_queue.put(uid)
 
             time.sleep(0.01) # fairness sleep
 
@@ -362,11 +599,6 @@ class ClientManager:
         pythoncom.CoUninitialize()
 
 
-"""
--2147418111: call was rejected by callee
--2146827864: object required
-
-"""
 class VBError:
     xlCallRejectedByCallee = 1  # Call Rejected by Callee (Custom errors)
     xlObjectRequired = 424  # Object required (when an object is not available or specified)
@@ -407,7 +639,6 @@ class VBError:
     xlUserDefinedError = 9999  # Custom user-defined error (error raised explicitly by VBA code)
 
 
-
 class VBErrorConverter:
     def __new__(cls, e):
         if isinstance(e, pythoncom.com_error):
@@ -415,14 +646,17 @@ class VBErrorConverter:
         elif isinstance(e, int):
             e_hresult = e
         else:
-            raise TypeError(f"Type {type(e)} is not allowed")
+            return -1 # -1 flags an invalid call, any eq comparisons will fail
+        # return the second half of the OLE Automation Error code.
         return VBErrorConverter.convert_hresult_to_vba_codes(e_hresult)[1]
         
+    @staticmethod
     def convert_hresult_to_32b_signed(hresult):
         """Convert a signed 32-bit HRESULT to its unsigned hexadecimal representation."""
         # Ensure the number is treated as a 32-bit unsigned integer
         hex_value = hresult & 0xFFFFFFFF
         return hex_value
+    
     @staticmethod
     def convert_hresult_to_vba_codes(hresult):
         """Returns the Facility Code, Error Code of an hresult"""
