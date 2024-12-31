@@ -26,8 +26,8 @@ def init_xl():
 xlapp:xl._Application
 wb:xl._Workbook
 
-VB_DYNAMIC_MODULE_NAME = "xlpro"
-VB_STATIC_MODULE_NAME = "xlpro_static"
+VB_DYNAMIC_MODULE_NAME = "xlpro_async"
+# VB_STATIC_MODULE_NAME = "xlpro_static"
 
 def myfunc(a:float, b:int, c:str, d) -> str:
     """the docstring hehehe"""
@@ -69,14 +69,19 @@ vb_type_conversion_strings = {
 vb_type_declaration_strings = {
     int: "{} As Integer",
     float: "{} As Double",
-    bool: "{} As Boonlean",
+    bool: "{} As Boolean",
     str: "{} As String",
     Any: "{} As Variant",
 }
 
-vb_ = {
-    "Optional {} As {} = {}",
-}
+# vb_ = {
+#     "Optional {} As {} = {}",
+# }
+
+import textwrap
+vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
+    {arg} = {arg}.Value
+EndIf"""
 
 
 def convert_to_array_if_range(arg:Any):
@@ -95,18 +100,49 @@ def wrap_function_with_caller_arg(func):
         
     return wrapper
 
-def function_template_with_caller(func:Callable):
+import numpy as np
+
+import matplotlib.figure
+def get_func_type(func) -> int:
+    # XXX - todo - link this up with the enum in the server at some point
+    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    if ret_type == matplotlib.figure.Figure:
+        return 1
+    return 0
+
+def function_template_with_caller(func:Callable) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
-    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    func_type = get_func_type(func)
+
+    func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     docstring = func.__doc__
     arg_declaration_list = []
     arg_conversion_list = []
-    
+    arg_range_conversion_check_list = []
+
+    # if an argument is an array, convert any range to its values.
+    # if isinstance(t, typing.Iterable)
+    #   if TypeName(a) = "Range" then
+    #   t = t.Value
+
     for a, t in args_and_types:
-        arg_declaration_list.append(vb_type_declaration_strings[t].format(a))
-        arg_conversion_list.append(vb_type_conversion_strings[t].format(a))
+        if vb_type_declaration_strings.get(t, None):
+            arg_declaration_list.append( vb_type_declaration_strings[t].format(a))
+        else:
+            arg_declaration_list.append("{} As Variant".format(a))
+        if vb_type_conversion_strings.get(t, None):
+            arg_conversion_list.append(vb_type_conversion_strings[t].format(a))
+        else:
+            arg_conversion_list.append("{}".format(a))
+        if a not in ["caller", "thiswb"]:
+            if t not in [float, int, bool, str]:
+                arg_range_conversion_check_list.append(
+                    textwrap.indent(vb_range_conversion_check_string.format(arg=a), "    ")
+            )
+
+    # XXX - todo - ensure no reserved vba arguments are parsed!   
     
     a_list = [a for a, t in args_and_types]
     # handle the reserved caller keyword
@@ -122,31 +158,19 @@ def function_template_with_caller(func:Callable):
         arg_idxs_to_del.append(indx)
         arg_conversion_list[indx] = "ThisWorkbook"
 
+    pass
+
     if arg_idxs_to_del:
         arg_idxs_to_del.sort(reverse=True)
         for idx in arg_idxs_to_del:
             del arg_declaration_list[idx]
 
-    # a_list_new = 
-    # for a in :
-    #     if a in default_value_map.keys():
-    #         idx = arg_declaration_list.index(a)
-            
-
-    #     return f"""Function {f_name}({', '.join(arg_declaration_list)}) as Variant
-    #     On Error GoTo ErrorHandler
-    #     initialize_xlpro
-    #     {f_name} = g_xlpro.execute_function("{f_name}", {', '.join(arg_conversion_list)})
-    # ErrorHandler:
-    #     If Err.Number <> 0 Then
-    #         MsgBox Err.Description
-    #     End If
-    #     Resume Next
-    # End Function
-    # """
-    return f"""Function {f_name}({', '.join(arg_declaration_list)}) as Variant
-    initialize_xlpro
-    {f_name} = g_xlpro.execute_function("{f_name}", {', '.join(arg_conversion_list)})
+    return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
+    Dim xlpro_async As Object
+    Set xlpro_async = CreateObject("xlproServerAsync.Application")
+    xlpro_async.register_functions_in_self
+{'\n'.join(arg_range_conversion_check_list)}
+    {func_name} = xlpro_async.execute_function_async({func_type}, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
 """
 
@@ -168,7 +192,6 @@ def write_to_vb_module(s:str, vb_codemod:vbide._CodeModule):
     vb_codemod.DeleteLines(1, vb_codemod.CountOfLines)
     vb_codemod.AddFromString(s)
 
-
 def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable]):
     """Write a list of commands to be registered in vba."""
     vb_dynamic_comdemod = get_or_create_codemodule(wb, VB_DYNAMIC_MODULE_NAME)
@@ -185,12 +208,20 @@ def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable
 
 from functools import wraps
 
+# XXX - todo implement a 
+def type_converter_wrapper(func):
+    """Converts the inbound data from excel into the types specified by the user 
+    e.g. The user specifies a numpy array, the inbound argument is converted from a row
+    major tuple to a numpy array
+    """
+    ...
+
 def dispatch_converter_wrapper(func):
     """Wraps a function so that the arguments are dispatched when they
     come to python. Saves the user needing to do this. Some of the secret
     sauce...
     """
-    @wraps
+    @wraps(func)
     def wrapper(*args):
         f_name, args_and_types, ret_type, _ = get_function_signature(func)
         arg_names = [v0 for v0, v1 in args_and_types]
@@ -224,7 +255,7 @@ def load_functions_from_file(module_name, file_path):
     functions = {
         name: getattr(module, name)
         for name in dir(module)
-        if callable(getattr(module, name))
+        if callable((v:=getattr(module, name))) and not type(v) == type
     }
     return functions
 
@@ -242,6 +273,27 @@ def hash_function_call(func, *args, **kwargs):
     # Generate a hash using SHA-256 (you can also use MD5 or others depending on your needs)
     hash_object = hashlib.sha256(combined.encode('utf-8'))
     return hash_object.hexdigest()
+
+def hash_function_call(func, args, kwargs):
+    # Create a unique string based on the function name and its arguments
+    func_name = func.__name__
+    # Convert arguments to a string (including both positional and keyword arguments)
+    args_str = str(args)
+    kwargs_str = str(kwargs)
+
+    # Combine the function name with its arguments
+    combined = func_name + args_str + kwargs_str
+
+    # Generate a hash using SHA-256 (you can also use MD5 or others depending on your needs)
+    hash_object = hashlib.sha256(combined.encode('utf-8'))
+    return hash_object.hexdigest()
+
+import uuid
+def create_random_hash():
+    r = str(uuid.uuid4())
+    return hashlib.sha256(r.encode('utf-8')).hexdigest()
+
+
 
 if __name__ == "__main__":
 

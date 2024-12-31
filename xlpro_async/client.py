@@ -15,6 +15,10 @@ from server import xlproServerAsync
 # # https://web.archive.org/web/20140917092059/http://www.devshed.com/c/a/Python/Windows-Programming-in-Python-Creating-COM-Servers/
 
 
+xlapp = win32com.client.Dispatch("Excel.Application")
+
+
+
 xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
 xlpro.register_functions_in_self()
 

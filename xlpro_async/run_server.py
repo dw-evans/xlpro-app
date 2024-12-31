@@ -35,26 +35,32 @@ loop = asyncio.new_event_loop()
 
 def serve():
     pythoncom.CoInitialize()
-    # we need to register everything dynamically using the clsid only.
+
+    # we register everything dynamically using the clsid only.
     # the progid must be registered separately with admin elevation
     clsid = pywintypes.IID(xlproServerAsync._reg_clsid_)
 
-    # honestly not sure what this new defaultpolicy does
+    # overwrite the win32com server policy. Leaves in room to dispatch other objects...?
+    # credit to xlwings library for this
     BaseDefaultPolicy = win32com.server.policy.DefaultPolicy
-    class MyPolicy(BaseDefaultPolicy):
+    class ServerWrapPolicy(BaseDefaultPolicy):
         def _CreateInstance_(self, reqClsid, reqIID):
             if reqClsid == clsid:
+                # fyi we wrap the clsid IID object (a com-compatible interface) around our COM server
                 return win32com.server.util.wrap(xlproServerAsync(), reqIID)
             else:
+                # I don't actually know how we would even get in here...?
+                # raise Exception 
                 return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
-    win32com.server.policy.DefaultPolicy = MyPolicy
+    win32com.server.policy.DefaultPolicy = ServerWrapPolicy
 
-    # dont know what this does
     factory = pythoncom.MakePyFactory(clsid)
 
     # definitely need to register as a multipleuse local server
-    # so Dispatch calls return the same object and the 
-    # Note that the class needs to be configured as a singleton regardless
+    # so Dispatch calls return the same object. Seems to work fine with Dispatch calls, but getactiveobject
+    # is the more elegant solution in theory. idc
+    
+    # Note that the class needs to be configured as a singleton regardless of the below settings
     clsctx = pythoncom.CLSCTX_LOCAL_SERVER
     flags = pythoncom.REGCLS_MULTIPLEUSE | pythoncom.REGCLS_SUSPENDED
     revokeId = pythoncom.CoRegisterClassObject(clsid, factory, clsctx, flags)
