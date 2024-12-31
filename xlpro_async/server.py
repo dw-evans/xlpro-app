@@ -46,6 +46,27 @@ def load_functions_from_register() -> dict:
             wd / "xlpro_register.py",
         )
 
+def dispatch_args_preprocessor(func, args):
+    """Dispatches the  b 
+    """
+    f_name, args_and_types, ret_type, _ = utils.get_function_signature(func)
+    arg_names = [v0 for v0, v1 in args_and_types]
+    new_args = args
+    if "caller" in arg_names:
+        idx = arg_names.index("caller")
+        caller = args[idx]
+        caller_stream = utils.comarshal_release_and_get_stream(caller)
+        new_args[idx] = caller_stream
+        # Caller type could be many things, likely just a Range.
+        pass
+    if "thiswb" in arg_names:
+        idx = arg_names.index("thiswb")
+        thiswb = args[idx]
+        thiswb_stream = utils.comarshal_release_and_get_stream(thiswb)
+        new_args[idx] = thiswb_stream
+        pass
+    return args
+
 
 class xlproServerAsync:
     _public_methods_ = [
@@ -191,7 +212,6 @@ class xlproServerAsync:
                 # marshal the thread for threaded use
                 caller_marshal = pythoncom.CoMarshalInterThreadInterfaceInStream(
                     pythoncom.IID_IDispatch,
-                    # caller_dispatch._oleobj_
                     caller_dispatch,
                 )
                 self._func_hash_to_caller_map[uid] = caller_marshal

@@ -191,6 +191,7 @@ def get_or_create_codemodule(wb:xl._Workbook, c_name:str) -> vbide._CodeModule:
 def write_to_vb_module(s:str, vb_codemod:vbide._CodeModule):
     vb_codemod.DeleteLines(1, vb_codemod.CountOfLines)
     vb_codemod.AddFromString(s)
+    pass
 
 def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable]):
     """Write a list of commands to be registered in vba."""
@@ -216,31 +217,27 @@ def type_converter_wrapper(func):
     """
     ...
 
-def dispatch_converter_wrapper(func):
-    """Wraps a function so that the arguments are dispatched when they
-    come to python. Saves the user needing to do this. Some of the secret
-    sauce...
-    """
-    @wraps(func)
-    def wrapper(*args):
-        f_name, args_and_types, ret_type, _ = get_function_signature(func)
-        arg_names = [v0 for v0, v1 in args_and_types]
-        new_args = args
-        if "caller" in arg_names:
-            idx = arg_names.index("caller")
-            caller = args[idx]
-            caller_dispatch = Dispatch(caller)
-            new_args[idx] = caller_dispatch
-            # Caller type could be many things, likely just a Range.
-            pass
-        if "thiswb" in arg_names:
-            idx = arg_names.index("thiswb")
-            thiswb = args[idx]
-            thiswb_dispatch = Dispatch(thiswb)
-            new_args[idx] = thiswb_dispatch
-            pass
-        return func(*new_args)
-    return wrapper
+import pythoncom
+import threading
+
+# XXX - todo - get a better understsanding of these COM names, they can't be right lol
+def comarshal_release_and_get_stream(com_dispatch):
+    """Releases the COM object (PyIDispatch) from this thread and returns the stream 
+    (PyIStream)"""
+    return pythoncom.CoMarshalInterThreadInterfaceInStream(
+        pythoncom.IID_IDispatch,
+        com_dispatch
+    )
+def comarshal_dispatch_stream(com_stream):
+    """Dispatch a com stream (PyIStream) to a com object"""
+    com_obj_pyidispatch = pythoncom.CoGetInterfaceAndReleaseStream(
+        com_stream, pythoncom.IID_IDispatch,
+    )
+    com_obj_dispatch = win32com.client.Dispatch(com_obj_pyidispatch)
+    return com_obj_dispatch
+
+
+
 
 import importlib
 

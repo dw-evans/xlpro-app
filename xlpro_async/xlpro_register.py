@@ -23,6 +23,11 @@ def basic_function(a:float, b:float):
 
 def py_plot(xdata:list, ydata:list, xlims:list, ylims:list, xaxislabel:str, yaxislabel:str) -> matplotlib.figure.Figure:
     fig, ax = plt.subplots()
+    # XXX - todo - excel always spits things out in a 2d format, a preprocess could be useful
+    ax.set_xlim(np.array(xlims).tolist()[0])
+    ax.set_ylim(np.array(ylims).tolist()[0])
+    ax.set_xlabel(xaxislabel)
+    ax.set_ylabel(yaxislabel)
     ax.plot(xdata, ydata)
     return fig
 
