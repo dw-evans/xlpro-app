@@ -1,7 +1,6 @@
 import win32com.client
 
 
-
 from pywintypes import IID
 from win32com.client import Dispatch
 
@@ -12,23 +11,11 @@ from typing import Any, Callable
 import typing
 
 import inspect
-
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-def init_xl():
-    global xlapp, wb
-    xlapp = win32com.client.Dispatch("Excel.Application")
-    wb = xlapp.Workbooks("workbook.xlsm")
-
-# type hints cant be set to globals in the function, so they live here
-# to make the language server happy.
-xlapp:xl._Application
-wb:xl._Workbook
-
 VB_DYNAMIC_MODULE_NAME = "xlpro_async"
-
 
 def get_function_signature(func):
     # Get the type hints from the function
@@ -80,7 +67,7 @@ EndIf"""
 import numpy as np
 
 import matplotlib.figure
-def get_func_type(func) -> int:
+def get_func_result_type(func) -> int:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     if ret_type == matplotlib.figure.Figure:
@@ -91,8 +78,6 @@ def function_template_with_caller(func:Callable) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
-    func_type = get_func_type(func)
-
     func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     docstring = func.__doc__
     arg_declaration_list = []
@@ -130,19 +115,18 @@ def function_template_with_caller(func:Callable) -> str:
         arg_idxs_to_del.append(indx)
         arg_conversion_list[indx] = "ThisWorkbook"
 
-    pass
-
     if arg_idxs_to_del:
         arg_idxs_to_del.sort(reverse=True)
         for idx in arg_idxs_to_del:
             del arg_declaration_list[idx]
 
+    import server 
+
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
-    Dim xlpro_async As Object
-    Set xlpro_async = CreateObject("xlproServerAsync.Application")
-    xlpro_async.register_functions_in_self
+    Dim xlpro As Object
+    Set xlpro = CreateObject("{server.xlproServerAsync._reg_progid_}")
 {'\n'.join(arg_range_conversion_check_list)}
-    {func_name} = xlpro_async.execute_function_async({func_type}, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
+    {func_name} = xlpro.{server.xlproServerAsync.execute_function_async.__name__}(ThisWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
 """
 
@@ -174,8 +158,7 @@ def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable
         s_list.append(function_template_with_caller(f))
 
     write_to_vb_module("\n".join(s_list), vb_dynamic_comdemod)
-
-    # XXX to do these functions need to be imported by the com server...
+    vb_dynamic_comdemod = None
 
 
 import pythoncom
@@ -198,7 +181,7 @@ def comarshal_dispatch_stream(com_stream):
     return com_obj_dispatch
 
 
-def com_args_release_preprocessor(func, args):
+def com_args_release_to_stream_reserved(func, args):
     """Be careful which thread this runs on!
     Marshals the caller and thiswb reserved keyword arguments for use
     in another thread. Replaces the args with streams that can be used on another thread.
@@ -221,7 +204,7 @@ def com_args_release_preprocessor(func, args):
         pass
     return new_args
 
-def com_args_dispatch_preprocessor(func, args):
+def com_args_dispatch_reserved(func, args):
     """Be careful which thread this runs on! 
     Marshals the caller and thiswb reserved keyword arguments for use
     in another thread. Replaces the args with streams that can be used on another thread.
@@ -344,12 +327,12 @@ def com_init_dispatch_release_wrapper(func):
         pythoncom.CoInitialize()
         # dispatch the args on this thread
         # only relevant if the reserved dispatch arguments are being used.
-        args_dispatched = com_args_dispatch_preprocessor(func, args)
+        args_dispatched = com_args_dispatch_reserved(func, args)
 
         ret = func(*args_dispatched, **kwargs)
 
         # must release after!
-        com_args_release_preprocessor(func, args_dispatched)
+        com_args_release_to_stream_reserved(func, args_dispatched)
         pythoncom.CoUninitialize()
         
         return ret

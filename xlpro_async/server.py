@@ -31,29 +31,16 @@ wd = Path(__file__).parent
 
 logger = logging.getLogger(__name__)
 
-class uuid:
-    count = 0
-    def __new__(cls):
-        cls.count += 1
-        return cls.count
 
-def load_functions_from_register() -> dict:
-    """Returns a dict of functions found in the xlpro registry module.
-    name: function. Runs all the imports too :)
-    """
-    return utils.load_functions_from_file(
-            "xlpro_register", 
-            wd / "xlpro_register.py",
-        )
-
+XLPRO_FUNC_REGISTRY_STEM = "functions"
+XLPRO_SUB_REGISTRY_STEM = "subroutines"
 
 class xlproServerAsync:
     _public_methods_ = [
-        'getpid',
-        "add_data",
+        "getpid",
+        "register_and_configure_wb_workspace",
         "register_functions_in_vba",
-        "register_functions_in_self",
-        "execute_function",
+        "register_functions_in_workspace",
         "execute_function_async",
     ]
     _reg_progid_ = 'xlproServerAsync.Application'
@@ -71,109 +58,119 @@ class xlproServerAsync:
 
     def __init__(self):
         if not xlproServerAsync._instance_initialized:
-            logger.info(f"__init__ initializing new instance")
-            self._data = []
+            pythoncom.CoInitialize()
             xlproServerAsync._instance_initialized = True
-
-            # XXX something errors in the init function and closes the server
-            # Debugger is not cut out to catch these errors.
-
-            self._func_register = {}
-            # self.register_functions_in_self()
-
-            self._func_hash_result_display_map = {} # the result to be displayed
-            self._func_hash_result_display_map_lock = threading.Lock()
-
-            self._func_hash_results_map = {} # the actual results
-            self._func_hash_results_map_lock = threading.Lock()
-            self._func_hash_result_iscomplete_map = {}
-            self._func_hash_result_iscomplete_map_lock = threading.Lock()
-
-            self._func_hash_result_type = {}
-            self._func_hash_result_type_lock = threading.Lock()
-
-            # function types: standard, figure, ...image...? Anything else...
-            # could just tag the results hash map, or create a dict that keeps the func hash and output type
-            # self._func_hash_figure_map = {} # dict that matches func call hash to the output figure.
-
-            # maps the uid to the caller and function hash
-            self._func_hash_to_caller_map = {}
-            self._func_hash_to_caller_map_lock = threading.Lock() # XXX - todo - not used currently
-
-            # maps the live processes and threads in the background.
-            # self._func_hash_to_thread_map = {} # XXX - not used
-            # self._func_hash_to_process_map = {} # XXX - not used
-
-            self._threaded_result_queue = queue.Queue() # stores the results as they come in
-            self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
-
-            self._multiprocessing_figure_result_queue = multiprocessing.Queue() # stores the multiprocessing results
-
-            # results manager handles processing the queue of results as they come in
-            # and signalling to the client manager to execute commands.
-            self._results_manager_thread:ResultsManager = ResultsManager(server=self)
-            self._results_manager_thread.start()
-
-            # self._wb:xl._Workbook = None
-            # self._client_manager:ClientManager = None
-            self._client_manager = ClientManager(server=self)
-            self._client_manager.start()
-
+            self._workspace_map:dict[str, xlproServerAsyncWorkspace] = {} # uid (path) to workspace
         else:
             logger.info("__init__ called however the singleton already exists and has been initialized.")
         return
-    
-    def register_workbook(self, thiswb):
-        """Register the workbook client of the xlpro server."""
-        self._wb = win32com.client.Dispatch(thiswb)
-        # XXX - I am concerned about accessing this from a different thread
-        # self._client_manager = ClientManager(self)
 
     def getpid(self):
         return os.getpid()
     
-    def add_data(self, data):
-        self._data.append(data)
-        logger.debug(f"add_data caller pid: {os.getpid()}")
-        logger.debug(f"add_data data: {data}")
-        logger.debug(f"add_data self memid: {hex(id(self))}")
-        logger.debug(f"self._data = {self._data}")
-        return f"self._data is now {self._data}"
+    def register_and_configure_wb_workspace(self, wb_dispatch):
+        wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
+        wb_path = Path(wb.FullName)
+        utils.comarshal_release_and_get_stream(wb)
+        if not wb_path in self._workspace_map.keys():
+            workspace = xlproServerAsyncWorkspace(self, wb_path)
+            workspace._set_working_dir(wb_path.parent.resolve())
+            self._workspace_map[wb_path] = workspace
+        
+    def _get_workspace_from_wb(self, wb_dispatch):
+        wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
+        wb_path = Path(wb.FullName)
+        if not wb_path in self._workspace_map.keys():
+            logger.info("Workbook has not been registered, initializing...")
+            utils.comarshal_release_and_get_stream(wb)
+            self.register_and_configure_wb_workspace(wb_dispatch)
+        return self._workspace_map[wb_path]
+
+    def execute_function_async(self, wb_dispatch, caller, func_name, *args):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        return workspace.execute_function_async(caller=caller, func_name=func_name, args=args)
+
+    def register_functions_in_workspace(self, wb_dispatch):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        workspace.register_functions_in_self(utils.comarshal_release_and_get_stream(wb_dispatch))
+
+    def register_functions_in_vba(self, wb_dispatch):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        workspace.register_functions_in_vba(utils.comarshal_release_and_get_stream(wb_dispatch))
     
+    
+class xlproServerAsyncWorkspace:
+    def __init__(self, server:xlproServerAsync, wb_uid):
+        self._server = server
+        self._wb_uid = wb_uid
+        self._wd = None # working directory
+
+        self._func_register = {}
+
+        self._func_hash_result_display_map = {} # the result to be displayed
+        self._func_hash_result_display_map_lock = threading.Lock()
+
+        self._func_hash_results_map = {} # the actual results
+        self._func_hash_results_map_lock = threading.Lock()
+
+        self._func_hash_result_iscomplete_map = {}
+        self._func_hash_result_iscomplete_map_lock = threading.Lock()
+
+        self._func_hash_result_type = {}
+        self._func_hash_result_type_lock = threading.Lock()
+
+        # maps the uid to the caller and function hash
+        self._func_hash_to_caller_map = {}
+        self._func_hash_to_caller_map_lock = threading.Lock() # XXX - todo - not used currently
+
+        self._threaded_result_queue = queue.Queue() # stores the results as they come in
+        self._recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
+
+        self._multiprocessing_figure_result_queue = multiprocessing.Queue() # stores the multiprocessing results
+
+        # results manager handles processing the queue of results as they come in
+        # and signalling to the client manager to execute commands.
+        self._results_manager_thread:ResultsManager = ResultsManager(server=self)
+        self._results_manager_thread.start()
+
+        self._client_manager = ClientManager(server=self)
+        self._client_manager.start()
+
+    def _set_working_dir(self, wd:Path):
+        self._wd = wd / ".xlpro"
+        self._wd.mkdir(parents=True, exist_ok=True)
+
+    # def _set_extra_sys_paths(self, paths:list[Path]):
+    #     raise NotImplementedError
+    
+    # def _remove_module_from_globals(self, module_name):
+    #     raise NotImplementedError
+
+    def _import_functions_and_get_dict(self, module_name):
+        return utils.load_functions_from_file(
+            f"{module_name}", 
+            self._wd / f"{module_name}.py",
+        )
     def register_functions_in_self(self):
-        self._func_register = load_functions_from_register()
-        return
+        d = self._import_functions_and_get_dict(XLPRO_FUNC_REGISTRY_STEM)
+        self._func_register = d
 
-    def register_functions_in_vba(self, thisworkbook):
-        wb = win32com.client.Dispatch(thisworkbook)
+    def register_functions_in_vba(self, wb_stream):
         self.register_functions_in_self()
-        funcs = [v for k,v in self._func_register.items()]
+        funcs = [v for k, v in self._func_register.items()]
+        time.sleep(0.2)
+        wb = utils.comarshal_dispatch_stream(wb_stream)
         utils.init_xlpro_vb_dynamic_component(wb, funcs)
-        return
+        utils.comarshal_release_and_get_stream(wb)
 
-    def execute_function(self, func_name, *args) -> str:
+
+    def execute_function_async(self, caller, func_name, args):
         try:
             func = self._func_register.get(func_name)
-            if func:
-                return func(*args)
-            else:
-                return f"Function {func_name} not found."
-        except Exception as e:
-            return str(e)
-
-    def execute_function_async(self, result_type:ResultType, caller, func_name, *args):
-        try:
-            # fetch the function that is being called.
-            func = self._func_register.get(func_name)
-
             if not func:
                 return f"Function {func_name} not found."
-            
-            
-            uid = utils.hash_function_call(
-                func, utils.get_args_minus_reserved(func, args), kwargs={}
-            )
-            # uid = utils.create_random_hash()
+
+            uid = utils.hash_function_call(func, utils.get_args_minus_reserved(func, args), kwargs={})
 
             # if the hash of the function has been marked complete, return that
             # avoid computation
@@ -182,32 +179,25 @@ class xlproServerAsync:
                     # return self._func_hash_results_map[uid]
                     return self._func_hash_result_display_map[uid]
 
-            # prepare the com args for use in another thread
-            args = utils.com_args_release_preprocessor(func, args)
+            # release the com args for use in another thread. convert them to streams
+            args = utils.com_args_release_to_stream_reserved(func, args)
 
-            # check the result_type is valid.
-            if not result_type in ResultType.as_list():
-                raise Exception(f"ResultType identifier is not valid, v={result_type}, valids={ResultType.as_list()}")
+            result_type = utils.get_func_result_type(func)
             self._func_hash_result_type[uid] = result_type
 
-            # Prepare the Application.Caller argument
             # XXX - todo - check if the caller is a range.
-            caller_marshal = utils.comarshal_release_and_get_stream(caller)
-            self._func_hash_to_caller_map[uid] = caller_marshal
+            caller_stream = utils.comarshal_release_and_get_stream(caller)
+            self._func_hash_to_caller_map[uid] = caller_stream
 
-            self._func_hash_result_display_map[uid] = f"Promise<{uid}>"
+            with self._func_hash_result_display_map_lock:
+                self._func_hash_result_display_map[uid] = f"Promise<{uid}>"
             with self._func_hash_result_display_map_lock:
                 self._func_hash_result_iscomplete_map[uid] = False
 
-            # convert the argument types per the type hints
-            # args_converted = utils.convert_xl_2d_types(func, args) # defer this to within the funciton for now
-
             if result_type == ResultType.default:
-                # create the daemon thread to compute the result
                 t = self._create_and_register_async_worker(uid, func, args, kwargs={})
                 t.start()
             elif result_type == ResultType.figure:
-                # create the daemon thread/subprocess to handle figure creation (mpl not thread-safe)
                 fig_generating_thread = FigureGeneratingThread(
                     uid=uid,
                     func_name=func_name,
@@ -222,7 +212,7 @@ class xlproServerAsync:
             with self._func_hash_result_display_map_lock:
                 return self._func_hash_result_display_map[uid]
 
-        # Return the python exception as a fallback
+        # Return the python exception string as a fallback
         except Exception as e:
             return str(e)
         
@@ -234,7 +224,6 @@ class xlproServerAsync:
             f = utils.type_converter_wrapper(
                 utils.com_init_dispatch_release_wrapper(func)
             )
-
             ret = f(*args, **kwargs)
 
             self._threaded_result_queue.put((uid, ret))
@@ -331,7 +320,7 @@ class ResultType:
         return [value for key, value in vars(cls).items() if isinstance(value, int)]
         
 class ResultsManager:
-    def __init__(self, server:xlproServerAsync):
+    def __init__(self, server:xlproServerAsyncWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._watch, daemon=True)
@@ -399,7 +388,7 @@ class ClientManager:
         self._server = server
         pass
 
-    def __init__(self, server:xlproServerAsync):
+    def __init__(self, server:xlproServerAsyncWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._watch, daemon=True)

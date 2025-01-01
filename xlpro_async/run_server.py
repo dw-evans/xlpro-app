@@ -76,10 +76,13 @@ def serve():
                 (), 0, win32event.INFINITE, win32event.QS_ALLEVENTS
             )
             if rc == win32event.WAIT_OBJECT_0:
-                if pythoncom.PumpWaitingMessages():
-                    break  # wm_quit
+                pwm = pythoncom.PumpWaitingMessages()
+                # if pwm:
+                #     break  # wm_quit
         except KeyboardInterrupt:
             break
+        except Exception:
+            pass
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()
