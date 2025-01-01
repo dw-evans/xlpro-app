@@ -199,6 +199,9 @@ class xlproServerAsync:
             with self._func_hash_result_display_map_lock:
                 self._func_hash_result_iscomplete_map[uid] = False
 
+            # convert the argument types per the type hints
+            # args_converted = utils.convert_xl_2d_types(func, args) # defer this to within the funciton for now
+
             if result_type == ResultType.default:
                 # create the daemon thread to compute the result
                 t = self._create_and_register_async_worker(uid, func, args, kwargs={})
@@ -224,18 +227,19 @@ class xlproServerAsync:
             return str(e)
         
     def _create_and_register_async_worker(self, uid, func, args, kwargs):
+        if kwargs:
+            raise Exception("kwargs should not be here!")
         def func_wrapper():
-            pythoncom.CoInitialize()
-            ppargs = utils.com_args_dispatch_preprocessor(func, args)
 
-            ret = func(*ppargs, **kwargs)
+            f = utils.type_converter_wrapper(
+                utils.com_init_dispatch_release_wrapper(func)
+            )
+
+            ret = f(*args, **kwargs)
 
             self._threaded_result_queue.put((uid, ret))
             with self._func_hash_result_iscomplete_map_lock:
                 self._func_hash_result_iscomplete_map[uid] = True
-
-            utils.com_args_release_preprocessor(func, ppargs)
-            pythoncom.CoUninitialize()
 
             self._results_manager_thread.wake()
 
@@ -292,7 +296,11 @@ class FigureGeneratingThread:
     def _create_process(self) -> multiprocessing.Process:
 
         p = multiprocessing.Process(
-            target=figure_process_func, 
+            target=utils.type_converter_wrapper(
+                utils.com_init_dispatch_release_wrapper(
+                    figure_process_func,
+                )
+            ), 
             daemon=True,
             kwargs={
                 "uid": self._uid,

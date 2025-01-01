@@ -13,8 +13,9 @@ import typing
 
 import inspect
 
-# CLSID = IID('{0002E157-0000-0000-C000-000000000046}')
-# vbide = win32com.client.Dispatch('{0002E157-0000-0000-C000-000000000046}')
+import logging
+logger = logging.getLogger(__name__)
+
 
 def init_xl():
     global xlapp, wb
@@ -27,11 +28,7 @@ xlapp:xl._Application
 wb:xl._Workbook
 
 VB_DYNAMIC_MODULE_NAME = "xlpro_async"
-# VB_STATIC_MODULE_NAME = "xlpro_static"
 
-def myfunc(a:float, b:int, c:str, d) -> str:
-    """the docstring hehehe"""
-    return f"{a}, {b}, {c}, {d}"
 
 def get_function_signature(func):
     # Get the type hints from the function
@@ -74,31 +71,11 @@ vb_type_declaration_strings = {
     Any: "{} As Variant",
 }
 
-# vb_ = {
-#     "Optional {} As {} = {}",
-# }
-
 import textwrap
 vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
     {arg} = {arg}.Value
 EndIf"""
 
-
-def convert_to_array_if_range(arg:Any):
-    ...
-
-def test_func(a:int, b:float, c, caller) -> float:
-    pass
-
-def wrap_function_with_caller_arg(func):
-    """Modifies the function to take a "caller" argument if it doesn't exist"""
-    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
-    # XXX todo
-
-    def wrapper(*args, **kwargs):
-        ...
-        
-    return wrapper
 
 import numpy as np
 
@@ -121,11 +98,6 @@ def function_template_with_caller(func:Callable) -> str:
     arg_declaration_list = []
     arg_conversion_list = []
     arg_range_conversion_check_list = []
-
-    # if an argument is an array, convert any range to its values.
-    # if isinstance(t, typing.Iterable)
-    #   if TypeName(a) = "Range" then
-    #   t = t.Value
 
     for a, t in args_and_types:
         if vb_type_declaration_strings.get(t, None):
@@ -174,7 +146,6 @@ def function_template_with_caller(func:Callable) -> str:
 End Function
 """
 
-
 def get_or_create_codemodule(wb:xl._Workbook, c_name:str) -> vbide._CodeModule:
     proj:vbide._VBProject = wb.VBProject
 
@@ -205,17 +176,7 @@ def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable
     write_to_vb_module("\n".join(s_list), vb_dynamic_comdemod)
 
     # XXX to do these functions need to be imported by the com server...
-    
 
-from functools import wraps
-
-# XXX - todo implement a 
-def type_converter_wrapper(func):
-    """Converts the inbound data from excel into the types specified by the user 
-    e.g. The user specifies a numpy array, the inbound argument is converted from a row
-    major tuple to a numpy array
-    """
-    ...
 
 import pythoncom
 import threading
@@ -259,7 +220,6 @@ def com_args_release_preprocessor(func, args):
         new_args[idx] = thiswb_stream
         pass
     return new_args
-
 
 def com_args_dispatch_preprocessor(func, args):
     """Be careful which thread this runs on! 
@@ -305,6 +265,7 @@ def get_args_minus_reserved(func, args):
 
 
 import importlib
+import types
 
 def load_functions_from_file(module_name, file_path):
     """Dynamically import all functions from a Python file."""
@@ -317,7 +278,7 @@ def load_functions_from_file(module_name, file_path):
     functions = {
         name: getattr(module, name)
         for name in dir(module)
-        if callable((v:=getattr(module, name))) and not type(v) == type
+        if isinstance((v:=getattr(module, name)), types.FunctionType)
     }
     return functions
 
@@ -341,11 +302,61 @@ def create_random_hash():
     r = str(uuid.uuid4())
     return hashlib.sha256(r.encode('utf-8')).hexdigest()
 
+from functools import wraps
 
+def convert_xl_2d_types(func, args):
+    _, args_and_types, _, _ = get_function_signature(func)
+    ppargs = []
+    for val, (a, t) in zip(args, args_and_types):
+        ppargs.append(xlpro_typing.xl2DArgConvertor(val, t))
+    return ppargs
+
+import xlpro_typing
+def type_converter_wrapper(func):
+    """Converts the inbound data from excel into the types specified by the user 
+    e.g. The user specifies a numpy array, the inbound argument is converted from a row
+    major tuple to a numpy array
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if kwargs:
+            raise NotImplementedError("kwargs not supported atm")
+        ppargs = convert_xl_2d_types(func, args)
+        ret = func(*ppargs, **kwargs)
+        
+        # convert it back to a range format
+        ret2 = xlpro_typing.xl2DArgConvertor._convert_back_to_range_format(ret)
+        # XXX - todo - add some logging to this. cant handle np arrays atm
+        # if ret2 != ret:
+        #     logger.debug("Return value was changed to suit excel's format")
+        #     pass
+
+        return ret2
+
+    return wrapper
+
+
+def com_init_dispatch_release_wrapper(func):
+    """Wraps com object dispatch and release around a func.
+    Also appropriately configures pythoncom coinitialise"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        pythoncom.CoInitialize()
+        # dispatch the args on this thread
+        # only relevant if the reserved dispatch arguments are being used.
+        args_dispatched = com_args_dispatch_preprocessor(func, args)
+
+        ret = func(*args_dispatched, **kwargs)
+
+        # must release after!
+        com_args_release_preprocessor(func, args_dispatched)
+        pythoncom.CoUninitialize()
+        
+        return ret
+    
+    return wrapper
 
 if __name__ == "__main__":
-
-
     pass
 
 
