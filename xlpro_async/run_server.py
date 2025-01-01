@@ -49,9 +49,9 @@ def serve():
                 # fyi we wrap the clsid IID object (a com-compatible interface) around our COM server
                 return win32com.server.util.wrap(xlproServerAsync(), reqIID)
             else:
+                # return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
                 # I don't actually know how we would even get in here...?
-                # raise Exception 
-                return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
+                raise Exception 
     win32com.server.policy.DefaultPolicy = ServerWrapPolicy
 
     factory = pythoncom.MakePyFactory(clsid)

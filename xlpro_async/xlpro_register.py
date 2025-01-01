@@ -62,19 +62,25 @@ def jsonize(arr:list):
 
 import os
 
-def write_to_file(s:str, p:str, caller, thiswb):
+def write_to_file(s:str, p:str, caller:xl.Range, thiswb:xl._Workbook):
     # XXX - todo - we can't access the workbook object while the user is editing it...
     # How do we handle this? retry calculation..?
 
-    wb:xl._Workbook = win32com.client.Dispatch(thiswb)
-    wd = Path(wb.FullName).parent
+    # wb:xl._Workbook = win32com.client.Dispatch(thiswb)
+    wd = Path(thiswb.FullName).parent
     wd_before = os.getcwd()
     os.chdir(wd)
     p_obj = Path(p)
     with open(p_obj, "w") as f:
         f.write(s)
+    ret = f"File written to {str(p_obj)}"
+    caller.Interior = xlrgb(0,0,255)
     os.chdir(wd_before)
-    return f"File written to {str(p_obj)}"
+    return ret
+
+def xlrgb(r:int, g:int, b:int):
+    """Returns the color as an int interpreted by excel"""
+    return b*256**2 + g*256 + r
 
 # def test(a, caller, thiswb):
 #     pass

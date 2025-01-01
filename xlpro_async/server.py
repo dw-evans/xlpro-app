@@ -46,27 +46,6 @@ def load_functions_from_register() -> dict:
             wd / "xlpro_register.py",
         )
 
-def dispatch_args_preprocessor(func, args):
-    """Dispatches the  b 
-    """
-    f_name, args_and_types, ret_type, _ = utils.get_function_signature(func)
-    arg_names = [v0 for v0, v1 in args_and_types]
-    new_args = args
-    if "caller" in arg_names:
-        idx = arg_names.index("caller")
-        caller = args[idx]
-        caller_stream = utils.comarshal_release_and_get_stream(caller)
-        new_args[idx] = caller_stream
-        # Caller type could be many things, likely just a Range.
-        pass
-    if "thiswb" in arg_names:
-        idx = arg_names.index("thiswb")
-        thiswb = args[idx]
-        thiswb_stream = utils.comarshal_release_and_get_stream(thiswb)
-        new_args[idx] = thiswb_stream
-        pass
-    return args
-
 
 class xlproServerAsync:
     _public_methods_ = [
@@ -108,6 +87,7 @@ class xlproServerAsync:
             self._func_hash_results_map = {} # the actual results
             self._func_hash_results_map_lock = threading.Lock()
             self._func_hash_result_iscomplete_map = {}
+            self._func_hash_result_iscomplete_map_lock = threading.Lock()
 
             self._func_hash_result_type = {}
             self._func_hash_result_type_lock = threading.Lock()
@@ -189,43 +169,42 @@ class xlproServerAsync:
             if not func:
                 return f"Function {func_name} not found."
             
-            # 
-            uid = utils.hash_function_call(func, args, kwargs={})
+            
+            uid = utils.hash_function_call(
+                func, utils.get_args_minus_reserved(func, args), kwargs={}
+            )
             # uid = utils.create_random_hash()
 
             # if the hash of the function has been marked complete, return that
             # avoid computation
-            if uid in self._func_hash_result_iscomplete_map.keys():
-                # return self._func_hash_results_map[uid]
-                return self._func_hash_result_display_map[uid]
+            with self._func_hash_result_display_map_lock:
+                if uid in self._func_hash_result_iscomplete_map.keys():
+                    # return self._func_hash_results_map[uid]
+                    return self._func_hash_result_display_map[uid]
+
+            # prepare the com args for use in another thread
+            args = utils.com_args_release_preprocessor(func, args)
 
             # check the result_type is valid.
             if not result_type in ResultType.as_list():
                 raise Exception(f"ResultType identifier is not valid, v={result_type}, valids={ResultType.as_list()}")
             self._func_hash_result_type[uid] = result_type
 
-            # Get the caller and convert it to a range to store.
-            # Range object needed to handle dynamic addresses.
-            map_to_caller = True
-            if map_to_caller:
-                caller_dispatch = win32com.client.Dispatch(caller)
-                # marshal the thread for threaded use
-                caller_marshal = pythoncom.CoMarshalInterThreadInterfaceInStream(
-                    pythoncom.IID_IDispatch,
-                    caller_dispatch,
-                )
-                self._func_hash_to_caller_map[uid] = caller_marshal
-                pass
+            # Prepare the Application.Caller argument
+            # XXX - todo - check if the caller is a range.
+            caller_marshal = utils.comarshal_release_and_get_stream(caller)
+            self._func_hash_to_caller_map[uid] = caller_marshal
 
-            # self._func_hash_results_map[uid] = f"Promise<{uid}>"
             self._func_hash_result_display_map[uid] = f"Promise<{uid}>"
-            self._func_hash_result_iscomplete_map[uid] = False
+            with self._func_hash_result_display_map_lock:
+                self._func_hash_result_iscomplete_map[uid] = False
 
             if result_type == ResultType.default:
                 # create the daemon thread to compute the result
                 t = self._create_and_register_async_worker(uid, func, args, kwargs={})
                 t.start()
             elif result_type == ResultType.figure:
+                # create the daemon thread/subprocess to handle figure creation (mpl not thread-safe)
                 fig_generating_thread = FigureGeneratingThread(
                     uid=uid,
                     func_name=func_name,
@@ -236,69 +215,49 @@ class xlproServerAsync:
                 )
                 fig_generating_thread.start()
 
-            # return the result (will be incomplete)
-            return self._func_hash_result_display_map[uid]
+            # return the (incomplete result)
+            with self._func_hash_result_display_map_lock:
+                return self._func_hash_result_display_map[uid]
 
+        # Return the python exception as a fallback
         except Exception as e:
             return str(e)
         
-    def _generate_uid(self):
-        return uuid()
-        
     def _create_and_register_async_worker(self, uid, func, args, kwargs):
-        
         def func_wrapper():
+            pythoncom.CoInitialize()
+            ppargs = utils.com_args_dispatch_preprocessor(func, args)
 
-            # XXX - todo - possible candidate here to wrap this in a try-except block
-            # so we can re-attempt failed functions.
-            # ATM there is a likely attribute error
-            # attempts = 0
-            # max_attempts = 20
-            # delay = 5.0
-            # while attempts < 10:
-            #     try:
-            #         ret = func(*args, **kwargs)
-            #     except Exception as e:
-            #         logger.warning(f"Async worker thread failed to get a result. Retrying in {delay} seconds")
-            #         ret = f"Failed Promise{attempts}/{max_attempts}<{uid}>"
-            #         attempts += 1
-            #         # add to queue and wake manager regardless. We are working on it in the background I think.
-            #         # self._threaded_result_queue.put((uid, ret))
-            #         # self._func_hash_result_iscomplete_map[uid] = True
-            #         # self._results_manager_thread.wake()
-            #         time.sleep(delay)
+            ret = func(*ppargs, **kwargs)
 
-            ret = func(*args, **kwargs)
-
-            # add to queue and wake manager.
             self._threaded_result_queue.put((uid, ret))
-            self._func_hash_result_iscomplete_map[uid] = True
+            with self._func_hash_result_iscomplete_map_lock:
+                self._func_hash_result_iscomplete_map[uid] = True
+
+            utils.com_args_release_preprocessor(func, ppargs)
+            pythoncom.CoUninitialize()
+
             self._results_manager_thread.wake()
 
         t = threading.Thread(target=func_wrapper, daemon=True)
         return t
     
-    def _create_and_register_figure_generating_process(self, uid, func, args, kwargs):
-        def func_wrapper():
-            fig = func(*args, **kwargs)
-            
-            fig:matplotlib.figure.Figure
-            exec('matplotlib.use("Agg")')
-            fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
-            fp.mkdir(parents=True, exist_ok=True)
-                
-            fig.savefig(wd / ".xlpro" / "tmp" / f"{uid}",)
-            fig.savefig(fp, dpi=600)
-        
-            # add to queue and wake manager.
-            self._multiprocessing_figure_result_queue.put((uid, fp.resolve()))
-            self._results_manager_thread.wake()
 
-        global _MULTIPROCESS_FUNCTION
-        _MULTIPROCESS_FUNCTION = func_wrapper
+def figure_process_func(uid, func_name, args, kwargs, queue):
+    func = setup_scope_and_get_function(func_name)
+    fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fig:matplotlib.figure.Figure = func(*args, **kwargs)
+    size_inches = np.array(fig.get_size_inches())
+    fig.savefig(fp, dpi=600)
+    queue.put((uid, (fp, size_inches)))
+    pass
 
-        p = multiprocessing.Process(target=_MULTIPROCESS_FUNCTION, daemon=True)
-        return p
+def setup_scope_and_get_function(func_name):
+    import sys, os
+    func_map = load_functions_from_register()
+    func = func_map[func_name]
+    return func
 
 class FigureGeneratingThread:
     """Class which maintains a thread which waits for a process to finish."""
@@ -317,7 +276,6 @@ class FigureGeneratingThread:
         self._func_name = func_name
         self._args = args
         self._kwargs = kwargs
-
 
     def start(self):
         # start the watcher
@@ -347,39 +305,16 @@ class FigureGeneratingThread:
         return p
     
     def _run(self): 
-        # logger.info(f"Starting FigureGeneratingThread process within thread, {threading.get_native_id()}")
         p = self._create_process()
-
         p.start()
         p.join() # once joined, we can check the queue
-
         # get the uid and value (figure path in this case)
         uid, val = self._multiprocess_queue.get()
-
         # send the uid/value combo to the return queue
-        # the return queue should always be the value return queue 
+        # the return queue should always be the server value return queue 
         self._return_queue.put((uid, val))
         self._return_event.set()
-        pass
         
-
-def figure_process_func(uid, func_name, args, kwargs, queue):
-    func = setup_scope_and_get_function(func_name)
-    fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    fig:matplotlib.figure.Figure = func(*args, **kwargs)
-    size_inches = np.array(fig.get_size_inches())
-    fig.savefig(fp, dpi=600)
-    queue.put((uid, (fp, size_inches)))
-    pass
-
-def setup_scope_and_get_function(func_name):
-    import sys, os
-    func_map = load_functions_from_register()
-    func = func_map[func_name]
-    return func
-
-
 class ResultType:
     default = 0
     figure = 1
@@ -387,9 +322,7 @@ class ResultType:
     def as_list(cls):
         return [value for key, value in vars(cls).items() if isinstance(value, int)]
         
-
 class ResultsManager:
-
     def __init__(self, server:xlproServerAsync):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
@@ -417,7 +350,8 @@ class ResultsManager:
         """Processes either the multiprocessing or threaded results queues"""
         # getting the value tells us the result is complete
         uid, val = self._server._threaded_result_queue.get()
-        self._server._func_hash_result_iscomplete_map[uid] = True
+        with self._server._func_hash_result_iscomplete_map_lock:
+            self._server._func_hash_result_iscomplete_map[uid] = True
 
         self._set_results_value(uid, val)
         
@@ -426,7 +360,6 @@ class ResultsManager:
         # wake the client manager to update the client
         self._server._client_manager.wake()
 
-    
     def _watch(self):
         """When awakened, retrieves the result queue and sends to the server cache.
         ResultsManager can reliably be woken up so no need for background checking.
@@ -499,9 +432,9 @@ class ClientManager:
 
     def _get_caller(self, uid):
         with self._server._func_hash_to_caller_map_lock:
-            return self._comarshal_com_object(self._server._func_hash_to_caller_map[uid])
+            return utils.comarshal_dispatch_stream(self._server._func_hash_to_caller_map[uid])
         
-    def _get_unmarshalled_com_object(com_object):
+    def _get_unmarshalled_com_object(self, com_object):
         return pythoncom.CoMarshalInterThreadInterfaceInStream(
             pythoncom.IID_IDispatch, 
             com_object,
@@ -521,9 +454,7 @@ class ClientManager:
         # update by resetting the formula
         caller_dispatch.Formula2 = caller_dispatch.Formula2
 
-        self._unmarshal_com_object(caller_dispatch)
-
-
+        utils.comarshal_release_and_get_stream(caller_dispatch)
 
     def _update_client_figure(self, uid) -> None:
         """Update the data for the figure case - add a figure image to the spreadsheet"""
@@ -545,8 +476,7 @@ class ClientManager:
 
         caller_dispatch.Formula2 = caller_dispatch.Formula2
 
-        self._unmarshal_com_object(caller_dispatch)
-
+        utils.comarshal_release_and_get_stream(caller_dispatch)
 
     def _process_queue(self):
         """Process the queue at the current point in time. Any failed attempts get
@@ -596,7 +526,6 @@ class ClientManager:
             # if we failed to update, recycle the queue as necessary
             if replace_in_queue:
                 self._server._recalculate_queue.put(uid)
-
 
             time.sleep(0.01) # fairness sleep
 
@@ -696,7 +625,6 @@ def exception_return_wrapper(func):
             return func(*args, **kwargs) 
         except Exception as e:
             return e
-        
     return wrapper
 
 
