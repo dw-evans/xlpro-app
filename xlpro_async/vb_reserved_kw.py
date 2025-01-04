@@ -1,5 +1,0 @@
-
-
-RESERVED_KW = [
-    "transpose"
-]
