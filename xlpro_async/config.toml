@@ -1,0 +1,12 @@
+progid = 'xlproServerAsync.Application'
+clsid = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
+
+# Interpreter used to run the server and internal excel code
+# python_path = "C:\\Users\\Daniel Evans\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"
+python_path = "C:\\Users\\Daniel Evans\\projects\\xlpro\\.venv\\Scripts\\python.exe"
+run_server_path = "C:/Users/Daniel Evans/projects/xlpro/xlpro_async/run_server.py"
+# Logging options: DEBUG/INFO/WARNING
+
+logging_level = "DEBUG"
+logging_path = "./xlpro.log"
+

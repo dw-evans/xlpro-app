@@ -16,16 +16,24 @@ from server import xlproServerAsync
 
 import logging
 
+import load_config
+
+config = load_config.load_config()
+
 wd = Path(__file__).parent
 
+__logging_dir = Path(config.logging_path).parent
+if not __logging_dir.exists():
+    __logging_dir.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
-    filename= wd / 'log.log',   # The file where logs will be saved
-    level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
+    # filename= wd / 'log.log',   # The file where logs will be saved
+    filename=config.logging_path,   # The file where logs will be saved
+    # level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
+    level=getattr(logging, config.logging_level),          # The log level (DEBUG, INFO, WARNING, etc.)
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
-
 
 logger = logging.getLogger(__name__)
 

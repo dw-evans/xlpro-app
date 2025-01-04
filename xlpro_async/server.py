@@ -25,12 +25,13 @@ from win32typelibs import excel as xl
 
 import matplotlib.figure
 
+import load_config
+
+config = load_config.load_config()
 
 wd = Path(__file__).parent
 
-
 logger = logging.getLogger(__name__)
-
 
 XLPRO_FUNC_REGISTRY_STEM = "functions"
 XLPRO_SUB_REGISTRY_STEM = "subroutines"
@@ -43,8 +44,10 @@ class xlproServerAsync:
         "register_functions_in_workspace",
         "execute_function_async",
     ]
-    _reg_progid_ = 'xlproServerAsync.Application'
-    _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
+    # _reg_progid_ = 'xlproServerAsync.Application'
+    # _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
+    _reg_progid_ = config.progid
+    _reg_clsid_ = config.clsid
 
     _instance = None  # Singleton instance
     _instance_initialized = False
