@@ -22,6 +22,10 @@ class Settings:
     logging_path:str
     
     run_server_path:str
+    xlpro_lock_path:str
+
+    debug_ip:str
+    debug_port:int
 
 
 

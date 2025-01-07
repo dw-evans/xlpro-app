@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 
 	"github.com/BurntSushi/toml"
@@ -16,7 +15,7 @@ type Config struct {
 }
 
 func main() {
-	// Define the path to the config.toml file
+	// Define the path to the config.toml file relative to the executable file.
 	configPath := "../config.toml"
 
 	// Read and parse the TOML file
@@ -28,6 +27,7 @@ func main() {
 
 	// Print the extracted python_interpreter value
 	fmt.Printf("Using Python interpreter: %s\n", config.PythonPath)
+	fmt.Printf("%s %s\n", config.PythonPath, config.RunServerPath)
 
 	// Define the path to the Python script you want to run
 	// pythonScriptPath := "path/to/your/script.py"
@@ -35,13 +35,23 @@ func main() {
 	// Construct the command to run the Python interpreter with the script
 	cmd := exec.Command(config.PythonPath, config.RunServerPath)
 
-	// Set up to capture the command's output
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Run the command
-	err = cmd.Run()
+	// Start the command (instead of Run, which waits for completion)
+	err = cmd.Start()
 	if err != nil {
-		log.Fatalf("Error running Python script: %v", err)
+		log.Fatal(err)
+	}
+
+	// Get the PID of the Python process
+	pythonPid := cmd.Process.Pid
+	fmt.Printf("Python process started with PID: %d\n", pythonPid)
+
+	// Optionally wait for the process to finish (if you need to block until done)
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err != nil {
+		log.Fatalf("Error running Python script: %v\n", err)
 	}
 }

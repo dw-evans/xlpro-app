@@ -121,10 +121,11 @@ def function_template_with_caller(func:Callable) -> str:
             del arg_declaration_list[idx]
 
     import server 
+    # Set xlpro = CreateObject("{server.xlproServerAsync._reg_progid_}")
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
-    Set xlpro = CreateObject("{server.xlproServerAsync._reg_progid_}")
+    Set xlpro = GetObject("new: {server.xlproServerAsync._reg_clsid_}")
 {'\n'.join(arg_range_conversion_check_list)}
     {func_name} = xlpro.{server.xlproServerAsync.execute_function_async.__name__}(ThisWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
@@ -142,6 +143,10 @@ def get_or_create_codemodule(wb:xl._Workbook, c_name:str) -> vbide._CodeModule:
     codemod:vbide._CodeModule = comp.CodeModule
     return codemod
 
+# xlapp = win32com.client.Dispatch("Excel.Application")
+# wb = xlapp.ActiveWorkbook
+# get_or_create_codemodule(wb, "ThisWorkbook")
+
 
 def write_to_vb_module(s:str, vb_codemod:vbide._CodeModule):
     vb_codemod.DeleteLines(1, vb_codemod.CountOfLines)
@@ -158,8 +163,10 @@ def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable
         s_list.append(function_template_with_caller(f))
 
     write_to_vb_module("\n".join(s_list), vb_dynamic_comdemod)
-    vb_dynamic_comdemod = None
-
+    # write_to_vb_module("\n".join([s_list[0]]), vb_dynamic_comdemod)
+    # write_to_vb_module("Sub fn()\n msgbox \"hello\"\nend sub", vb_dynamic_comdemod)
+    # vb_dynamic_comdemod = None
+    # pythoncom.CoUninitialize()
 
 import pythoncom
 import threading
@@ -168,10 +175,13 @@ import threading
 def comarshal_release_and_get_stream(com_dispatch):
     """Releases the COM object (PyIDispatch) from this thread and returns the stream 
     (PyIStream)"""
-    return pythoncom.CoMarshalInterThreadInterfaceInStream(
+    stream = pythoncom.CoMarshalInterThreadInterfaceInStream(
         pythoncom.IID_IDispatch,
         com_dispatch,
     )
+    com_dispatch = None
+    return stream
+
 def comarshal_dispatch_stream(com_stream):
     """Dispatch a com stream (PyIStream) to a com object"""
     com_obj_pyidispatch = pythoncom.CoGetInterfaceAndReleaseStream(
@@ -338,6 +348,14 @@ def com_init_dispatch_release_wrapper(func):
         return ret
     
     return wrapper
+
+
+import ctypes
+def show_warning(title, message):
+    # MessageBox parameters: hWnd, text, caption, uType
+    ctypes.windll.user32.MessageBoxW(0, message, title, 0x30)  # 0x30 = MB_ICONWARNING
+
+
 
 if __name__ == "__main__":
     pass

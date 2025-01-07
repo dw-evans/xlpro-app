@@ -118,3 +118,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+
+xlpro_async/xlpro.lock

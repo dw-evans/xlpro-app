@@ -17,8 +17,14 @@ from server import xlproServerAsync
 import logging
 
 import load_config
+import sys
 
 config = load_config.load_config()
+
+import os
+
+import file_lock
+import utils
 
 wd = Path(__file__).parent
 
@@ -42,6 +48,22 @@ loop = asyncio.new_event_loop()
 
 
 def serve():
+    try:
+        file_lock.acquire_lock_file_and_write_pid(config.xlpro_lock_path)
+    except PermissionError as e:
+        print("Could not acquire lock on file. Checking validity")
+        if not file_lock.check_existing_lock_and_pid(config.xlpro_lock_path):
+            print("The process with the lock file is not alive. ")
+            raise Exception
+            # sys.exit(1)
+        print("The process appears to be alive.")
+        utils.show_warning(
+            "xlpro",
+            f"""WARNING: Could not acquire the file lock.
+  - Another xlpro instance appears to be running.
+  - Delete {config.xlpro_lock_path} if this issue persists.
+  - This will not have affected your current session if xlpro was already running.""")
+
     pythoncom.CoInitialize()
 
     # we register everything dynamically using the clsid only.
@@ -77,7 +99,7 @@ def serve():
     pythoncom.CoResumeClassObjects() # I think this cancels the suspended operation
 
     # XXX fix the main loop exit seq
-    print("Loop starting, ctrl+c to exit (Probably doesn't work)")
+    print(f"Loop starting on PID:{os.getpid()}")
     while True:
         try:
             rc = win32event.MsgWaitForMultipleObjects(

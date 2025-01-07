@@ -1,5 +1,6 @@
 import winreg as reg
 from server import xlproServerAsync
+import sys
 
 """
 Completes the registry mappings for the dynamic COM server.
@@ -19,12 +20,33 @@ def register_progid_to_clsid(progid, clsid):
         
         # Map CLSID to ProgID (Optional)
         clsid_key_path = f"CLSID\\{clsid}\\ProgID"
-        with reg.CreateKey(reg.HKEY_CLASSES_ROOT, clsid_key_path) as clsid_key:
+        with reg.CreateKey(reg.HKEY_CURRENT_USER, clsid_key_path) as clsid_key:
             reg.SetValue(clsid_key, "", reg.REG_SZ, progid)
             print(f"Successfully mapped CLSID '{clsid}' to ProgID '{progid}'. {clsid_key_path}")
         
-        
         print(f"Successfully registered ProgID '{progid}' to CLSID '{clsid}'.")
+
+    except Exception as e:
+        print(f"Error registering ProgID to CLSID: {e}")
+
+def unregister_progid_to_clsid(progid, clsid):
+    try:
+        # Map ProgID to CLSID
+        progid_key_path = f"{progid}\\CLSID"
+        try:
+            reg.DeleteKey(reg.HKEY_CURRENT_USER, progid_key_path) 
+            print(f"Successfully removed ProgID '{progid}' to CLSID '{clsid}'. {progid_key_path}")
+        except Exception as e:
+            print(f"{e}")
+        
+        # Map CLSID to ProgID (Optional)
+        clsid_key_path = f"CLSID\\{clsid}\\ProgID"
+        try:
+            reg.DeleteKey(reg.HKEY_CURRENT_USER, clsid_key_path)
+        except Exception as e:
+            print(f"{e}")
+        
+        print(f"Successfully deregistered ProgID '{progid}' to CLSID '{clsid}'.")
         
 
     except Exception as e:
@@ -34,5 +56,8 @@ def register_progid_to_clsid(progid, clsid):
 if __name__ == "__main__":
     progid = xlproServerAsync._reg_progid_
     clsid = xlproServerAsync._reg_clsid_
-    register_progid_to_clsid(progid, clsid)
+    if "--unregister" in sys.argv:
+        unregister_progid_to_clsid(progid, clsid)
+    else:
+        register_progid_to_clsid(progid, clsid)
     input("Press enter to continue...")

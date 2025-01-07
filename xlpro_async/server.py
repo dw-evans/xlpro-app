@@ -36,6 +36,16 @@ logger = logging.getLogger(__name__)
 XLPRO_FUNC_REGISTRY_STEM = "functions"
 XLPRO_SUB_REGISTRY_STEM = "subroutines"
 
+def load_functions_from_register() -> dict:
+    """Returns a dict of functions found in the xlpro registry module.
+    name: function. Runs all the imports too :)
+    """
+    return utils.load_functions_from_file(
+            "xlpro_register", 
+            wd / "xlpro_register.py",
+        )
+
+
 class xlproServerAsync:
     _public_methods_ = [
         "getpid",
@@ -43,6 +53,7 @@ class xlproServerAsync:
         "register_functions_in_vba",
         "register_functions_in_workspace",
         "execute_function_async",
+        "shutdown_workspace",
     ]
     # _reg_progid_ = 'xlproServerAsync.Application'
     # _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
@@ -79,15 +90,21 @@ class xlproServerAsync:
             workspace = xlproServerAsyncWorkspace(self, wb_path)
             workspace._set_working_dir(wb_path.parent.resolve())
             self._workspace_map[wb_path] = workspace
+            
         
     def _get_workspace_from_wb(self, wb_dispatch):
+        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        if not uid in self._workspace_map.keys():
+            logger.info("Workbook has not been registered, initializing...")
+            self.register_and_configure_wb_workspace(wb_dispatch)
+            utils.comarshal_release_and_get_stream(wb_dispatch)
+        return self._workspace_map[uid]
+    
+    def _get_workspace_uid_from_wb(self, wb_dispatch):
         wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
         wb_path = Path(wb.FullName)
-        if not wb_path in self._workspace_map.keys():
-            logger.info("Workbook has not been registered, initializing...")
-            utils.comarshal_release_and_get_stream(wb)
-            self.register_and_configure_wb_workspace(wb_dispatch)
-        return self._workspace_map[wb_path]
+        utils.comarshal_release_and_get_stream(wb)
+        return wb_path
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         workspace = self._get_workspace_from_wb(wb_dispatch)
@@ -100,7 +117,20 @@ class xlproServerAsync:
     def register_functions_in_vba(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         workspace.register_functions_in_vba(utils.comarshal_release_and_get_stream(wb_dispatch))
+
+    def _shutdown(self):
+        ...
     
+    def shutdown_workspace(self, wb_dispatch):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        logger.info(f"Shutting down workspace uid:'{uid}'")
+        workspace:xlproServerAsyncWorkspace
+        workspace._shutdown()
+        del workspace
+        del self._workspace_map[uid]
+        pass
+
     
 class xlproServerAsyncWorkspace:
     def __init__(self, server:xlproServerAsync, wb_uid):
@@ -139,6 +169,9 @@ class xlproServerAsyncWorkspace:
         self._client_manager = ClientManager(server=self)
         self._client_manager.start()
 
+        self._func_hash_subthread_map = {}
+        self._func_hash_fig_generating_thread_map = {}
+
     def _set_working_dir(self, wd:Path):
         self._wd = wd / ".xlpro"
         self._wd.mkdir(parents=True, exist_ok=True)
@@ -161,7 +194,7 @@ class xlproServerAsyncWorkspace:
     def register_functions_in_vba(self, wb_stream):
         self.register_functions_in_self()
         funcs = [v for k, v in self._func_register.items()]
-        time.sleep(0.2)
+        time.sleep(1.0)
         wb = utils.comarshal_dispatch_stream(wb_stream)
         utils.init_xlpro_vb_dynamic_component(wb, funcs)
         utils.comarshal_release_and_get_stream(wb)
@@ -199,6 +232,7 @@ class xlproServerAsyncWorkspace:
 
             if result_type == ResultType.default:
                 t = self._create_and_register_async_worker(uid, func, args, kwargs={})
+                self._func_hash_subthread_map[uid] = t
                 t.start()
             elif result_type == ResultType.figure:
                 fig_generating_thread = FigureGeneratingThread(
@@ -209,6 +243,7 @@ class xlproServerAsyncWorkspace:
                     return_value_queue=self._threaded_result_queue, 
                     return_event=self._results_manager_thread._wake_event,
                 )
+                # self._func_hash_fig_generating_thread_map[uid] = fig_generating_thread
                 fig_generating_thread.start()
 
             # return the (incomplete result)
@@ -238,7 +273,16 @@ class xlproServerAsyncWorkspace:
         t = threading.Thread(target=func_wrapper, daemon=True)
         return t
     
+    def _shutdown(self):
+        for uid, t in self._func_hash_subthread_map.items():
+            t:threading.Thread
+            if t.is_alive():
+                t.join()
+        for uid, p in self._func_hash_fig_generating_thread_map.items():
+            p:FigureGeneratingThread
+            p.stop()
 
+    
 def figure_process_func(uid, func_name, args, kwargs, queue):
     func = setup_scope_and_get_function(func_name)
     fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
@@ -277,10 +321,11 @@ class FigureGeneratingThread:
         # start the watcher
         self._thread.start()
 
-    def stop(self):
+    def stop(self, timeout_s=10):
         self._stop_event.set()
         self._wake_event.set()  # Wake up if sleeping
-        self._thread.join()
+        self._thread.join(timeout=timeout_s)
+        # self._process.terminate()
 
     def wake(self):
         self._wake_event.set()
