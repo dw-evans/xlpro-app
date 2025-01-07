@@ -54,6 +54,7 @@ class xlproServerAsync:
         "register_functions_in_workspace",
         "execute_function_async",
         "shutdown_workspace",
+        "get_vba_sync_text",
     ]
     # _reg_progid_ = 'xlproServerAsync.Application'
     # _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
@@ -97,7 +98,7 @@ class xlproServerAsync:
         if not uid in self._workspace_map.keys():
             logger.info("Workbook has not been registered, initializing...")
             self.register_and_configure_wb_workspace(wb_dispatch)
-            utils.comarshal_release_and_get_stream(wb_dispatch)
+        utils.comarshal_release_and_get_stream(wb_dispatch)
         return self._workspace_map[uid]
     
     def _get_workspace_uid_from_wb(self, wb_dispatch):
@@ -112,16 +113,15 @@ class xlproServerAsync:
 
     def register_functions_in_workspace(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        workspace.register_functions_in_self(utils.comarshal_release_and_get_stream(wb_dispatch))
+        # workspace.register_functions_in_self(utils.comarshal_release_and_get_stream(wb_dispatch))
+        workspace.register_functions_in_self()
 
     def register_functions_in_vba(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         workspace.register_functions_in_vba(utils.comarshal_release_and_get_stream(wb_dispatch))
 
-    def _shutdown(self):
-        ...
-    
     def shutdown_workspace(self, wb_dispatch):
+        # XXX - todo - check this actually does anything meaninfgul
         workspace = self._get_workspace_from_wb(wb_dispatch)
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
         logger.info(f"Shutting down workspace uid:'{uid}'")
@@ -130,6 +130,14 @@ class xlproServerAsync:
         del workspace
         del self._workspace_map[uid]
         pass
+
+    def get_vba_sync_text(self, wb_dispatch):
+        """Gets the vba code module contents to register the udfs"""
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        return workspace._get_vba_sync_text()
+
+
+
 
     
 class xlproServerAsyncWorkspace:
@@ -170,7 +178,7 @@ class xlproServerAsyncWorkspace:
         self._client_manager.start()
 
         self._func_hash_subthread_map = {}
-        self._func_hash_fig_generating_thread_map = {}
+        # self._func_hash_fig_generating_thread_map = {}
 
     def _set_working_dir(self, wd:Path):
         self._wd = wd / ".xlpro"
@@ -198,7 +206,6 @@ class xlproServerAsyncWorkspace:
         wb = utils.comarshal_dispatch_stream(wb_stream)
         utils.init_xlpro_vb_dynamic_component(wb, funcs)
         utils.comarshal_release_and_get_stream(wb)
-
 
     def execute_function_async(self, caller, func_name, args):
         try:
@@ -278,10 +285,14 @@ class xlproServerAsyncWorkspace:
             t:threading.Thread
             if t.is_alive():
                 t.join()
-        for uid, p in self._func_hash_fig_generating_thread_map.items():
-            p:FigureGeneratingThread
-            p.stop()
+        # for uid, p in self._func_hash_fig_generating_thread_map.items():
+        #     p:FigureGeneratingThread
+        #     p.stop()
 
+    def _get_vba_sync_text(self) -> str:
+        funcs = [v for k, v, in self._func_register.items()]
+        s = utils.get_xlpro_vb_dynamic_component_contents(funcs)
+        return s
     
 def figure_process_func(uid, func_name, args, kwargs, queue):
     func = setup_scope_and_get_function(func_name)

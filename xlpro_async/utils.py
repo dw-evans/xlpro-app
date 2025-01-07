@@ -168,6 +168,15 @@ def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable
     # vb_dynamic_comdemod = None
     # pythoncom.CoUninitialize()
 
+def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str:
+    s_list = []
+    for f in func_register:
+        if not isinstance(f, Callable):
+            raise TypeError(f"Item must be a function, {type(f)}, {f}")
+        s_list.append(function_template_with_caller(f))
+    return "\n".join(s_list)
+
+
 import pythoncom
 import threading
 
@@ -310,7 +319,7 @@ def type_converter_wrapper(func):
     e.g. The user specifies a numpy array, the inbound argument is converted from a row
     major tuple to a numpy array
     """
-    @wraps(func)
+    # @wraps(func)
     def wrapper(*args, **kwargs):
         if kwargs:
             raise NotImplementedError("kwargs not supported atm")
