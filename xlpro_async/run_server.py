@@ -12,7 +12,7 @@ import win32api
 import pywintypes
 import win32event
 
-from server import xlproServerAsync
+from server import xlproServerAsync, ServerClosedException
 
 import logging
 
@@ -46,16 +46,18 @@ logger = logging.getLogger(__name__)
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()
 
+def should_close_server():
+    server = xlproServerAsync()
+    return server._is_pending_close
 
 def serve():
     try:
-        file_lock.acquire_lock_file_and_write_pid(config.xlpro_lock_path)
+        lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)
     except PermissionError as e:
         print("Could not acquire lock on file. Checking validity")
         if not file_lock.check_existing_lock_and_pid(config.xlpro_lock_path):
             print("The process with the lock file is not alive. ")
-            raise Exception
-            # sys.exit(1)
+            raise Exception(f"Error in lock file '{config.xlpro_lock_path}' please correct manually.")
         print("The process appears to be alive.")
         utils.show_warning(
             "xlpro",
@@ -63,6 +65,8 @@ def serve():
   - Another xlpro instance appears to be running.
   - Delete {config.xlpro_lock_path} if this issue persists.
   - This will not have affected your current session if xlpro was already running.""")
+        sys.exit(1)
+
 
     pythoncom.CoInitialize()
 
@@ -103,16 +107,17 @@ def serve():
     while True:
         try:
             rc = win32event.MsgWaitForMultipleObjects(
-                (), 0, win32event.INFINITE, win32event.QS_ALLEVENTS
+                (), 0, 1000, win32event.QS_ALLEVENTS
             )
             if rc == win32event.WAIT_OBJECT_0:
                 pwm = pythoncom.PumpWaitingMessages()
-                # if pwm:
-                #     break  # wm_quit
-        except KeyboardInterrupt:
+            if should_close_server():
+                raise ServerClosedException
+        except ServerClosedException:
+            logger.info("ServerClosedException encountered. Closing the server...")
+            logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
+            file_lock.close_file(handle=lock_file_handle)
             break
-        except Exception:
-            pass
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()

@@ -24,6 +24,7 @@ import utils
 from win32typelibs import excel as xl
 
 import matplotlib.figure
+import sys
 
 import load_config
 
@@ -45,24 +46,32 @@ def load_functions_from_register() -> dict:
             wd / "xlpro_register.py",
         )
 
+class ServerClosedException(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
 
 class xlproServerAsync:
     _public_methods_ = [
         "getpid",
+
         "register_and_configure_wb_workspace",
         "register_functions_in_vba",
         "register_functions_in_workspace",
+
         "execute_function_async",
+
         "shutdown_workspace",
+        "shutdown",
+
         "get_vba_sync_text",
     ]
-    # _reg_progid_ = 'xlproServerAsync.Application'
-    # _reg_clsid_ = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
-    _reg_progid_ = config.progid
+    # _reg_progid_ = config.progid
     _reg_clsid_ = config.clsid
 
     _instance = None  # Singleton instance
     _instance_initialized = False
+
+    _is_pending_close = False
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -81,6 +90,7 @@ class xlproServerAsync:
         return
 
     def getpid(self):
+        xlproServerAsync._is_pending_close = True
         return os.getpid()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
@@ -91,7 +101,7 @@ class xlproServerAsync:
             workspace = xlproServerAsyncWorkspace(self, wb_path)
             workspace._set_working_dir(wb_path.parent.resolve())
             self._workspace_map[wb_path] = workspace
-            
+
         
     def _get_workspace_from_wb(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
@@ -129,6 +139,16 @@ class xlproServerAsync:
         workspace._shutdown()
         del workspace
         del self._workspace_map[uid]
+        n_live_workspaces = len(list(self._workspace_map.values())) 
+        logger.info(f"There are currently {n_live_workspaces}")
+
+    def shutdown(self):
+        """Shuts down the server"""
+        n_live_workspaces = len(list(self._workspace_map.values())) 
+        if n_live_workspaces == 0:
+            logger.info("No workspaces alive, shutting down the server...")
+            raise ServerClosedException
+        logger.error(f"Unable to shutdown, {n_live_workspaces} are active. Please close these first.")
         pass
 
     def get_vba_sync_text(self, wb_dispatch):
@@ -136,10 +156,6 @@ class xlproServerAsync:
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace._get_vba_sync_text()
 
-
-
-
-    
 class xlproServerAsyncWorkspace:
     def __init__(self, server:xlproServerAsync, wb_uid):
         self._server = server

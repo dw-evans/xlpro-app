@@ -99,7 +99,7 @@ def write_to_file(handle, data:str):
     return rc
     # return bytes_written.value
 
-def acquire_lock_file_and_write_pid(file_path):
+def acquire_file_and_write_pid(file_path):
     """Try to acquire an exclusive lock on the file."""
     handle = _winapi.CreateFile(
         file_path,
@@ -111,7 +111,11 @@ def acquire_lock_file_and_write_pid(file_path):
         0,
     )
     write_to_file(handle, str(os.getpid()))
-    return
+    return handle
+
+def close_file(handle):
+    pass
+    _winapi.CloseHandle(handle)
 
 def check_existing_lock_and_pid(lock_file):
     """Check if a process holding the lock is still running."""
@@ -124,13 +128,6 @@ def check_existing_lock_and_pid(lock_file):
         pass
     return False
 
-def release_lock(fd):
-    """Release the lock and close the file descriptor."""
-    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-    os.close(fd)
-
-
-
 if __name__ == "__main__":
     import load_config
     config = load_config.load_config()
@@ -138,14 +135,12 @@ if __name__ == "__main__":
     p = config.xlpro_lock_path
 
     try:
-        fd = acquire_lock_file_and_write_pid(p)
+        handle = acquire_file_and_write_pid(p)
     except Exception as e:
         b = check_existing_lock_and_pid(p)
-
         pass
+    close_file(handle)
 
-
-    pass
     
 
 
