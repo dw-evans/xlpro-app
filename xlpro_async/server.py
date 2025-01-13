@@ -71,6 +71,8 @@ class xlproServerAsync:
     _instance = None  # Singleton instance
     _instance_initialized = False
 
+    # use this flag to tell the server to close it next time
+    # it is checked.
     _is_pending_close = False
 
     def __new__(cls, *args, **kwargs):
@@ -90,7 +92,7 @@ class xlproServerAsync:
         return
 
     def getpid(self):
-        xlproServerAsync._is_pending_close = True
+        # xlproServerAsync._is_pending_close = True
         return os.getpid()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
