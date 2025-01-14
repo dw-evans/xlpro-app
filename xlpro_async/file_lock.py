@@ -123,7 +123,7 @@ def check_existing_lock_and_pid(lock_file):
         with open(lock_file, 'r') as f:
             pid = int(f.read().strip())
             if psutil.pid_exists(pid):
-                return True  # Process is still running
+                return pid  # Process is still running
     except (ValueError, FileNotFoundError):
         pass
     return False

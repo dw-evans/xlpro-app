@@ -23,5 +23,4 @@ import typing
 
 def type_conversion_test_simple(range1:list1d):
     g = xl2DArgConvertor(range1, list1d)
-    time.sleep(5.0)
     return range1

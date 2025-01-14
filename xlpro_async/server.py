@@ -50,6 +50,7 @@ class ServerClosedException(Exception):
     def __init__(self, *args):
         super().__init__(*args)
 
+
 class xlproServerAsync:
     _public_methods_ = [
         "getpid",
@@ -64,6 +65,8 @@ class xlproServerAsync:
         "shutdown",
 
         "get_vba_sync_text",
+
+        "__dev_shutdown",
     ]
     # _reg_progid_ = config.progid
     _reg_clsid_ = config.clsid
@@ -96,7 +99,10 @@ class xlproServerAsync:
     
     @classmethod
     def signal_shutdown(cls):
-        cls._is_pending_close = True
+        cls._is_pending_close = True#
+    
+    def __dev_shutdown(self):
+        xlproServerAsync.signal_shutdown()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)

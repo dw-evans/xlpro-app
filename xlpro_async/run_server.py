@@ -25,6 +25,9 @@ import os
 
 import file_lock
 import utils
+import psutil
+
+
 
 wd = Path(__file__).parent
 
@@ -46,23 +49,37 @@ logger = logging.getLogger(__name__)
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()
 
-def should_close_server():
+def is_server_pending_close():
     server = xlproServerAsync()
     return server._is_pending_close
 
+def is_parent_process_closed(pid):
+    # Check if parent process still exists
+    try:
+        parent = psutil.Process(pid)
+        if parent.status() == psutil.STATUS_ZOMBIE:
+            return True
+    except psutil.NoSuchProcess:
+        return True
+
+    return False
+
+
 def serve():
+    global parent_pid
     try:
         lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)
     except PermissionError as e:
         print("Could not acquire lock on file. Checking validity")
-        if not file_lock.check_existing_lock_and_pid(config.xlpro_lock_path):
-            print("The process with the lock file is not alive. ")
+        pid = file_lock.check_existing_lock_and_pid(config.xlpro_lock_path)
+        if not pid:
+            print("The process with the lock file is not alive.")
             raise Exception(f"Error in lock file '{config.xlpro_lock_path}' please correct manually.")
         print("The process appears to be alive.")
         utils.show_warning(
             "xlpro",
             f"""WARNING: Could not acquire the file lock.
-  - Another xlpro instance appears to be running.
+  - Another xlpro instance appears to be running at PID: {pid}
   - Delete {config.xlpro_lock_path} if this issue persists.
   - This will not have affected your current session if xlpro was already running.""")
         sys.exit(1)
@@ -103,7 +120,7 @@ def serve():
     pythoncom.CoResumeClassObjects() # I think this cancels the suspended operation
 
     # XXX fix the main loop exit seq
-    print(f"Loop starting on PID:{os.getpid()}")
+    print(f"xlpro Python COM server starting on PID: {os.getpid()}")
     while True:
         try:
             # wait with a 1 sec timeout before checking for closedown signal
@@ -113,12 +130,22 @@ def serve():
             if rc == win32event.WAIT_OBJECT_0:
                 # message loop is mandatory
                 pwm = pythoncom.PumpWaitingMessages()
-            if should_close_server():
+            if is_server_pending_close():
                 raise ServerClosedException
+            if parent_pid is not None:
+                if is_parent_process_closed(parent_pid):
+                    raise psutil.NoSuchProcess(parent_pid)
         except ServerClosedException:
             logger.info("ServerClosedException encountered. Closing the server...")
             logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
             file_lock.close_file(handle=lock_file_handle)
+            break
+        except psutil.NoSuchProcess:
+            logger.info("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
+            logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
+            file_lock.close_file(handle=lock_file_handle)
+            break
+        except KeyboardInterrupt:
             break
 
     pythoncom.CoRevokeClassObject(revokeId)
@@ -127,5 +154,13 @@ def serve():
     logger.info("Graceful exit")
     sys.exit(1)
 
+import argparse
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
+    parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor")
+    args = parser.parse_args()
+
+    parent_pid = args.parent_pid if args.parent_pid else None
+
     serve()

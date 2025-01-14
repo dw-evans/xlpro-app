@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/BurntSushi/toml"
 )
@@ -27,13 +29,13 @@ func main() {
 
 	// Print the extracted python_interpreter value
 	fmt.Printf("Using Python interpreter: %s\n", config.PythonPath)
-	fmt.Printf("%s %s\n", config.PythonPath, config.RunServerPath)
-
+	fmt.Printf("%s %s %s %s\n", config.PythonPath, config.RunServerPath, "--parent_pid", strconv.Itoa(os.Getpid()))
+	
 	// Define the path to the Python script you want to run
 	// pythonScriptPath := "path/to/your/script.py"
-
+	
 	// Construct the command to run the Python interpreter with the script
-	cmd := exec.Command(config.PythonPath, config.RunServerPath)
+	cmd := exec.Command(config.PythonPath, config.RunServerPath, "--parent_pid", strconv.Itoa(os.Getpid()))
 
 	// Start the command (instead of Run, which waits for completion)
 	err = cmd.Start()

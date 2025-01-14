@@ -21,6 +21,8 @@ xlpro = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
 # xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
 
 ret1 = xlpro.getpid()
+print(ret1)
+xlpro.__dev_shutdown()
 
 
 
