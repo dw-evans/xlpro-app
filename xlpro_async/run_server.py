@@ -106,10 +106,12 @@ def serve():
     print(f"Loop starting on PID:{os.getpid()}")
     while True:
         try:
+            # wait with a 1 sec timeout before checking for closedown signal
             rc = win32event.MsgWaitForMultipleObjects(
                 (), 0, 1000, win32event.QS_ALLEVENTS
             )
             if rc == win32event.WAIT_OBJECT_0:
+                # message loop is mandatory
                 pwm = pythoncom.PumpWaitingMessages()
             if should_close_server():
                 raise ServerClosedException
@@ -121,6 +123,9 @@ def serve():
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()
+
+    logger.info("Graceful exit")
+    sys.exit(1)
 
 if __name__ == "__main__":
     serve()

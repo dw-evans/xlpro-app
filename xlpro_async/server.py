@@ -92,19 +92,31 @@ class xlproServerAsync:
         return
 
     def getpid(self):
-        # xlproServerAsync._is_pending_close = True
         return os.getpid()
     
+    @classmethod
+    def signal_shutdown(cls):
+        cls._is_pending_close = True
+    
     def register_and_configure_wb_workspace(self, wb_dispatch):
-        wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
-        wb_path = Path(wb.FullName)
-        utils.comarshal_release_and_get_stream(wb)
-        if not wb_path in self._workspace_map.keys():
-            workspace = xlproServerAsyncWorkspace(self, wb_path)
-            workspace._set_working_dir(wb_path.parent.resolve())
-            self._workspace_map[wb_path] = workspace
+        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        if not uid in self._workspace_map.keys():
+            workspace = xlproServerAsyncWorkspace(self, uid)
+            workspace_wd = Path(uid).parent.resolve()
+            logger.info(f"Setting working directory for workspace '{uid}' to '{str(workspace_wd)}'")
+            workspace._set_working_dir(workspace_wd)
+            logger.info(f"Registering functions in workspace '{uid}'")
+            workspace.register_functions_in_self()
+            self._workspace_map[uid] = workspace
+            pass
+        else:
+            uid = self._get_workspace_uid_from_wb(wb_dispatch)
+            logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
+            self.shutdown_workspace_from_dispatch(wb_dispatch)
+            logger.info(f"Re-initializing workspace...")
+            self.register_and_configure_wb_workspace(wb_dispatch)
+            logger.info(f"Re-initialization complete")
 
-        
     def _get_workspace_from_wb(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
         if not uid in self._workspace_map.keys():
@@ -115,7 +127,7 @@ class xlproServerAsync:
     
     def _get_workspace_uid_from_wb(self, wb_dispatch):
         wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
-        wb_path = Path(wb.FullName)
+        wb_path = str(Path(wb.FullName))
         utils.comarshal_release_and_get_stream(wb)
         return wb_path
 
@@ -129,10 +141,11 @@ class xlproServerAsync:
         workspace.register_functions_in_self()
 
     def register_functions_in_vba(self, wb_dispatch):
+        raise NotImplementedError("Obsoleted to remove combase.dll issue")
         workspace = self._get_workspace_from_wb(wb_dispatch)
         workspace.register_functions_in_vba(utils.comarshal_release_and_get_stream(wb_dispatch))
 
-    def shutdown_workspace(self, wb_dispatch):
+    def shutdown_workspace_from_dispatch(self, wb_dispatch):
         # XXX - todo - check this actually does anything meaninfgul
         workspace = self._get_workspace_from_wb(wb_dispatch)
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
@@ -149,7 +162,7 @@ class xlproServerAsync:
         n_live_workspaces = len(list(self._workspace_map.values())) 
         if n_live_workspaces == 0:
             logger.info("No workspaces alive, shutting down the server...")
-            raise ServerClosedException
+            xlproServerAsync.signal_shutdown()
         logger.error(f"Unable to shutdown, {n_live_workspaces} are active. Please close these first.")
         pass
 
@@ -192,8 +205,8 @@ class xlproServerAsyncWorkspace:
         self._results_manager_thread:ResultsManager = ResultsManager(server=self)
         self._results_manager_thread.start()
 
-        self._client_manager = ClientManager(server=self)
-        self._client_manager.start()
+        self._client_manager_thread = ClientManager(server=self)
+        self._client_manager_thread.start()
 
         self._func_hash_subthread_map = {}
         # self._func_hash_fig_generating_thread_map = {}
@@ -201,12 +214,6 @@ class xlproServerAsyncWorkspace:
     def _set_working_dir(self, wd:Path):
         self._wd = wd / ".xlpro"
         self._wd.mkdir(parents=True, exist_ok=True)
-
-    # def _set_extra_sys_paths(self, paths:list[Path]):
-    #     raise NotImplementedError
-    
-    # def _remove_module_from_globals(self, module_name):
-    #     raise NotImplementedError
 
     def _import_functions_and_get_dict(self, module_name):
         return utils.load_functions_from_file(
@@ -218,6 +225,7 @@ class xlproServerAsyncWorkspace:
         self._func_register = d
 
     def register_functions_in_vba(self, wb_stream):
+        raise NotImplementedError("Obsoleted to remove combase.dll issue")
         self.register_functions_in_self()
         funcs = [v for k, v in self._func_register.items()]
         time.sleep(1.0)
@@ -303,6 +311,8 @@ class xlproServerAsyncWorkspace:
             t:threading.Thread
             if t.is_alive():
                 t.join()
+        self._results_manager_thread.stop()
+        self._client_manager_thread.stop()
         # for uid, p in self._func_hash_fig_generating_thread_map.items():
         #     p:FigureGeneratingThread
         #     p.stop()
@@ -400,7 +410,7 @@ class ResultsManager:
     def __init__(self, server:xlproServerAsyncWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
-        self._thread = threading.Thread(target=self._watch, daemon=True)
+        self._thread = threading.Thread(target=self._rmgr_watch, daemon=True)
         self._server = server
 
     def start(self):
@@ -423,7 +433,7 @@ class ResultsManager:
     def _process_queue_element(self):
         """Processes either the multiprocessing or threaded results queues"""
         # getting the value tells us the result is complete
-        uid, val = self._server._threaded_result_queue.get()
+        uid, val = self._server._threaded_result_queue.get(timeout=0.01)
         with self._server._func_hash_result_iscomplete_map_lock:
             self._server._func_hash_result_iscomplete_map[uid] = True
 
@@ -432,9 +442,9 @@ class ResultsManager:
         self._server._recalculate_queue.put(uid)
 
         # wake the client manager to update the client
-        self._server._client_manager.wake()
+        self._server._client_manager_thread.wake()
 
-    def _watch(self):
+    def _rmgr_watch(self):
         """When awakened, retrieves the result queue and sends to the server cache.
         ResultsManager can reliably be woken up so no need for background checking.
         Unlike the ClientManager
