@@ -44,6 +44,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
 
+
 logger = logging.getLogger(__name__)
 
 # the background loop to keep the process alive
@@ -66,6 +67,15 @@ def is_parent_process_closed(pid):
 
 
 def serve():
+
+    import debugpy
+    debugpy.listen((config.debug_ip, config.debug_port))
+    print(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
+    logger.info(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
+    # debugpy.wait_for_client()
+    # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
+
+
     global parent_pid
     try:
         lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)
