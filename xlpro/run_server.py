@@ -12,7 +12,7 @@ import win32api
 import pywintypes
 import win32event
 
-from server import xlproServerAsync, ServerClosedException
+from server import xlproServer, ServerClosedException
 
 import logging
 
@@ -26,7 +26,6 @@ import os
 import file_lock
 import utils
 import psutil
-
 
 
 wd = Path(__file__).parent
@@ -62,9 +61,19 @@ logger.addHandler(handler)
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()
 
+SERVER:xlproServer = None
+
 def is_server_pending_close():
-    server = xlproServerAsync()
-    return server._is_pending_close
+    global SERVER
+    # TODO - XXX - Not sure why this loop is called so much...
+    try:
+        ret = SERVER._is_pending_close
+        logger.debug(f"Checked is_pending_close: {ret}")
+        return SERVER._is_pending_close
+    except Exception as e:
+        logger.warning(f"Exception encountered while checking is_pending_close: {e}")
+        SERVER = xlproServer()
+        return SERVER._is_pending_close
 
 def is_parent_process_closed(pid):
     # Check if parent process still exists
@@ -79,11 +88,9 @@ def is_parent_process_closed(pid):
 
 
 def serve():
-    logger.info(f"serve() being run at root directory: {os.getcwd()}")
-    print(__file__)
+    logger.debug(f"serve() being run at root directory: {os.getcwd()}")
     import debugpy
     debugpy.listen((config.debug_ip, config.debug_port),)
-    print(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
     logger.info(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
     # debugpy.wait_for_client()
     # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
@@ -112,16 +119,18 @@ def serve():
 
     # we register everything dynamically using the clsid only.
     # the progid must be registered separately with admin elevation
-    clsid = pywintypes.IID(xlproServerAsync._reg_clsid_)
+    clsid = pywintypes.IID(xlproServer._reg_clsid_)
 
     # overwrite the win32com server policy. Leaves in room to dispatch other objects...?
     # credit to xlwings library for this
     BaseDefaultPolicy = win32com.server.policy.DefaultPolicy
     class ServerWrapPolicy(BaseDefaultPolicy):
         def _CreateInstance_(self, reqClsid, reqIID):
+            global SERVER
             if reqClsid == clsid:
                 # fyi we wrap the clsid IID object (a com-compatible interface) around our COM server
-                return win32com.server.util.wrap(xlproServerAsync(), reqIID)
+                SERVER = xlproServer()
+                return win32com.server.util.wrap(SERVER, reqIID)
             else:
                 # return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
                 # I don't actually know how we would even get in here...?
@@ -143,12 +152,12 @@ def serve():
     pythoncom.CoResumeClassObjects() # I think this cancels the suspended operation
 
     # XXX fix the main loop exit seq
-    print(f"xlpro Python COM server starting on PID: {os.getpid()}")
+    logger.info(f"xlpro server starting on PID: {os.getpid()}")
     while True:
         try:
             # wait with a 1 sec timeout before checking for closedown signal
             rc = win32event.MsgWaitForMultipleObjects(
-                (), 0, 1000, win32event.QS_ALLEVENTS
+                (), 0, 30_000, win32event.QS_ALLEVENTS
             )
             if rc == win32event.WAIT_OBJECT_0:
                 # message loop is mandatory

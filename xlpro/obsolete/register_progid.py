@@ -1,5 +1,5 @@
 import winreg as reg
-from server import xlproServerAsync
+from server import xlproServer
 import sys
 
 """
@@ -54,8 +54,8 @@ def unregister_progid_to_clsid(progid, clsid):
 
 # Example usage
 if __name__ == "__main__":
-    progid = xlproServerAsync._reg_progid_
-    clsid = xlproServerAsync._reg_clsid_
+    progid = xlproServer._reg_progid_
+    clsid = xlproServer._reg_clsid_
     if "--unregister" in sys.argv:
         unregister_progid_to_clsid(progid, clsid)
     else:

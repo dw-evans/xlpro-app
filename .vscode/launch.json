@@ -18,20 +18,8 @@
                 {
                     "localRoot":"${workspaceFolder}",
                     "remoteRoot":"${workspaceFolder}",
-                    // "remoteRoot":"${workspaceFolder}/xlpro_async/startup"
-                    // "remoteRoot":"."
-                    // "remoteRoot": "../.."
-                    // "remoteRoot": "${workspaceFolder}/xlpro_async/startup"
-                    // "remoteRoot": "${workspaceFolder}/xlpro_async/startup/../.."
                 }
             ]
-        },
-        {
-            "name": "go launch file",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${file}"
         },
         {
             "name":"debugpy: current",
@@ -45,6 +33,21 @@
             "type": "debugpy",
             "request": "attach",
             "processId": "${command:pickProcess}"
-        }
+        },
+        {
+            "name": "go: launch file here",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}"
+        },
+        {
+            "name": "go: launch file at workspace root",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

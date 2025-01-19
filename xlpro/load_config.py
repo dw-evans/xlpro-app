@@ -3,8 +3,7 @@ import toml
 from pathlib import Path
 from dataclasses import dataclass
 
-wd = Path(__file__).parent
-config_path = wd / "config.toml"
+config_path = "config.toml"
 
 def load_config() -> Settings:
     with open(config_path, "r") as f:

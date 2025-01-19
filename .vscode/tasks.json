@@ -2,42 +2,23 @@
     "version": "2.0.0",
     "tasks": [
         {
-            // "label": "(Admin) Reregister COM Server",
-            "label": "(Admin) Reregister COM Server",
+            "label": "go compile xlpro",
             "type": "shell",
-            "command": "powershell",
+            "command": "go",
             "args": [
-                "./tools_async/reregister_with_admin.ps1"
+              "build",
+              "-o",
+              "xlpro.exe",
+              "src/main.go"
             ],
-            "problemMatcher": []
-        },
-        {
-            "label": "Restart Excel Session",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "./tools_async/refresh_excel.bat"
-            ],
-            "problemMatcher": [],
-        },
-        // {
-        //     "label": "Build Go Project",
-        //     "type": "shell",
-        //     "command": "go",
-        //     "args": [
-        //       "build",
-        //       "-o",
-        //       "startup.exe",
-        //       "main.go"
-        //     ],
-        //     "group": {
-        //       "kind": "build",
-        //       "isDefault": true
-        //     },
-        //     "problemMatcher": ["$go"],
-        //     "options": {
-        //       "cwd": "${workspaceFolder}/xlpro_async/startup"
-        //     }
-        //   }
+            "group": {
+              "kind": "build",
+              "isDefault": true
+            },
+            "problemMatcher": ["$go"],
+            "options": {
+              "cwd": "${workspaceFolder}"
+            }
+          }
     ]
 }

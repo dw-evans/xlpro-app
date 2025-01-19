@@ -27,7 +27,7 @@ func main() {
 	fmt.Printf("xlpro.exe Working Directory: %s\n", path)
 	
 	// Define the path to the config.toml file relative to the executable file.
-	configPath := "../config.toml"
+	configPath := "config.toml"
 	
 	// Read and parse the TOML file
 	var config Config

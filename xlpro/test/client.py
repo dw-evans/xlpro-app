@@ -1,7 +1,7 @@
 import win32com.client
 import datetime, os, threading
 
-from server import xlproServerAsync
+from server import xlproServer
 
 # # now works with the progid after registering it in the registry
 # xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
@@ -17,7 +17,7 @@ from server import xlproServerAsync
 
 # xlapp = win32com.client.Dispatch("Excel.Application")
 
-xlpro = win32com.client.Dispatch(xlproServerAsync._reg_clsid_)
+xlpro = win32com.client.Dispatch(xlproServer._reg_clsid_)
 # xlpro = win32com.client.Dispatch(xlproServerAsync._reg_progid_)
 
 ret1 = xlpro.getpid()

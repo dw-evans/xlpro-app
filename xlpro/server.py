@@ -51,7 +51,7 @@ class ServerClosedException(Exception):
         super().__init__(*args)
 
 
-class xlproServerAsync:
+class xlproServer:
     _public_methods_ = [
         "getpid",
 
@@ -86,12 +86,12 @@ class xlproServerAsync:
         return cls._instance
 
     def __init__(self):
-        if not xlproServerAsync._instance_initialized:
+        if not xlproServer._instance_initialized:
             pythoncom.CoInitialize()
-            xlproServerAsync._instance_initialized = True
-            self._workspace_map:dict[str, xlproServerAsyncWorkspace] = {} # uid (path) to workspace
+            xlproServer._instance_initialized = True
+            self._workspace_map:dict[str, xlproWorkspace] = {} # uid (path) to workspace
         else:
-            logger.info("__init__ called however the singleton already exists and has been initialized.")
+            logger.debug("__init__ called however the singleton already exists and has been initialized.")
         return
 
     def getpid(self):
@@ -102,12 +102,12 @@ class xlproServerAsync:
         cls._is_pending_close = True#
     
     def __dev_shutdown(self):
-        xlproServerAsync.signal_shutdown()
+        xlproServer.signal_shutdown()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
         if not uid in self._workspace_map.keys():
-            workspace = xlproServerAsyncWorkspace(self, uid)
+            workspace = xlproWorkspace(self, uid)
             workspace_wd = Path(uid).parent.resolve()
             logger.info(f"Setting working directory for workspace '{uid}' to '{str(workspace_wd)}'")
             workspace._set_working_dir(workspace_wd)
@@ -156,7 +156,7 @@ class xlproServerAsync:
         workspace = self._get_workspace_from_wb(wb_dispatch)
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
         logger.info(f"Shutting down workspace uid:'{uid}'")
-        workspace:xlproServerAsyncWorkspace
+        workspace:xlproWorkspace
         workspace._shutdown()
         del workspace
         del self._workspace_map[uid]
@@ -168,7 +168,7 @@ class xlproServerAsync:
         n_live_workspaces = len(list(self._workspace_map.values())) 
         if n_live_workspaces == 0:
             logger.info("No workspaces alive, shutting down the server...")
-            xlproServerAsync.signal_shutdown()
+            xlproServer.signal_shutdown()
         logger.error(f"Unable to shutdown, {n_live_workspaces} are active. Please close these first.")
         pass
 
@@ -177,8 +177,8 @@ class xlproServerAsync:
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace._get_vba_sync_text()
 
-class xlproServerAsyncWorkspace:
-    def __init__(self, server:xlproServerAsync, wb_uid):
+class xlproWorkspace:
+    def __init__(self, server:xlproServer, wb_uid):
         self._server = server
         self._wb_uid = wb_uid
         self._wd = None # working directory
@@ -413,7 +413,7 @@ class ResultType:
         return [value for key, value in vars(cls).items() if isinstance(value, int)]
         
 class ResultsManager:
-    def __init__(self, server:xlproServerAsyncWorkspace):
+    def __init__(self, server:xlproWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._rmgr_watch, daemon=True)
@@ -481,7 +481,7 @@ class ClientManager:
         self._server = server
         pass
 
-    def __init__(self, server:xlproServerAsyncWorkspace):
+    def __init__(self, server:xlproWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._watch, daemon=True)

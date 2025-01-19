@@ -125,9 +125,9 @@ def function_template_with_caller(func:Callable) -> str:
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
-    Set xlpro = GetObject("new: {server.xlproServerAsync._reg_clsid_}")
+    Set xlpro = GetObject("new: {server.xlproServer._reg_clsid_}")
 {'\n'.join(arg_range_conversion_check_list)}
-    {func_name} = xlpro.{server.xlproServerAsync.execute_function_async.__name__}(ThisWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
+    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ThisWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
 """
 
