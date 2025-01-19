@@ -156,15 +156,16 @@ def serve():
     logger.info(f"xlpro server starting on PID: {os.getpid()}")
     SERVER = xlproServer()
 
-    def close_lock_file():
+    def tidy_up_lock_file():
         logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
         file_lock.close_file(handle=lock_file_handle)
         logger.info(f"Removing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
         os.remove(config.xlpro_lock_path)
+        pass
 
     while True:
         try:
-            # wait with a 1 sec timeout before checking for closedown signal
+            # wait with a timeout before checking for closedown signal
             rc = win32event.MsgWaitForMultipleObjects(
                 (), 0, 10_000, win32event.QS_ALLEVENTS
             )
@@ -178,22 +179,22 @@ def serve():
                     raise psutil.NoSuchProcess(parent_pid)
         except ServerClosedException:
             logger.info("ServerClosedException encountered. Closing the server...")
-            close_lock_file()
+            tidy_up_lock_file()
             break
         except psutil.NoSuchProcess:
             logger.info("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
-            close_lock_file()
+            tidy_up_lock_file()
             break
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt encountered. Closing the server...")
-            close_lock_file()
+            tidy_up_lock_file()
             break
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()
 
     logger.info("Graceful exit")
-    sys.exit(1)
+    sys.exit()
 
 import argparse
 

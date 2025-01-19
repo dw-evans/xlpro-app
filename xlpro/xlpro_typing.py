@@ -2,23 +2,47 @@ from typing import TypeVar
 import numpy as np
 from typing import Any
 import typing
+import types
+
 
 import logging
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T') # arbitrary
+from xlpro_types import list1d, list2d, ndarray1d, ndarray2d, T
 
-# this preserves all of the methods for type hinting and code completion for the user
-# 1d options will force attempt reduction to a 1d vector and except if the input dimensionality is wrong.
-list1d = list[T]
-list2d = list[list1d[T]]
 
-ndarray1d = np.ndarray[T]
-ndarray2d = np.ndarray[T, T]
+def compare_generic_aliases(t1, t2):
+    if isinstance(t1, typing.GenericAlias) and isinstance(t2, typing.GenericAlias):
+        checks = []
+        checks.append(t1.__origin__ == t2.__origin__)
+        for st1, st2 in zip(t1.__args__, t2.__args__):
+            if isinstance(st1, typing.TypeVar) and isinstance(st2, typing.TypeVar):
+                checks.append(True)
+                continue
+            if isinstance(st1, typing.GenericAlias) and isinstance(st1, typing.GenericAlias):
+                checks.append(compare_generic_aliases(st1, st2))
+                continue
+            checks.append(st1 == st2)
+        return all(checks)
+    t_generic = None
+    t_other = None
+    if isinstance(t1, typing.GenericAlias):
+        t_generic = t1
+        t_other = t2
+    elif isinstance(t2, typing.GenericAlias):
+        t_generic = t2
+        t_other = t1
+    else:
+        raise TypeError("Incompatible types being checked")
+    return t_generic.__origin__ == t_other
 
+
+# XXX - todo - apparently this is sensitive to imports...
+# type checking broke when I refactored, presumably changed the origin of some of the objects?
 class xl2DArgConvertor:
     """Excel will convert ranges to 2d tuple arrays. Use this class to convert
-    the arguments before the user's code intereacts with them to ease debugging.
+    2d arrays into a user-specified type before the user's code receives it.
+    
     The user should only require up to 2d data with float, int, str and maybe
     boolean types so we can implement this custom logic confidently.
     """
@@ -31,19 +55,22 @@ class xl2DArgConvertor:
         # extract the final or intermediate dtype to use.
         dtype = cls._convert_args_to_np_dtype(args)
 
-        if tdst in [list1d, ndarray1d]:
+        if compare_generic_aliases(tdst, list1d):
+            pass
+
+        if any([compare_generic_aliases(tdst, x) for x in [list1d, ndarray1d]]):
             intermediate = np.array(val)
             shape = intermediate.shape
             if all([x > 1 for x in shape]):
                 raise TypeError("Provided value is not compatible with list1d")
-            if tdst == list1d:
+            if compare_generic_aliases(tdst, list1d):
                 return intermediate.flatten().tolist()
-            elif tdst == ndarray1d:
+            elif compare_generic_aliases(tdst, ndarray1d):
                 return intermediate.flatten()
         
-        elif tdst in [list2d, ndarray2d]:
+        elif any([compare_generic_aliases(tdst, x) for x in [list2d, ndarray2d]]):
             intermediate = np.array(val)
-            if tdst == list2d:
+            if compare_generic_aliases(tdst, list2d):
                 return intermediate.tolist()
             return intermediate
 
@@ -62,6 +89,7 @@ class xl2DArgConvertor:
             elif origin == np.ndarray:
                 intermediate = np.array(val, dtype=dtype)
                 return intermediate
+            
         if not tdst in [typing.Any]:
             raise Exception(f"Type {tdst} is too complicated or not supported for conversion attempt")
     
@@ -94,6 +122,8 @@ class xl2DArgConvertor:
             return np.int64
         elif a0 == bool:
             return np.bool
+        elif isinstance(a0, TypeVar):
+            return None
         elif any([np.issubdtype(a0, x) for x in (np.floating, np.integer, np.bool)]):
             # if the user specifies a specific dtype, resort to that
             # numpy should catch any conversion errors when attempting to convert
@@ -147,6 +177,6 @@ if __name__ == "__main__":
     print(f"r14={r14}, dtype={r14.dtype}")
     r15 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.int64])
     print(f"r15={r15}, dtype={r15.dtype}")
-
+    pass
 
 pass

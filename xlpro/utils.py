@@ -306,12 +306,19 @@ def create_random_hash():
 
 from functools import wraps
 
-def convert_xl_2d_types(func, args):
+def convert_xl_2d_types_args(func, args):
     _, args_and_types, _, _ = get_function_signature(func)
     ppargs = []
     for val, (a, t) in zip(args, args_and_types):
         ppargs.append(xlpro_typing.xl2DArgConvertor(val, t))
     return ppargs
+
+def convert_xl_2d_types_kwargs(func, kwargs):
+    _, args_and_types, _, _ = get_function_signature(func)
+    ppkwargs = {}
+    for a, t in args_and_types:
+        ppkwargs[a] = xlpro_typing.xl2DArgConvertor(kwargs[a], t)
+    return ppkwargs
 
 import xlpro_typing
 def type_converter_wrapper(func):
@@ -319,12 +326,11 @@ def type_converter_wrapper(func):
     e.g. The user specifies a numpy array, the inbound argument is converted from a row
     major tuple to a numpy array
     """
-    # @wraps(func)
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        if kwargs:
-            raise NotImplementedError("kwargs not supported atm")
-        ppargs = convert_xl_2d_types(func, args)
-        ret = func(*ppargs, **kwargs)
+        ppkwargs = convert_xl_2d_types_kwargs(func, kwargs)
+        ppargs = convert_xl_2d_types_args(func, args)
+        ret = func(*ppargs, **ppkwargs)
         
         # convert it back to a range format
         ret2 = xlpro_typing.xl2DArgConvertor._convert_back_to_range_format(ret)

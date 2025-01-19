@@ -46,6 +46,13 @@ def load_functions_from_register() -> dict:
             wd / "xlpro_register.py",
         )
 
+def _import_functions_and_get_dict(wd:Path, module_name):
+    return utils.load_functions_from_file(
+        f"{module_name}", 
+        wd / f"{module_name}.py",
+    )
+
+
 class ServerClosedException(Exception):
     def __init__(self, *args):
         super().__init__(*args)
@@ -99,7 +106,7 @@ class xlproServer:
     
     @classmethod
     def signal_shutdown(cls):
-        cls._is_pending_close = True#
+        cls._is_pending_close = True
     
     def __dev_shutdown(self):
         xlproServer.signal_shutdown()
@@ -275,6 +282,7 @@ class xlproWorkspace:
                 t.start()
             elif result_type == ResultType.figure:
                 fig_generating_thread = FigureGeneratingThread(
+                    wd=self._wd,
                     uid=uid,
                     func_name=func_name,
                     args=args,
@@ -328,8 +336,11 @@ class xlproWorkspace:
         s = utils.get_xlpro_vb_dynamic_component_contents(funcs)
         return s
     
-def figure_process_func(uid, func_name, args, kwargs, queue):
-    func = setup_scope_and_get_function(func_name)
+
+@utils.type_converter_wrapper
+@utils.com_init_dispatch_release_wrapper
+def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
+    func = setup_scope_and_get_function(wd, XLPRO_FUNC_REGISTRY_STEM, func_name)
     fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
     fp.parent.mkdir(parents=True, exist_ok=True)
     fig:matplotlib.figure.Figure = func(*args, **kwargs)
@@ -338,15 +349,18 @@ def figure_process_func(uid, func_name, args, kwargs, queue):
     queue.put((uid, (fp, size_inches)))
     pass
 
-def setup_scope_and_get_function(func_name):
-    import sys, os
-    func_map = load_functions_from_register()
+def setup_scope_and_get_function(wd, module_name, func_name):
+    func_map = _import_functions_and_get_dict(wd, module_name)
+    # func_map = load_functions_from_register()
     func = func_map[func_name]
     return func
 
 class FigureGeneratingThread:
     """Class which maintains a thread which waits for a process to finish."""
-    def __init__(self, uid, func_name, args, kwargs, return_value_queue, return_event):
+    def __init__(self, wd, uid, func_name, args, kwargs, return_value_queue, return_event):
+        self._wd = wd
+        if not isinstance(self._wd, Path):
+            raise TypeError 
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -378,13 +392,14 @@ class FigureGeneratingThread:
     def _create_process(self) -> multiprocessing.Process:
 
         p = multiprocessing.Process(
-            target=utils.type_converter_wrapper(
-                utils.com_init_dispatch_release_wrapper(
-                    figure_process_func,
-                )
-            ), 
+            # target=utils.type_converter_wrapper(
+            #     utils.com_init_dispatch_release_wrapper(
+            #         figure_process_func,
+            #     )
+            target=figure_process_func,
             daemon=True,
             kwargs={
+                "wd": self._wd,
                 "uid": self._uid,
                 "func_name": self._func_name,
                 "args": self._args,
