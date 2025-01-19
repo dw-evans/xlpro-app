@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 )
@@ -26,8 +28,14 @@ func main() {
 	}
 	fmt.Printf("xlpro.exe Working Directory: %s\n", path)
 	
+	exePath, err := os.Executable()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Printf("xlpro.exe Path: %s\n", exePath)
+	
 	// Define the path to the config.toml file relative to the executable file.
-	configPath := "config.toml"
+	configPath := filepath.Join(filepath.Dir(exePath), "config.toml")
 	
 	// Read and parse the TOML file
 	var config Config
@@ -49,7 +57,9 @@ func main() {
 
 	fmt.Printf("Running command: %s\n", strings.Join(cmdArgs, " "))
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-	// cmd := exec.Command("cmd", "/C", "start",config.PythonPath, config.RunServerPath, "--parent_pid", strconv.Itoa(os.Getpid()))
+
+	cmd.Dir = filepath.Dir(exePath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP}
 
 	// Capture the stdout pipe
 	stdout, err := cmd.StdoutPipe()

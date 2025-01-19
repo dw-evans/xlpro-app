@@ -2,6 +2,7 @@
 ~$*
 *.png
 .venv/
+xlpro.lock
 
 
 # --- GO GITIGNORE ---
@@ -140,4 +141,3 @@ dmypy.json
 
 
 
-xlpro_async/xlpro.lock

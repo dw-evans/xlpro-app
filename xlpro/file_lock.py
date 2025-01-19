@@ -128,6 +128,7 @@ def check_existing_lock_and_pid(lock_file):
         pass
     return False
 
+
 if __name__ == "__main__":
     import load_config
     config = load_config.load_config()

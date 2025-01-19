@@ -97,6 +97,7 @@ def serve():
 
     pass
     global parent_pid
+    global SERVER
     try:
         lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)
     except PermissionError as e:
@@ -153,11 +154,19 @@ def serve():
 
     # XXX fix the main loop exit seq
     logger.info(f"xlpro server starting on PID: {os.getpid()}")
+    SERVER = xlproServer()
+
+    def close_lock_file():
+        logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
+        file_lock.close_file(handle=lock_file_handle)
+        logger.info(f"Removing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
+        os.remove(config.xlpro_lock_path)
+
     while True:
         try:
             # wait with a 1 sec timeout before checking for closedown signal
             rc = win32event.MsgWaitForMultipleObjects(
-                (), 0, 30_000, win32event.QS_ALLEVENTS
+                (), 0, 10_000, win32event.QS_ALLEVENTS
             )
             if rc == win32event.WAIT_OBJECT_0:
                 # message loop is mandatory
@@ -169,15 +178,15 @@ def serve():
                     raise psutil.NoSuchProcess(parent_pid)
         except ServerClosedException:
             logger.info("ServerClosedException encountered. Closing the server...")
-            logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
-            file_lock.close_file(handle=lock_file_handle)
+            close_lock_file()
             break
         except psutil.NoSuchProcess:
             logger.info("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
-            logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
-            file_lock.close_file(handle=lock_file_handle)
+            close_lock_file()
             break
         except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt encountered. Closing the server...")
+            close_lock_file()
             break
 
     pythoncom.CoRevokeClassObject(revokeId)
