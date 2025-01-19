@@ -35,6 +35,7 @@ __logging_dir = Path(config.logging_path).parent
 if not __logging_dir.exists():
     __logging_dir.mkdir(parents=True, exist_ok=True)
 
+
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
     filename=config.logging_path,   # The file where logs will be saved
@@ -46,6 +47,17 @@ logging.basicConfig(
 
 
 logger = logging.getLogger(__name__)
+
+# Create a handler to output logs to stdout
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)  # Set the handler's log level
+
+# Create a formatter and attach it to the handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+logger.addHandler(handler)
 
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()
@@ -67,15 +79,16 @@ def is_parent_process_closed(pid):
 
 
 def serve():
-
+    logger.info(f"serve() being run at root directory: {os.getcwd()}")
+    print(__file__)
     import debugpy
-    debugpy.listen((config.debug_ip, config.debug_port))
+    debugpy.listen((config.debug_ip, config.debug_port),)
     print(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
     logger.info(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
     # debugpy.wait_for_client()
     # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
 
-
+    pass
     global parent_pid
     try:
         lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)

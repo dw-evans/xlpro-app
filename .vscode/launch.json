@@ -17,7 +17,12 @@
             "pathMappings":[
                 {
                     "localRoot":"${workspaceFolder}",
-                    "remoteRoot":"."
+                    "remoteRoot":"${workspaceFolder}",
+                    // "remoteRoot":"${workspaceFolder}/xlpro_async/startup"
+                    // "remoteRoot":"."
+                    // "remoteRoot": "../.."
+                    // "remoteRoot": "${workspaceFolder}/xlpro_async/startup"
+                    // "remoteRoot": "${workspaceFolder}/xlpro_async/startup/../.."
                 }
             ]
         },

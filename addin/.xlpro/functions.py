@@ -19,8 +19,6 @@ from xlpro_typing import list1d, list2d, ndarray1d, ndarray2d, xl2DArgConvertor
 import numpy as np
 import typing
 
-
-
 def type_conversion_test_simple(range1:list1d):
     g = xl2DArgConvertor(range1, list1d)
     return range1

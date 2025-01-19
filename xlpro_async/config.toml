@@ -12,6 +12,7 @@ logging_path = "./xlpro.log"
 
 xlpro_lock_path = "C:/Users/Daniel Evans/projects/xlpro/xlpro_async/xlpro.lock"
 
+# a debug server will start to listen here. 
 debug_ip = "localhost"
 debug_port = 5678
 
