@@ -316,8 +316,12 @@ def convert_xl_2d_types_args(func, args):
 def convert_xl_2d_types_kwargs(func, kwargs):
     _, args_and_types, _, _ = get_function_signature(func)
     ppkwargs = {}
-    for a, t in args_and_types:
-        ppkwargs[a] = xlpro_typing.xl2DArgConvertor(kwargs[a], t)
+    for k, v in kwargs.items():
+        for a, t in args_and_types:
+            if a == k:
+                ppkwargs[a] = xlpro_typing.xl2DArgConvertor(v, t)
+                break
+
     return ppkwargs
 
 import xlpro_typing
