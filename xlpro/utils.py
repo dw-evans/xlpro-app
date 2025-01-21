@@ -13,6 +13,24 @@ import typing
 import inspect
 import logging
 
+from pathlib import Path
+import hashlib
+import uuid
+from functools import wraps
+import xlpro_typing
+import ctypes
+import os
+
+import textwrap
+import numpy as np
+import matplotlib.figure
+import pythoncom
+import importlib
+import types
+import sys
+import regex as re
+
+
 logger = logging.getLogger(__name__)
 
 VB_DYNAMIC_MODULE_NAME = "xlpro_async"
@@ -58,15 +76,12 @@ vb_type_declaration_strings = {
     Any: "{} As Variant",
 }
 
-import textwrap
 vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
     {arg} = {arg}.Value
 EndIf"""
 
 
-import numpy as np
 
-import matplotlib.figure
 def get_func_result_type(func) -> int:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
@@ -177,8 +192,6 @@ def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str
     return "\n".join(s_list)
 
 
-import pythoncom
-import threading
 
 # XXX - todo - get a better understsanding of these COM names, they can't be right lol
 def comarshal_release_and_get_stream(com_dispatch):
@@ -266,17 +279,18 @@ def get_args_minus_reserved(func, args):
     return new_args
 
 
-import importlib
-import types
 
-def load_functions_from_file(module_name, file_path):
+def import_module(module_name, file_path):
     """Dynamically import all functions from a Python file."""
     # Load the module dynamically
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    
+    sys.modules[module_name] = module
+
+def get_functions_from_module(module_name):
     # Get all functions in the module
+    module = sys.modules[module_name]
     functions = {
         name: getattr(module, name)
         for name in dir(module)
@@ -284,7 +298,23 @@ def load_functions_from_file(module_name, file_path):
     }
     return functions
 
-import hashlib
+def get_function_names_from_module(module_name):
+    # Get all functions in the module
+    module = sys.modules[module_name]
+    functions = [
+        name
+        for name in dir(module)
+        if isinstance((v:=getattr(module, name)), types.FunctionType)
+    ]
+    return functions
+
+
+def import_functions_and_get_dict(module_name:str, module_path):
+    return import_module(
+        module_name, 
+        module_path,
+    )
+
 def hash_function_call(func, *args, **kwargs):
     # Create a unique string based on the function name and its arguments
     func_name = func.__name__
@@ -299,12 +329,13 @@ def hash_function_call(func, *args, **kwargs):
     hash_object = hashlib.sha256(combined.encode('utf-8'))
     return hash_object.hexdigest()
 
-import uuid
+def hash_str(s:str):
+    return hashlib.sha256(s.encode('utf-8')).hexdigest()
+
 def create_random_hash():
     r = str(uuid.uuid4())
     return hashlib.sha256(r.encode('utf-8')).hexdigest()
 
-from functools import wraps
 
 def convert_xl_2d_types_args(func, args):
     _, args_and_types, _, _ = get_function_signature(func)
@@ -324,7 +355,6 @@ def convert_xl_2d_types_kwargs(func, kwargs):
 
     return ppkwargs
 
-import xlpro_typing
 def type_converter_wrapper(func):
     """Converts the inbound data from excel into the types specified by the user 
     e.g. The user specifies a numpy array, the inbound argument is converted from a row
@@ -369,15 +399,52 @@ def com_init_dispatch_release_wrapper(func):
     return wrapper
 
 
-import ctypes
 def show_warning(title, message):
     # MessageBox parameters: hWnd, text, caption, uType
     ctypes.windll.user32.MessageBoxW(0, message, title, 0x30)  # 0x30 = MB_ICONWARNING
 
+def get_short_path(long_path):
+    # Ensure the path exists
+    if not os.path.exists(long_path):
+        raise FileNotFoundError(f"The path '{long_path}' does not exist.")
+    
+    # Allocate a buffer for the short path
+    buffer = ctypes.create_unicode_buffer(260)  # Maximum path length on Windows
+    ctypes.windll.kernel32.GetShortPathNameW(long_path, buffer, len(buffer))
+    
+    return buffer.value
+
+
+
+def hash_cell(rng_dispatch) -> str:
+    rng = Dispatch(rng_dispatch)
+    # XXX - todo - check that this also works for only worksheet files.
+    ws = rng.Parent
+    wb = ws.Parent
+    comarshal_release_and_get_stream(rng)
+    # return f"{get_short_path(wb.FullName)}::{ws.Name}::{rng.Address}"
+    return f"{wb.FullName}::{ws.Name}::{rng.Address}"
+
+
+
+
+
+class xlproptr:
+    def __init__(self, hash):
+        self._hash = None
+    
+    @staticmethod
+    def decode(s:str):
+        pass
+
+
+
+
 
 
 if __name__ == "__main__":
-    pass
+    xlapp = Dispatch("Excel.Application")
 
+    pass
 
 

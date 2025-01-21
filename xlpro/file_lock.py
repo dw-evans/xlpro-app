@@ -130,8 +130,8 @@ def check_existing_lock_and_pid(lock_file):
 
 
 if __name__ == "__main__":
-    import load_config
-    config = load_config.load_config()
+    import config
+    config = config.load()
 
     p = config.xlpro_lock_path
 

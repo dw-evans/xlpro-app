@@ -1,4 +1,4 @@
-progid = 'xlproServerAsync.Application'
+# progid = 'xlproServerAsync.Application'
 clsid = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
 
 # Interpreter used to run the server and internal excel code
@@ -16,3 +16,6 @@ xlpro_lock_path = "./xlpro.lock"
 debug_ip = "localhost"
 debug_port = 5678
 
+xlpro_directory = "./.xlpro"
+xlpro_functions_stem = "functions"
+xlpro_subroutines_stem = "subroutines"

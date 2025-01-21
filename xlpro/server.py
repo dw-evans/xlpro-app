@@ -15,7 +15,6 @@ from win32com.client import _PyIDispatchType # Type that can be used for isinsta
 import win32com.server.util
 import win32com.server.policy
 
-import datetime
 import numpy as np
 import pywintypes
 
@@ -24,39 +23,38 @@ import utils
 from win32typelibs import excel as xl
 
 import matplotlib.figure
+
+import config
+
 import sys
 
-import load_config
-
-config = load_config.load_config()
-
+cfg = config.load()
 wd = Path(__file__).parent
-
 logger = logging.getLogger(__name__)
 
-XLPRO_FUNC_REGISTRY_STEM = "functions"
-XLPRO_SUB_REGISTRY_STEM = "subroutines"
+def configure_workspace_xlpro_files(wd:Path, cfg:config.Configuration):
+    xlpro_dir_path = Path() / wd / cfg.xlpro_directory
+    xlpro_dir_path.mkdir(exist_ok=True)
 
-def load_functions_from_register() -> dict:
-    """Returns a dict of functions found in the xlpro registry module.
-    name: function. Runs all the imports too :)
-    """
-    return utils.load_functions_from_file(
-            "xlpro_register", 
-            wd / "xlpro_register.py",
-        )
+    funcs_path = xlpro_dir_path / f"{cfg.xlpro_functions_stem}.py"
+    subroutines_path = xlpro_dir_path / f"{cfg.xlpro_subroutines_stem}.py"
 
-def _import_functions_and_get_dict(wd:Path, module_name):
-    return utils.load_functions_from_file(
-        f"{module_name}", 
-        wd / f"{module_name}.py",
-    )
+    p = funcs_path
+    if not p.exists():
+        with open(p, "w") as f:
+            f.write(f"# > {p.resolve()}\n")
+            f.write(f"# xlpro will automatically detect functions in this file as Excel UDFs.\n\n")
 
+    p = subroutines_path
+    if not p.exists():
+        with open(p, "w") as f:
+            f.write(f"# > {p.resolve()}\n")
+            f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
 
+    
 class ServerClosedException(Exception):
     def __init__(self, *args):
         super().__init__(*args)
-
 
 class xlproServer:
     _public_methods_ = [
@@ -76,7 +74,7 @@ class xlproServer:
         "__dev_shutdown",
     ]
     # _reg_progid_ = config.progid
-    _reg_clsid_ = config.clsid
+    _reg_clsid_ = cfg.clsid
 
     _instance = None  # Singleton instance
     _instance_initialized = False
@@ -108,27 +106,35 @@ class xlproServer:
     def signal_shutdown(cls):
         cls._is_pending_close = True
     
-    def __dev_shutdown(self):
+    def force_shutdown(self):
         xlproServer.signal_shutdown()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
+
         if not uid in self._workspace_map.keys():
+            logger.info(f"Creating workspace '{uid}'...")
             workspace = xlproWorkspace(self, uid)
             workspace_wd = Path(uid).parent.resolve()
-            logger.info(f"Setting working directory for workspace '{uid}' to '{str(workspace_wd)}'")
-            workspace._set_working_dir(workspace_wd)
-            logger.info(f"Registering functions in workspace '{uid}'")
-            workspace.register_functions_in_self()
+
+            workspace.set_xlpro_working_dir(workspace_wd)
+            workspace.reset()
+
             self._workspace_map[uid] = workspace
+            logger.info(f"Creation of workspace complete for '{uid}'.")
+
             pass
         else:
-            uid = self._get_workspace_uid_from_wb(wb_dispatch)
-            logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
-            self.shutdown_workspace_from_dispatch(wb_dispatch)
-            logger.info(f"Re-initializing workspace...")
-            self.register_and_configure_wb_workspace(wb_dispatch)
-            logger.info(f"Re-initialization complete")
+            logger.info(f"Workspace already exists, resetting workspace '{uid}'.")
+            workspace = self._get_workspace_from_wb(wb_dispatch)
+            workspace.reset()
+            logger.info(f"Workspace reset complete for '{uid}'.")
+            
+            # logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
+            # self.shutdown_workspace_from_dispatch(wb_dispatch)
+            # logger.info(f"Re-initializing workspace...")
+            # self.register_and_configure_wb_workspace(wb_dispatch)
+            # logger.info(f"Re-initialization complete")
 
     def _get_workspace_from_wb(self, wb_dispatch):
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
@@ -143,6 +149,7 @@ class xlproServer:
         wb_path = str(Path(wb.FullName))
         utils.comarshal_release_and_get_stream(wb)
         return wb_path
+        # return utils.hash_str(wb_path)
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         workspace = self._get_workspace_from_wb(wb_dispatch)
@@ -151,12 +158,10 @@ class xlproServer:
     def register_functions_in_workspace(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         # workspace.register_functions_in_self(utils.comarshal_release_and_get_stream(wb_dispatch))
-        workspace.register_functions_in_self()
+        workspace._register_functions_in_self()
 
     def register_functions_in_vba(self, wb_dispatch):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
-        workspace = self._get_workspace_from_wb(wb_dispatch)
-        workspace.register_functions_in_vba(utils.comarshal_release_and_get_stream(wb_dispatch))
 
     def shutdown_workspace_from_dispatch(self, wb_dispatch):
         # XXX - todo - check this actually does anything meaninfgul
@@ -190,8 +195,6 @@ class xlproWorkspace:
         self._wb_uid = wb_uid
         self._wd = None # working directory
 
-        self._func_register = {}
-
         self._func_hash_result_display_map = {} # the result to be displayed
         self._func_hash_result_display_map_lock = threading.Lock()
 
@@ -224,31 +227,50 @@ class xlproWorkspace:
         self._func_hash_subthread_map = {}
         # self._func_hash_fig_generating_thread_map = {}
 
-    def _set_working_dir(self, wd:Path):
-        self._wd = wd / ".xlpro"
+        self._temp_module_name:str = None
+        self._valid_function_names:list[str] = []
+
+    def set_xlpro_working_dir(self, wd:Path):
+        logger.info(f"Setting working directory for workspace to '{str(wd)}'")
+        self._wd = wd / cfg.xlpro_directory
         self._wd.mkdir(parents=True, exist_ok=True)
 
-    def _import_functions_and_get_dict(self, module_name):
-        return utils.load_functions_from_file(
-            f"{module_name}", 
-            self._wd / f"{module_name}.py",
-        )
-    def register_functions_in_self(self):
-        d = self._import_functions_and_get_dict(XLPRO_FUNC_REGISTRY_STEM)
-        self._func_register = d
+    def _configure_xlpro_files(self):
+        configure_workspace_xlpro_files(self._wd.parent, cfg)
+
+    def _register_functions_in_self(self):
+        logger.info(f"Re-initializing workspace functions...")
+        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{utils.hash_str(self._wb_uid)}"
+        utils.import_module(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
+        self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
+        logger.info(f"Reinitialization complete.")
+
+    def _deregister_functions_in_self(self):
+        logger.info(f"Uninitializing workspace functions...")
+        self._valid_function_names = []
+        if self._temp_module_name is not None:
+            del sys.modules[self._temp_module_name]
+        logger.info(f"Uninitialization complete.")
+
+    def reset(self):
+        self._configure_xlpro_files()
+        self._deregister_functions_in_self()
+        self._register_functions_in_self()
+        logger.info("Clearing cached results")
+        self._func_hash_results_map = {}
+
+
 
     def register_functions_in_vba(self, wb_stream):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
-        self.register_functions_in_self()
-        funcs = [v for k, v in self._func_register.items()]
-        time.sleep(1.0)
-        wb = utils.comarshal_dispatch_stream(wb_stream)
-        utils.init_xlpro_vb_dynamic_component(wb, funcs)
-        utils.comarshal_release_and_get_stream(wb)
+
+    def _get_function_by_name(self, func_name):
+        return getattr(sys.modules[self._temp_module_name], func_name)
+
 
     def execute_function_async(self, caller, func_name, args):
         try:
-            func = self._func_register.get(func_name)
+            func = self._get_function_by_name(func_name)
             if not func:
                 return f"Function {func_name} not found."
 
@@ -332,26 +354,34 @@ class xlproWorkspace:
         #     p.stop()
 
     def _get_vba_sync_text(self) -> str:
-        funcs = [v for k, v, in self._func_register.items()]
+        funcs = [getattr(sys.modules[self._temp_module_name], f) for f in self._valid_function_names]
         s = utils.get_xlpro_vb_dynamic_component_contents(funcs)
+        del funcs
         return s
     
 
+# wrappers must be applied before we pickle the function I believe...
 @utils.type_converter_wrapper
 @utils.com_init_dispatch_release_wrapper
 def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
-    func = setup_scope_and_get_function(wd, XLPRO_FUNC_REGISTRY_STEM, func_name)
-    fp = wd / ".xlpro" / "tmp" / f"{uid}.png"
+
+    module_name = f"{cfg.xlpro_functions_stem}_{uid}"
+    utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
+    func = getattr(sys.modules[module_name], func_name)
+
+    fp = wd / "tmp" / f"{uid}.svg"
     fp.parent.mkdir(parents=True, exist_ok=True)
+
     fig:matplotlib.figure.Figure = func(*args, **kwargs)
     size_inches = np.array(fig.get_size_inches())
     fig.savefig(fp, dpi=600)
+
     queue.put((uid, (fp, size_inches)))
     pass
 
-def setup_scope_and_get_function(wd, module_name, func_name):
-    func_map = _import_functions_and_get_dict(wd, module_name)
-    # func_map = load_functions_from_register()
+def setup_scope_and_get_function(module_name, module_path, func_name):
+    utils.import_module(module_name, wd / f"{module_name}.py")
+    func_map = utils.get_functions_from_module(module_name)
     func = func_map[func_name]
     return func
 
@@ -577,6 +607,7 @@ class ClientManager:
         width, height = size_pt
 
         ws = caller_adjacent.Parent
+        # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
         ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
         caller_dispatch.Formula2 = caller_dispatch.Formula2

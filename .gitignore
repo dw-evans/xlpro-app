@@ -1,8 +1,9 @@
 # --- CUSTOM GITIGNORE ---
 ~$*
 *.png
+*.svg
 .venv/
-xlpro.lock
+*.lock
 
 
 # --- GO GITIGNORE ---

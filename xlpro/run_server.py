@@ -16,10 +16,10 @@ from server import xlproServer, ServerClosedException
 
 import logging
 
-import load_config
+import config
 import sys
 
-config = load_config.load_config()
+config = config.load()
 
 import os
 

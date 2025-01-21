@@ -30,7 +30,7 @@ import typing
 
 
 def type_conversion_test_simple(range1:list1d):
-    return range1
+    return np.array(range1) + 3.4
 
 def type_conversion_test_simple2(range1:list2d):
     return range1
@@ -62,34 +62,35 @@ def py_plot(xdata:list1d, ydata:list1d, xlims:list, ylims:list, xaxislabel:str, 
     return fig
 
 
-# def func_name_to_function(func_name):
-#     return globals()[func_name]
 
-# def get_args_of_function(func_name) -> list:
-#     func = func_name_to_function(func_name)
-#     f_name, args_and_types, ret_type, default_value_map = utils.get_function_signature(func)
-#     args = [a for a, t in args_and_types]
-#     return d2dd(args)
+def func_name_to_function(func_name):
+    return globals()[func_name]
 
-# def d2dd(vector:list):
-#     return np.array(vector).reshape(-1, 1)
+def d2dd(vector:list):
+    return np.array(vector).reshape(-1, 1)
+
+def get_args_of_function(func_name) -> list:
+    func = func_name_to_function(func_name)
+    f_name, args_and_types, ret_type, default_value_map = utils.get_function_signature(func)
+    args = [a for a, t in args_and_types]
+    return d2dd(args)
 
 # def pytranspose(vector:list):
 #     return np.array(vector).T
 
-# def decon(vector:list):
-#     return json.dumps(vector)
+def decon(vector:list):
+    return json.dumps(vector)
 
-# def jsonize(arr:list):
-#     if len(arr[0]) != 2:
-#         raise Exception("Please provide a nx2 array of key:value pairs")
-#     ret = {}
-#     for row in arr:
-#         if not isinstance(row[0], str):
-#             raise TypeError("Ensure the first column values are all strings")
-#         ret[row[0]] = row[1]
+def jsonize(arr:list):
+    if len(arr[0]) != 2:
+        raise Exception("Please provide a nx2 array of key:value pairs")
+    ret = {}
+    for row in arr:
+        if not isinstance(row[0], str):
+            raise TypeError("Ensure the first column values are all strings")
+        ret[row[0]] = row[1]
 
-#     return json.dumps(ret, indent=2)
+    return json.dumps(ret, indent=2)
 
 # import os
 
