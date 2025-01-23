@@ -10,19 +10,19 @@ import json
 from pathlib import Path
 from win32typelibs import excel as xl
 import win32com.client
-from xlpro_typing import list1d, list2d, ndarray1d, ndarray2d, xl2DArgConvertor
+from xlpro_typing import list1d, list2d, ndarray1d, ndarray2d, ExcelArrayConverter
 import numpy as np
 import typing
 
 
 def type_conversion_test_simple(range1):
-    # a = xl2DArgConvertor(range1, list1d)
-    # b = xl2DArgConvertor(range1, list2d)
-    # c = xl2DArgConvertor(range1, list2d[int])
-    # d = xl2DArgConvertor(range1, ndarray1d)
-    # e = xl2DArgConvertor(range1, ndarray2d)
-    f = xl2DArgConvertor(range1, ndarray2d[bool])
-    # g = xl2DArgConvertor(range1, list1d)
+    # a = ArrayTypeConverter(range1, list1d)
+    # b = ArrayTypeConverter(range1, list2d)
+    # c = ArrayTypeConverter(range1, list2d[int])
+    # d = ArrayTypeConverter(range1, ndarray1d)
+    # e = ArrayTypeConverter(range1, ndarray2d)
+    f = ExcelArrayConverter(range1, ndarray2d[bool])
+    # g = ArrayTypeConverter(range1, list1d)
     return f
 
 def type_conversion_testing(range1:list1d, range2:list2d, range3:ndarray1d, range4:ndarray2d):

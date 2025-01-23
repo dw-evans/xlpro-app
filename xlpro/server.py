@@ -258,6 +258,7 @@ class xlproWorkspace:
         self._register_functions_in_self()
         logger.info("Clearing cached results")
         self._func_hash_results_map = {}
+        pass
 
 
 

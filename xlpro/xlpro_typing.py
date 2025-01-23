@@ -39,7 +39,7 @@ def compare_generic_aliases(t1, t2):
 
 # XXX - todo - apparently this is sensitive to imports...
 # type checking broke when I refactored, presumably changed the origin of some of the objects?
-class xl2DArgConvertor:
+class ExcelArrayConverter:
     """Excel will convert ranges to 2d tuple arrays. Use this class to convert
     2d arrays into a user-specified type before the user's code receives it.
     
@@ -47,13 +47,21 @@ class xl2DArgConvertor:
     boolean types so we can implement this custom logic confidently.
     """
     def __new__(cls, val:Any, tdst:type):
+
+        # excel will provide a range as tuple[tuple]
+        # or a 1x1 range as a value.
+
+        # return the incoming value if not a 2d array needing conversion
         if not isinstance(val, tuple):
             return val
 
+        # dissect the destination type
         origin = typing.get_origin(tdst)
         args = typing.get_args(tdst)
+
+        # The user can specify a type if they want - e.g. np.float64, np.int32, np.bool
         # extract the final or intermediate dtype to use.
-        dtype = cls._convert_args_to_np_dtype(args)
+        dtype = cls._convert_alias_args_to_np_dtype(args)
 
         if compare_generic_aliases(tdst, list1d):
             pass
@@ -96,12 +104,13 @@ class xl2DArgConvertor:
         return val
 
     @classmethod
-    def _convert_args_to_np_dtype(cls, args:tuple[type]):
+    def _convert_alias_args_to_np_dtype(cls, args:tuple[type]):
 
         # XXX - todo - we may want to support strings in a fancy way...
         # For string arrays we probably want to fetch the .Text property of 
         # a range and not the .Value property (specifically concerned with 
         # 0 != "" (blank cells))
+        # XXX - todo - this is a job for the vba string generator!
 
         if len(args) == 0:
             return None
@@ -114,7 +123,7 @@ class xl2DArgConvertor:
         if isinstance(a0, typing.GenericAlias):
             if not typing.get_origin(a0) == list:
                 raise TypeError(f"Type {a0} cannot be processed, origin must be list")
-            return cls._convert_args_to_np_dtype(typing.get_args(a0))
+            return cls._convert_alias_args_to_np_dtype(typing.get_args(a0))
         
         elif a0 == float:
             return np.float64
@@ -149,33 +158,33 @@ class xl2DArgConvertor:
 
 
 if __name__ == "__main__":
-    r1  = xl2DArgConvertor(((1, 2,),), list1d)
+    r1  = ExcelArrayConverter(((1, 2,),), list1d)
     print(f"r1={r1}")
-    r2  = xl2DArgConvertor(((1, 2,),), list2d)
+    r2  = ExcelArrayConverter(((1, 2,),), list2d)
     print(f"r2={r2}")
-    r5  = xl2DArgConvertor(((1, 2,),), list)
+    r5  = ExcelArrayConverter(((1, 2,),), list)
     print(f"r5={r5}")
-    r6  = xl2DArgConvertor(((1, 2,),), list[float])
+    r6  = ExcelArrayConverter(((1, 2,),), list[float])
     print(f"r6={r6}")
-    r7  = xl2DArgConvertor(((1, 2,),), list[int])
+    r7  = ExcelArrayConverter(((1, 2,),), list[int])
     print(f"r7={r7}")
-    r8  = xl2DArgConvertor(((0, 1,),), list[bool])
+    r8  = ExcelArrayConverter(((0, 1,),), list[bool])
     print(f"r8={r8}")
-    r3  = xl2DArgConvertor(((1, 2,),), ndarray1d)
+    r3  = ExcelArrayConverter(((1, 2,),), ndarray1d)
     print(f"r3={r3}, dtype={r3.dtype}")
-    r4  = xl2DArgConvertor(((1, 2,),), ndarray2d)
+    r4  = ExcelArrayConverter(((1, 2,),), ndarray2d)
     print(f"r4={r4}, dtype={r4.dtype}")
-    r10 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.float16])
+    r10 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float16])
     print(f"r10={r10}, dtype={r10.dtype}")
-    r11 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.float32])
+    r11 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float32])
     print(f"r11={r11}, dtype={r11.dtype}")
-    r12 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.float64])
+    r12 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float64])
     print(f"r12={r12}, dtype={r12.dtype}")
-    r13 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.int16])
+    r13 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int16])
     print(f"r13={r13}, dtype={r13.dtype}")
-    r14 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.int32])
+    r14 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int32])
     print(f"r14={r14}, dtype={r14.dtype}")
-    r15 = xl2DArgConvertor(((0, 1,),), np.ndarray[np.int64])
+    r15 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int64])
     print(f"r15={r15}, dtype={r15.dtype}")
     pass
 

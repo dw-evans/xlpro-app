@@ -22,12 +22,20 @@ import win32com.client
 
 # These must be the exact same objects!...
 from xlpro_types import list1d, list2d, ndarray1d, ndarray2d
-from xlpro_typing import xl2DArgConvertor
+from xlpro_typing import ExcelArrayConverter
 
 import numpy as np
 import typing
 
+import utils
 
+@utils.jsonify_func(globals())
+def test_function_1(rng1:ndarray1d):
+    return rng1
+
+@utils.jsonify_func(globals())
+def test_function_2(rng1:ndarray1d, rng2:ndarray1d, rng3:ndarray1d):
+    return rng1 + rng2 + rng3
 
 def type_conversion_test_simple(range1:list1d):
     return np.array(range1) + 3.4
@@ -36,17 +44,19 @@ def type_conversion_test_simple2(range1:list2d):
     return range1
 
 def type_conversion_test_simple3(range1:list):
-    g = xl2DArgConvertor(range1, list)
+    g = ExcelArrayConverter(range1, list)
     return range1
 
+
+from utils import jsonify
 # def type_conversion_test_simple(range1:list1d):
-#     # a = xl2DArgConvertor(range1, list1d)
-#     # b = xl2DArgConvertor(range1, list2d)
-#     # c = xl2DArgConvertor(range1, list2d[int])
-#     # d = xl2DArgConvertor(range1, ndarray1d)
-#     # e = xl2DArgConvertor(range1, ndarray2d)
-#     # f = xl2DArgConvertor(range1, ndarray2d[bool])
-#     g = xl2DArgConvertor(range1, list1d)
+#     # a = ArrayTypeConverter(range1, list1d)
+#     # b = ArrayTypeConverter(range1, list2d)
+#     # c = ArrayTypeConverter(range1, list2d[int])
+#     # d = ArrayTypeConverter(range1, ndarray1d)
+#     # e = ArrayTypeConverter(range1, ndarray2d)
+#     # f = ArrayTypeConverter(range1, ndarray2d[bool])
+#     g = ArrayTypeConverter(range1, list1d)
 #     return range1
 
 
@@ -60,9 +70,7 @@ def py_plot(xdata:list1d, ydata:list1d, xlims:list, ylims:list, xaxislabel:str, 
     ax.set_ylabel(yaxislabel)
     ax.plot(xdata, ydata)
     return fig
-
-
-
+# func_name = "test_function1_json"
 def func_name_to_function(func_name):
     return globals()[func_name]
 
@@ -78,19 +86,9 @@ def get_args_of_function(func_name) -> list:
 # def pytranspose(vector:list):
 #     return np.array(vector).T
 
-def decon(vector:list):
-    return json.dumps(vector)
 
-def jsonize(arr:list):
-    if len(arr[0]) != 2:
-        raise Exception("Please provide a nx2 array of key:value pairs")
-    ret = {}
-    for row in arr:
-        if not isinstance(row[0], str):
-            raise TypeError("Ensure the first column values are all strings")
-        ret[row[0]] = row[1]
 
-    return json.dumps(ret, indent=2)
+
 
 # import os
 
@@ -113,3 +111,6 @@ def jsonize(arr:list):
 #     """Returns the color as an int interpreted by excel"""
 #     return b*256**2 + g*256 + r
 
+
+
+    

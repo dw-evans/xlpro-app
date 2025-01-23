@@ -56,7 +56,8 @@ def get_function_signature(func):
         if param.default is not inspect.Parameter.empty
     }
     
-    return func.__qualname__, result, type_hints.get('return', Any), default_value_map
+    # return func.__qualname__, result, type_hints.get('return', Any), default_value_map
+    return func.__name__, result, type_hints.get('return', Any), default_value_map
 
 # Converts python type to vb type
 vb_type_conversion_strings = {
@@ -117,32 +118,32 @@ def function_template_with_caller(func:Callable) -> str:
     # XXX - todo - ensure no reserved vba arguments are parsed!   
     
     a_list = [a for a, t in args_and_types]
-    # handle the reserved caller keyword
-    arg_idxs_to_del = []
-    if "caller" in a_list:
-        indx = a_list.index("caller")
-        arg_idxs_to_del.append(indx)
-        arg_conversion_list[indx] = "Application.Caller"
-    
-    # handle the reserved thisworkbook keyword
-    if "thiswb" in a_list:
-        indx = a_list.index("thiswb")
-        arg_idxs_to_del.append(indx)
-        arg_conversion_list[indx] = "ThisWorkbook"
 
-    if arg_idxs_to_del:
-        arg_idxs_to_del.sort(reverse=True)
-        for idx in arg_idxs_to_del:
-            del arg_declaration_list[idx]
+    # # handle the reserved caller keyword
+    # arg_idxs_to_del = []
+    # if "caller" in a_list:
+    #     indx = a_list.index("caller")
+    #     arg_idxs_to_del.append(indx)
+    #     arg_conversion_list[indx] = "Application.Caller"
+    
+    # # handle the reserved ActiveWorkbook keyword (pseudo thisworkbook...)
+    # if "thiswb" in a_list:
+    #     indx = a_list.index("thiswb")
+    #     arg_idxs_to_del.append(indx)
+    #     arg_conversion_list[indx] = "ActiveWorkbook"
+
+    # if arg_idxs_to_del:
+    #     arg_idxs_to_del.sort(reverse=True)
+    #     for idx in arg_idxs_to_del:
+    #         del arg_declaration_list[idx]
 
     import server 
-    # Set xlpro = CreateObject("{server.xlproServerAsync._reg_progid_}")
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
     Set xlpro = GetObject("new: {server.xlproServer._reg_clsid_}")
 {'\n'.join(arg_range_conversion_check_list)}
-    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ThisWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
+    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
 """
 
@@ -157,10 +158,6 @@ def get_or_create_codemodule(wb:xl._Workbook, c_name:str) -> vbide._CodeModule:
 
     codemod:vbide._CodeModule = comp.CodeModule
     return codemod
-
-# xlapp = win32com.client.Dispatch("Excel.Application")
-# wb = xlapp.ActiveWorkbook
-# get_or_create_codemodule(wb, "ThisWorkbook")
 
 
 def write_to_vb_module(s:str, vb_codemod:vbide._CodeModule):
@@ -227,12 +224,14 @@ def com_args_release_to_stream_reserved(func, args):
         caller_stream = comarshal_release_and_get_stream(caller)
         new_args[idx] = caller_stream
         # Caller type could be many things, likely just a Range.
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
         pass
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         thiswb = args[idx]
         thiswb_stream = comarshal_release_and_get_stream(thiswb)
         new_args[idx] = thiswb_stream
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
         pass
     return new_args
 
@@ -250,12 +249,14 @@ def com_args_dispatch_reserved(func, args):
         caller_stream = comarshal_dispatch_stream(caller)
         new_args[idx] = caller_stream
         # Caller type could be many things, likely just a Range.
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
         pass
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         thiswb = args[idx]
         thiswb_stream = comarshal_dispatch_stream(thiswb)
         new_args[idx] = thiswb_stream
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
         pass
     return new_args
 
@@ -270,18 +271,19 @@ def get_args_minus_reserved(func, args):
     if "caller" in arg_names:
         idx = arg_names.index("caller")
         arg_idxs_to_del.append(idx)
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         arg_idxs_to_del.append(idx)
+        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
     arg_idxs_to_del.sort(reverse=True)
     for idx in arg_idxs_to_del:
         new_args.pop(idx)
     return new_args
 
 
-
 def import_module(module_name, file_path):
-    """Dynamically import all functions from a Python file."""
+    """Dynamically import a module with a custom name"""
     # Load the module dynamically
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
@@ -289,6 +291,7 @@ def import_module(module_name, file_path):
     sys.modules[module_name] = module
 
 def get_functions_from_module(module_name):
+    """Retrieves all functions from a model"""
     # Get all functions in the module
     module = sys.modules[module_name]
     functions = {
@@ -298,7 +301,11 @@ def get_functions_from_module(module_name):
     }
     return functions
 
+
 def get_function_names_from_module(module_name):
+    """Returns a list of function names within a module. Returned names satisfy
+    being a valid callable function from Excel
+    """
     # Get all functions in the module
     module = sys.modules[module_name]
     functions = [
@@ -309,12 +316,6 @@ def get_function_names_from_module(module_name):
     return functions
 
 
-def import_functions_and_get_dict(module_name:str, module_path):
-    return import_module(
-        module_name, 
-        module_path,
-    )
-
 def hash_function_call(func, *args, **kwargs):
     # Create a unique string based on the function name and its arguments
     func_name = func.__name__
@@ -323,25 +324,20 @@ def hash_function_call(func, *args, **kwargs):
     kwargs_str = str(kwargs)
 
     # Combine the function name with its arguments
-    combined = func_name + args_str + kwargs_str
+    combined_string = func_name + args_str + kwargs_str
 
     # Generate a hash using SHA-256 (you can also use MD5 or others depending on your needs)
-    hash_object = hashlib.sha256(combined.encode('utf-8'))
-    return hash_object.hexdigest()
+    return hash_str(combined_string)
 
 def hash_str(s:str):
     return hashlib.sha256(s.encode('utf-8')).hexdigest()
-
-def create_random_hash():
-    r = str(uuid.uuid4())
-    return hashlib.sha256(r.encode('utf-8')).hexdigest()
 
 
 def convert_xl_2d_types_args(func, args):
     _, args_and_types, _, _ = get_function_signature(func)
     ppargs = []
     for val, (a, t) in zip(args, args_and_types):
-        ppargs.append(xlpro_typing.xl2DArgConvertor(val, t))
+        ppargs.append(xlpro_typing.ExcelArrayConverter(val, t))
     return ppargs
 
 def convert_xl_2d_types_kwargs(func, kwargs):
@@ -350,7 +346,7 @@ def convert_xl_2d_types_kwargs(func, kwargs):
     for k, v in kwargs.items():
         for a, t in args_and_types:
             if a == k:
-                ppkwargs[a] = xlpro_typing.xl2DArgConvertor(v, t)
+                ppkwargs[a] = xlpro_typing.ExcelArrayConverter(v, t)
                 break
 
     return ppkwargs
@@ -362,12 +358,11 @@ def type_converter_wrapper(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        ppkwargs = convert_xl_2d_types_kwargs(func, kwargs)
-        ppargs = convert_xl_2d_types_args(func, args)
+        ppargs, ppkwargs = preprocess_arguments(func, args, kwargs)
         ret = func(*ppargs, **ppkwargs)
         
         # convert it back to a range format
-        ret2 = xlpro_typing.xl2DArgConvertor._convert_back_to_range_format(ret)
+        ret2 = xlpro_typing.ExcelArrayConverter._convert_back_to_range_format(ret)
         # XXX - todo - add some logging to this. cant handle np arrays atm
         # if ret2 != ret:
         #     logger.debug("Return value was changed to suit excel's format")
@@ -376,6 +371,7 @@ def type_converter_wrapper(func):
         return ret2
 
     return wrapper
+
 
 
 def com_init_dispatch_release_wrapper(func):
@@ -427,24 +423,84 @@ def hash_cell(rng_dispatch) -> str:
 
 
 
-
-
-class xlproptr:
-    def __init__(self, hash):
-        self._hash = None
+from xlpro_types import xlproptr
     
-    @staticmethod
-    def decode(s:str):
-        pass
 
+    
+import json
+def jsonify_func(globals_dict:dict):
+    # XXX - todo - figure out a way to not need to provide globals on user-side
+    """Provide the globals() dict to modify the caller globals :)"""
+    def wrapper0(func):
+        """Adds a function func_json(json_kwargs:str) to globals()
+        The returned function replaces all args with a single json string
+        """
+        @wraps(func)
+        def wrapper(json_kwargs_str):
+            kwargs = json.loads(json_kwargs_str)
+            preprocess_arguments(func=func, kwargs=kwargs)
+            return func(**kwargs)
 
+        wrapper.__name__ = f"{func.__name__}_json"
+        wrapper.__qualname__ = wrapper.__name__
+        globals_dict[wrapper.__name__] = wrapper
+        return func
+    return wrapper0
 
+from xlpro_typing import list1d, list2d
+def jsonify(arr:list2d):
+    """Converts range to json string"""
+    if len(arr[0]) != 2:
+        raise Exception("Please provide a nx2 array of key:value pairs")
+    ret = {}
+    for row in arr:
+        if not isinstance(row[0], str):
+            raise TypeError("Ensure the first column values are all strings")
+        ret[row[0]] = row[1]
 
+    return json.dumps(ret, indent=2)
+
+# import copy
+def pre_p_an_arg(cval, target_type):
+    # 1. check if its an xlproptr. Replace val with the ptr result
+    # cval = copy.copy(val)
+    if xlproptr.is_ptr(cval):
+        cval = xlproptr.decode(cval).evaluate()
+    
+    # 2. convert an argument to a target type
+    ppval = xlpro_typing.ExcelArrayConverter(cval, target_type)
+    return ppval
+
+def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
+    if not isinstance(args, typing.Iterable):
+        raise TypeError("args must be an iterable")
+    if not isinstance(kwargs, dict):
+        raise TypeError("kwargs must be a dict")
+
+    _, args_and_types, _, _ = get_function_signature(func)
+
+    ppargs = []
+    if args is not None:
+        for val, (a, t) in zip(args, args_and_types):
+            ppargs.append(pre_p_an_arg(val, t))
+
+    ppkwargs = {}
+    if kwargs is not None:
+        for k, val in kwargs.items():
+            for a, t in args_and_types:
+                if a == k:
+                    ppkwargs[a] = (pre_p_an_arg(val, t))
+                    break
+
+    return ppargs, ppkwargs
+    
 
 
 if __name__ == "__main__":
-    xlapp = Dispatch("Excel.Application")
 
+    jsonify_func(hash_str)
+
+    a = xlproptr.decode("*<a::b::c>")
     pass
 
 
