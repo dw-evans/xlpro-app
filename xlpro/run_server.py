@@ -12,7 +12,7 @@ import win32api
 import pywintypes
 import win32event
 
-from server import xlproServer, ServerClosedException
+from server import xlproServer
 
 import logging
 
@@ -26,6 +26,7 @@ import os
 import file_lock
 import utils
 import psutil
+import errors
 
 
 wd = Path(__file__).parent
@@ -173,12 +174,12 @@ def serve():
                 # message loop is mandatory
                 pwm = pythoncom.PumpWaitingMessages()
             if is_server_pending_close():
-                raise ServerClosedException
+                raise errors.ServerClosedException
             if parent_pid is not None:
                 if is_parent_process_closed(parent_pid):
                     raise psutil.NoSuchProcess(parent_pid)
-        except ServerClosedException:
-            logger.info("ServerClosedException encountered. Closing the server...")
+        except errors.ServerClosedException:
+            logger.info("errors.ServerClosedException encountered. Closing the server...")
             tidy_up_lock_file()
             break
         except psutil.NoSuchProcess:

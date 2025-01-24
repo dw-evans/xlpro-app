@@ -30,6 +30,11 @@ import types
 import sys
 import regex as re
 
+from xlpro_types import xlproptr
+import errors
+import json
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -358,7 +363,7 @@ def type_converter_wrapper(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        ppargs, ppkwargs = preprocess_arguments(func, args, kwargs)
+        ppargs, ppkwargs = preprocess_arguments(func=func, args=args, kwargs=kwargs)
         ret = func(*ppargs, **ppkwargs)
         
         # convert it back to a range format
@@ -423,11 +428,6 @@ def hash_cell(rng_dispatch) -> str:
 
 
 
-from xlpro_types import xlproptr
-    
-
-    
-import json
 def jsonify_func(globals_dict:dict):
     # XXX - todo - figure out a way to not need to provide globals on user-side
     """Provide the globals() dict to modify the caller globals :)"""
@@ -437,9 +437,12 @@ def jsonify_func(globals_dict:dict):
         """
         @wraps(func)
         def wrapper(json_kwargs_str):
+            if is_arg_promise(json_kwargs_str):
+                raise errors.ArugmentNotReadyException
+            # XXX - todo - need to convert args based on the original function! (although it seems to work already...?)
             kwargs = json.loads(json_kwargs_str)
-            preprocess_arguments(func=func, kwargs=kwargs)
-            return func(**kwargs)
+            ppargs, ppkwargs = preprocess_arguments(func=func, kwargs=kwargs)
+            return func(*ppargs, **ppkwargs)
 
         wrapper.__name__ = f"{func.__name__}_json"
         wrapper.__qualname__ = wrapper.__name__
@@ -460,21 +463,40 @@ def jsonify(arr:list2d):
 
     return json.dumps(ret, indent=2)
 
+def is_arg_promise(arg):
+    if not isinstance(arg, str):
+        return False
+    return re.search(r"^Promise<\w*>", arg)
+
+def validate_args_wrapper(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        for arg in args + [v for k, v in kwargs.items()]:
+            if is_arg_promise(arg):
+                raise errors.ArugmentNotReadyException
+        return func(*args, **kwargs)
+    return wrapper
+
 # import copy
 def pre_p_an_arg(cval, target_type):
+    # 0. raise error if the argument is currently a promise!
+    if is_arg_promise(cval):
+        raise errors.ArugmentNotReadyException
+    
     # 1. check if its an xlproptr. Replace val with the ptr result
     # cval = copy.copy(val)
     if xlproptr.is_ptr(cval):
         cval = xlproptr.decode(cval).evaluate()
+
     
     # 2. convert an argument to a target type
     ppval = xlpro_typing.ExcelArrayConverter(cval, target_type)
     return ppval
 
 def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
-    if not isinstance(args, typing.Iterable):
+    if not args is None and not isinstance(args, typing.Iterable):
         raise TypeError("args must be an iterable")
-    if not isinstance(kwargs, dict):
+    if not kwargs is None and not isinstance(kwargs, dict):
         raise TypeError("kwargs must be a dict")
 
     _, args_and_types, _, _ = get_function_signature(func)
@@ -495,12 +517,50 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
     return ppargs, ppkwargs
     
 
+import threading
+class ThreadWithException(threading.Thread):
+    """Thread wrapper class that allows exception extraction"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.exception = None
+
+    def run(self):
+        try:
+            if self._target:
+                self._target(*self._args, **self._kwargs)
+        except Exception as e:
+            self.exception = e  # Store the exception
+
+    def get_exception(self):
+        return self.exception
+
+
+
 
 if __name__ == "__main__":
 
-    jsonify_func(hash_str)
+    # jsonify_func(hash_str)
 
-    a = xlproptr.decode("*<a::b::c>")
+    # a = xlproptr.decode("*<a::b::c>")
+
+
+    # Example target function
+    def faulty_function():
+        raise ValueError("Something went wrong in the thread!")
+
+    # Using the custom thread
+    thread = ThreadWithException(target=faulty_function)
+    thread.start()
+    thread.join()
+
+    # Check for exceptions
+    if thread.get_exception():
+        print(f"Exception occurred: {thread.get_exception()}")
+    else:
+        print("Thread completed successfully.")
+
+
+
+
     pass
-
 

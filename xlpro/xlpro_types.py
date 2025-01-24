@@ -44,7 +44,7 @@ class xlproptr:
     @classmethod
     def decode(cls, s:str):
         """Primary entry point into class"""
-        mtch = re.search(r"\*\<(.+)::(.+)::(.+)\>", s)
+        mtch = re.search(r"^\*\<(.+)::(.+)::(.+)\>", s)
         return cls(*mtch.groups())
     
     @staticmethod
@@ -83,7 +83,7 @@ class xlproptr:
         # e.g. mapped drives may convert to server addresses. I believe resolve() corrects for this...
         if not Path(self.wb_path).resolve().__str__() in [Path(wb.FullName).resolve().__str__() for wb in xlapp.Workbooks]:
             xlapp.Workbooks.Open(self.wb_path)
-        ret = xlapp.Workbooks(self.wb_path).Sheets(self.ws_name).Range(self.rng_addr).Value
+        ret = xlapp.Workbooks(str(Path(self.wb_path).name)).Sheets(self.ws_name).Range(self.rng_addr).Value
         xlapp = None
         # comarshal_release_and_get_stream(wb)
         pythoncom.CoUninitialize()
