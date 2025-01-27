@@ -38,26 +38,26 @@ if not __logging_dir.exists():
 
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
-    filename=config.logging_path,   # The file where logs will be saved
+    # filename=config.logging_path,   # The file where logs will be saved
+    stream=sys.stdout,
     # level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
     level=getattr(logging, config.logging_level),          # The log level (DEBUG, INFO, WARNING, etc.)
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
 
+logger = logging.getLogger()
 
-logger = logging.getLogger(__name__)
+# # Create a handler to output logs to stdout
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.DEBUG)  # Set the handler's log level
 
-# Create a handler to output logs to stdout
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)  # Set the handler's log level
+# # Create a formatter and attach it to the handler
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# handler.setFormatter(formatter)
 
-# Create a formatter and attach it to the handler
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-
-# Add the handler to the logger
-logger.addHandler(handler)
+# # Add the handler to the logger
+# logger.addHandler(handler)
 
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()

@@ -87,13 +87,19 @@ vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
 EndIf"""
 
 
-
-def get_func_result_type(func) -> int:
+def infer_func_result_type_from_type_hints(func) -> int:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     if ret_type == matplotlib.figure.Figure:
         return 1
     return 0
+
+def infer_function_type(func):
+    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    if ret_type == matplotlib.figure.Figure:
+        return 1
+    return 0
+
 
 def function_template_with_caller(func:Callable) -> str:
     """Returns function template string to send to VBA module.
@@ -295,19 +301,19 @@ def import_module(module_name, file_path):
     spec.loader.exec_module(module)
     sys.modules[module_name] = module
 
-def get_functions_from_module(module_name):
+def get_udf_valid_functions_from_module(module_name):
     """Retrieves all functions from a model"""
     # Get all functions in the module
     module = sys.modules[module_name]
-    functions = {
-        name: getattr(module, name)
+    functions = [
+        v
         for name in dir(module)
         if isinstance((v:=getattr(module, name)), types.FunctionType)
-    }
+    ]
     return functions
 
 
-def get_function_names_from_module(module_name):
+def get_udf_valid_function_names_from_module(module_name):
     """Returns a list of function names within a module. Returned names satisfy
     being a valid callable function from Excel
     """
@@ -319,6 +325,13 @@ def get_function_names_from_module(module_name):
         if isinstance((v:=getattr(module, name)), types.FunctionType)
     ]
     return functions
+
+
+def is_function_udf_valid(func):
+    return isinstance(func, types.FunctionType)
+
+def get_udf_valid_functions(funcs:list):
+    return [f for f in funcs if is_function_udf_valid(f)]
 
 
 def hash_function_call(func, *args, **kwargs):
@@ -356,32 +369,11 @@ def convert_xl_2d_types_kwargs(func, kwargs):
 
     return ppkwargs
 
-def type_converter_wrapper(func):
-    """Converts the inbound data from excel into the types specified by the user 
-    e.g. The user specifies a numpy array, the inbound argument is converted from a row
-    major tuple to a numpy array
-    """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        ppargs, ppkwargs = preprocess_arguments(func=func, args=args, kwargs=kwargs)
-        ret = func(*ppargs, **ppkwargs)
-        
-        # convert it back to a range format
-        ret2 = xlpro_typing.ExcelArrayConverter._convert_back_to_range_format(ret)
-        # XXX - todo - add some logging to this. cant handle np arrays atm
-        # if ret2 != ret:
-        #     logger.debug("Return value was changed to suit excel's format")
-        #     pass
-
-        return ret2
-
-    return wrapper
-
-
 
 def com_init_dispatch_release_wrapper(func):
     """Wraps com object dispatch and release around a func.
     Also appropriately configures pythoncom coinitialise"""
+    raise NotImplementedError
     @wraps(func)
     def wrapper(*args, **kwargs):
         pythoncom.CoInitialize()
@@ -427,32 +419,12 @@ def hash_cell(rng_dispatch) -> str:
     return f"{wb.FullName}::{ws.Name}::{rng.Address}"
 
 
-
-def jsonify_func(globals_dict:dict):
-    # XXX - todo - figure out a way to not need to provide globals on user-side
-    """Provide the globals() dict to modify the caller globals :)"""
-    def wrapper0(func):
-        """Adds a function func_json(json_kwargs:str) to globals()
-        The returned function replaces all args with a single json string
-        """
-        @wraps(func)
-        def wrapper(json_kwargs_str):
-            if is_arg_promise(json_kwargs_str):
-                raise errors.ArugmentNotReadyException
-            # XXX - todo - need to convert args based on the original function! (although it seems to work already...?)
-            kwargs = json.loads(json_kwargs_str)
-            ppargs, ppkwargs = preprocess_arguments(func=func, kwargs=kwargs)
-            return func(*ppargs, **ppkwargs)
-
-        wrapper.__name__ = f"{func.__name__}_json"
-        wrapper.__qualname__ = wrapper.__name__
-        globals_dict[wrapper.__name__] = wrapper
-        return func
-    return wrapper0
-
 from xlpro_typing import list1d, list2d
-def jsonify(arr:list2d):
+def jsonify(arr):
     """Converts range to json string"""
+    from xlpro_typing import ExcelArrayConverter
+    arr:list2d = ExcelArrayConverter(arr, list2d)
+
     if len(arr[0]) != 2:
         raise Exception("Please provide a nx2 array of key:value pairs")
     ret = {}
@@ -468,14 +440,10 @@ def is_arg_promise(arg):
         return False
     return re.search(r"^Promise<\w*>", arg)
 
-def validate_args_wrapper(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        for arg in args + [v for k, v in kwargs.items()]:
-            if is_arg_promise(arg):
-                raise errors.ArugmentNotReadyException
-        return func(*args, **kwargs)
-    return wrapper
+def validate_args_ready(args, kwargs):
+    for arg in list(args) + [v for k, v in kwargs.items()]:
+        if is_arg_promise(arg):
+            raise errors.ArugmentNotReadyException
 
 # import copy
 def pre_p_an_arg(cval, target_type):
@@ -535,6 +503,13 @@ class ThreadWithException(threading.Thread):
         return self.exception
 
 
+def get_precedents_chain(rng_stream):
+    rng_dispatch:xl.Range = comarshal_dispatch_stream(rng_stream)
+    precedents = []
+    for cell in rng_dispatch.Precedents:
+        precedents.append(comarshal_release_and_get_stream(cell))
+    comarshal_release_and_get_stream(rng_dispatch)
+    return precedents
 
 
 if __name__ == "__main__":

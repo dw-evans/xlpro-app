@@ -20,6 +20,9 @@ import pythoncom
 from win32typelibs import excel as xl
 from pathlib import Path
 
+
+
+
 @dataclass
 class xlproptr:
     """Class encoding a dynamic excel range link. Sister function ptr() to be used
@@ -92,3 +95,5 @@ class xlproptr:
     
     # if any array argument arrives as a string, a pre-process step should be used
     # to evaluate the range.
+
+

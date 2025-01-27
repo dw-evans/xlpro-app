@@ -28,12 +28,15 @@ import config
 
 import sys
 import errors
-
+from xlpro_wrappers import ModuleFunctionMapsWrapper
+from xlpro_enums import FunctionTypes
+import xlpro_wrappers
 
 
 cfg = config.load()
 wd = Path(__file__).parent
 logger = logging.getLogger(__name__)
+# logger = logging.getLogger()
 
 def configure_workspace_xlpro_files(wd:Path, cfg:config.Configuration):
     xlpro_dir_path = Path() / wd / cfg.xlpro_directory
@@ -152,7 +155,7 @@ class xlproServer:
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        return workspace.execute_function_async(caller=caller, func_name=func_name, args=args)
+        return workspace.execute_function_async(caller=caller, fname=func_name, args=args)
 
     def register_functions_in_workspace(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
@@ -194,8 +197,8 @@ class xlproWorkspace:
         self._wb_uid = wb_uid
         self._wd = None # working directory
 
-        self._func_hash_result_display_map = {} # the result to be displayed
-        self._func_hash_result_display_map_lock = threading.Lock()
+        self._uid_result_display_map = {} # the result to be displayed
+        self._uid_result_display_map_lock = threading.Lock()
 
         self._uid_results_map = {} # the actual results
         self._uid_results_map_lock = threading.Lock()
@@ -233,7 +236,8 @@ class xlproWorkspace:
         # self._func_hash_fig_generating_thread_map = {}
 
         self._temp_module_name:str = None
-        self._valid_function_names:list[str] = []
+
+        self._module_function_maps_wrapper:ModuleFunctionMapsWrapper = None
 
     def set_xlpro_working_dir(self, wd:Path):
         logger.info(f"Setting working directory for workspace to '{str(wd)}'")
@@ -246,16 +250,28 @@ class xlproWorkspace:
     def _register_functions_in_self(self):
         logger.info(f"Re-initializing workspace functions...")
         self._temp_module_name = f"{cfg.xlpro_functions_stem}_{utils.hash_str(self._wb_uid)}"
-        utils.import_module(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
-        self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
+        xlpro_wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
+        # self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
+        self._update_module_func_map_wrapper()
+
         logger.info(f"Reinitialization complete.")
 
+    def _get_active_registered_functon_names(self):
+        return [k for k, isactive in self._module_function_maps_wrapper.func_name_isactive_register.items() if isactive]
+    
+    def _get_active_registered_functions(self):
+        keys = self._get_active_registered_functon_names()
+        return [self._module_function_maps_wrapper.func_name_register[key] for key in keys]
+    
     def _deregister_functions_in_self(self):
         logger.info(f"Uninitializing workspace functions...")
         self._valid_function_names = []
         if self._temp_module_name is not None:
             del sys.modules[self._temp_module_name]
         logger.info(f"Uninitialization complete.")
+
+    def _update_module_func_map_wrapper(self):
+        self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
 
     def reset(self):
         self._configure_xlpro_files()
@@ -265,57 +281,54 @@ class xlproWorkspace:
         self._uid_results_map = {}
         pass
 
-
-
     def register_functions_in_vba(self, wb_stream):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
 
-    def _get_function_by_name(self, func_name):
-        return getattr(sys.modules[self._temp_module_name], func_name)
+    def _get_function_by_name(self, fname):
+        return self._module_function_maps_wrapper.func_name_register[fname]
 
 
-    def execute_function_async(self, caller, func_name, args):
+    def execute_function_async(self, caller, fname, args):
         try:
-            func = self._get_function_by_name(func_name)
+            func = self._get_function_by_name(fname)
+
             if not func:
-                return f"Function {func_name} not found."
+                return f"Function {fname} not found."
 
             uid = utils.hash_function_call(func, utils.get_args_minus_reserved(func, args), kwargs={})
 
-            # if the hash of the function has been marked complete, return that
-            # avoid computation
-            with self._func_hash_result_display_map_lock:
+            with self._uid_result_display_map_lock:
                 if uid in self._uid_result_iscomplete_map.keys():
-                    # return self._func_hash_results_map[uid]
-                    return self._func_hash_result_display_map[uid]
+                    return self._uid_result_display_map[uid]
 
             # release the com args for use in another thread. convert them to streams
             args = utils.com_args_release_to_stream_reserved(func, args)
 
-            result_type = utils.get_func_result_type(func)
+            result_type = self._module_function_maps_wrapper.func_name_type_register[fname]
+            # result_type = utils.get_func_result_type(func)
+            
             self._uid_result_type_map[uid] = result_type
 
             # XXX - todo - check if the caller is a range.
             caller_stream = utils.comarshal_release_and_get_stream(caller)
             self._uid_to_caller_map[uid] = caller_stream
 
-            with self._func_hash_result_display_map_lock:
-                self._func_hash_result_display_map[uid] = f"Promise<{uid}>"
-            with self._func_hash_result_display_map_lock:
+            with self._uid_result_display_map_lock:
+                self._uid_result_display_map[uid] = f"Promise<{uid}>"
+            with self._uid_result_display_map_lock:
                 self._uid_result_iscomplete_map[uid] = False
 
-            if result_type == ResultType.default:
+            if result_type == FunctionTypes.default:
                 f = self._create_worker_func(uid, func, args, kwargs={})
                 self._uid_pending_function_map[uid] = f
                 self._pending_function_queue.put(uid)
                 self._worker_manager.wake()
-                # self._func_hash_subthread_map[uid] = t
 
-            elif result_type == ResultType.figure:
+            elif result_type == FunctionTypes.figure:
                 fig_generating_thread = FigureGeneratingThread(
                     wd=self._wd,
                     uid=uid,
-                    func_name=func_name,
+                    func_name=fname,
                     args=args,
                     kwargs={},
                     return_value_queue=self._result_queue, 
@@ -325,8 +338,8 @@ class xlproWorkspace:
                 fig_generating_thread.start()
 
             # return the (incomplete result)
-            with self._func_hash_result_display_map_lock:
-                return self._func_hash_result_display_map[uid]
+            with self._uid_result_display_map_lock:
+                return self._uid_result_display_map[uid]
 
         # Return the python exception string as a fallback
         except Exception as e:
@@ -336,19 +349,16 @@ class xlproWorkspace:
         if kwargs:
             raise Exception("kwargs should not be here!")
         
-        def wrapped_func():
+        def worker():
+            f = xlpro_wrappers.generate_wrapped_function(func.__module__, func.__name__)
             try:
-                f = utils.type_converter_wrapper(
-                    utils.com_init_dispatch_release_wrapper(func)
-                )
                 ret = f(*args, **kwargs)
                 self._result_queue.put((uid, ret))
             except Exception as e:
                 self._result_queue.put((uid, e))
-
             self._results_manager_thread.wake()
-
-        return wrapped_func
+        
+        return worker
             
     
     def _shutdown(self):
@@ -363,19 +373,18 @@ class xlproWorkspace:
         #     p.stop()
 
     def _get_vba_sync_text(self) -> str:
-        funcs = [getattr(sys.modules[self._temp_module_name], f) for f in self._valid_function_names]
-        s = utils.get_xlpro_vb_dynamic_component_contents(funcs)
-        del funcs
-        return s
+        funcs = self._get_active_registered_functions()
+        return utils.get_xlpro_vb_dynamic_component_contents(funcs)
     
 
 # wrappers must be applied before we pickle the function I believe...
-@utils.type_converter_wrapper
-@utils.com_init_dispatch_release_wrapper
+# @utils.type_converter_wrapper
+# @utils.com_init_dispatch_release_wrapper
 def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
 
     module_name = f"{cfg.xlpro_functions_stem}_{uid}"
     utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
+    raise NotImplementedError
     func = getattr(sys.modules[module_name], func_name)
 
     fp = wd / "tmp" / f"{uid}.svg"
@@ -390,7 +399,7 @@ def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
 
 def setup_scope_and_get_function(module_name, module_path, func_name):
     utils.import_module(module_name, wd / f"{module_name}.py")
-    func_map = utils.get_functions_from_module(module_name)
+    func_map = utils.get_udf_valid_functions_from_module(module_name)
     func = func_map[func_name]
     return func
 
@@ -460,15 +469,7 @@ class FigureGeneratingThread:
         self._return_event.set()
 
 
-class ResultType:
-    default = 0
-    figure = 1
 
-    @classmethod
-    def as_list(cls):
-        return [value for key, value in vars(cls).items() if isinstance(value, int)]
-
-    
 class WorkerManager:
 
     """Manages function execution for a workspace. Sends results to the results manager"""
@@ -481,7 +482,8 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        return cfg.max_worker_threads
+        return 20
+        # return cfg.max_worker_threads
 
     def start(self):
         self._thread.start()
@@ -506,6 +508,8 @@ class WorkerManager:
             self._threadpool.append(t)
             # XXX - todo - limit the number of attempts for a given function in some way
             t.start()
+            return
+
         logger.info(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
 
     def _clear_completed_threads(self):
@@ -526,13 +530,13 @@ class WorkerManager:
             if self._wake_event.is_set():
                 self._wake_event.clear()
                 logger.info("WorkerManager thread woke up for an event!")
+            while True:
+                try:
+                    self._process_function_queue()
+                except queue.Empty:
+                    break
                 self._clear_completed_threads()
-                while True:
-                    try:
-                        self._process_function_queue()
-                    except queue.Empty:
-                        break
-                    time.sleep(0.001) # fairness sleep
+                time.sleep(0.001) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -577,7 +581,15 @@ class ResultsManager:
                 with self._server._uid_pending_function_map_lock:
                     #  add the uid back to the pending function queue
                     self._server._pending_function_queue.put(uid)
-                return
+                    logger.info(f"Arguments not ready for uid '{uid}', recycling function...")
+                    with self._server._uid_to_caller_map_lock:
+                        precedents = utils.get_precedents_chain(self._server._uid_to_caller_map)
+                    return
+            elif isinstance(val, pythoncom.com_error):
+                if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
+                    self._server._pending_function_queue.put(uid)
+                    logger.info(f"Call rejected by callee for '{uid}', recycling function...")
+                    return
             
             ret = str(val) # convert exception to string for it to show in excel.
 
@@ -604,14 +616,14 @@ class ResultsManager:
             if self._wake_event.is_set():
                 self._wake_event.clear()
                 logger.info("ResultsManager thread woke up for an event!")
-                # Process the whole queue once woken up
-                # XXX - could replace while trye with while not stop event.
-                while True:
-                    try:
-                        self._process_queue_element()
-                    except queue.Empty:
-                        break
-                    time.sleep(0.01) # fairness sleep
+            # Process the whole queue once woken up
+            # XXX - could replace while trye with while not stop event.
+            while True:
+                try:
+                    self._process_queue_element()
+                except queue.Empty:
+                    break
+                time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -644,8 +656,8 @@ class ClientManager:
         self._wake_event.set()
     
     def _set_result_display(self, uid, val) -> None:
-        with self._server._func_hash_result_display_map_lock:
-            self._server._func_hash_result_display_map[uid] = val
+        with self._server._uid_result_display_map_lock:
+            self._server._uid_result_display_map[uid] = val
 
     def _get_result_display(self, uid):
         with self._server._uid_results_map_lock:
@@ -713,9 +725,9 @@ class ClientManager:
 
             # Decide whether to recycle
             try:
-                if result_type == ResultType.default:
+                if result_type == FunctionTypes.default:
                     self._update_client_default_result(uid)
-                elif result_type == ResultType.figure:
+                elif result_type == FunctionTypes.figure:
                     self._update_client_figure_result(uid)
                 else:
                     raise Exception("Result type invalid")
