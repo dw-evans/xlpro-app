@@ -420,10 +420,12 @@ def hash_cell(rng_dispatch) -> str:
 
 
 from xlpro_typing import list1d, list2d
-def jsonify(arr):
+def jsonify(*arr:list1d):
     """Converts range to json string"""
     from xlpro_typing import ExcelArrayConverter
     arr:list2d = ExcelArrayConverter(arr, list2d)
+    
+    # validate_args_ready(*arr, {})
 
     if len(arr[0]) != 2:
         raise Exception("Please provide a nx2 array of key:value pairs")
@@ -482,6 +484,8 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
                     ppkwargs[a] = (pre_p_an_arg(val, t))
                     break
 
+
+
     return ppargs, ppkwargs
     
 
@@ -503,13 +507,21 @@ class ThreadWithException(threading.Thread):
         return self.exception
 
 
-def get_precedents_chain(rng_stream):
-    rng_dispatch:xl.Range = comarshal_dispatch_stream(rng_stream)
+def get_precedents_chain(rng_dispatch:xl.Range):
     precedents = []
     for cell in rng_dispatch.Precedents:
-        precedents.append(comarshal_release_and_get_stream(cell))
-    comarshal_release_and_get_stream(rng_dispatch)
+        precedents.append(cell)
     return precedents
+
+def formula_is_for_xlpro(formula:str, formulas:list[str]):
+    for f in formulas:
+        if f in formula:
+            ret = True
+            return ret
+            # return True
+    ret = False
+    return ret
+    # return False
 
 
 if __name__ == "__main__":

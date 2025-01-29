@@ -68,8 +68,6 @@ def is_server_pending_close():
     global SERVER
     # TODO - XXX - Not sure why this loop is called so much...
     try:
-        ret = SERVER._is_pending_close
-        logger.debug(f"Checked is_pending_close: {ret}")
         return SERVER._is_pending_close
     except Exception as e:
         logger.warning(f"Exception encountered while checking is_pending_close: {e}")

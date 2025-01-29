@@ -32,6 +32,7 @@ from xlpro_wrappers import ModuleFunctionMapsWrapper
 from xlpro_enums import FunctionTypes
 import xlpro_wrappers
 
+from win32com.client import Dispatch
 
 cfg = config.load()
 wd = Path(__file__).parent
@@ -98,7 +99,8 @@ class xlproServer:
             xlproServer._instance_initialized = True
             self._workspace_map:dict[str, xlproWorkspace] = {} # uid (path) to workspace
         else:
-            logger.debug("__init__ called however the singleton already exists and has been initialized.")
+            # logger.debug("__init__ called however the singleton already exists and has been initialized.")
+            pass
         return
 
     def getpid(self):
@@ -112,6 +114,7 @@ class xlproServer:
         xlproServer.signal_shutdown()
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
+        # marshalling ok afaik - excel vba interface
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
 
         if not uid in self._workspace_map.keys():
@@ -143,23 +146,24 @@ class xlproServer:
         if not uid in self._workspace_map.keys():
             logger.info("Workbook has not been registered, initializing...")
             self.register_and_configure_wb_workspace(wb_dispatch)
-        utils.comarshal_release_and_get_stream(wb_dispatch)
+        utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
         return self._workspace_map[uid]
     
     def _get_workspace_uid_from_wb(self, wb_dispatch):
         wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
         wb_path = str(Path(wb.FullName))
-        utils.comarshal_release_and_get_stream(wb)
+        utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
         return wb_path
         # return utils.hash_str(wb_path)
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
+        # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.execute_function_async(caller=caller, fname=func_name, args=args)
 
     def register_functions_in_workspace(self, wb_dispatch):
+        # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        # workspace.register_functions_in_self(utils.comarshal_release_and_get_stream(wb_dispatch))
         workspace._register_functions_in_self()
 
     def register_functions_in_vba(self, wb_dispatch):
@@ -167,6 +171,7 @@ class xlproServer:
 
     def shutdown_workspace_from_dispatch(self, wb_dispatch):
         # XXX - todo - check this actually does anything meaninfgul
+        # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         uid = self._get_workspace_uid_from_wb(wb_dispatch)
         logger.info(f"Shutting down workspace uid:'{uid}'")
@@ -188,6 +193,7 @@ class xlproServer:
 
     def get_vba_sync_text(self, wb_dispatch):
         """Gets the vba code module contents to register the udfs"""
+        # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace._get_vba_sync_text()
 
@@ -215,6 +221,9 @@ class xlproWorkspace:
 
         self._uid_pending_function_map = {} # uid: func
         self._uid_pending_function_map_lock = threading.Lock()
+
+        self._caller_address_uid_map = {} # uid: address
+        self._caller_address_uid_map_lock = threading.Lock()
 
         self._pending_function_queue = queue.Queue()
         self._result_queue = queue.Queue() # stores the results as they come in
@@ -281,12 +290,33 @@ class xlproWorkspace:
         self._uid_results_map = {}
         pass
 
-    def register_functions_in_vba(self, wb_stream):
-        raise NotImplementedError("Obsoleted to remove combase.dll issue")
-
     def _get_function_by_name(self, fname):
         return self._module_function_maps_wrapper.func_name_register[fname]
 
+    def _clear_uid(self, uid):
+        """Clear a uid from memory"""
+        # XXX - todo - check if this is a valid method to purge an item from the queue.
+        with self._uid_result_display_map_lock:
+            del self._uid_result_display_map[uid]
+
+        with self._uid_results_map_lock:
+            del self._uid_results_map[uid]
+
+        with self._uid_result_iscomplete_map_lock:
+            del self._uid_result_iscomplete_map[uid]
+
+        with self._uid_result_type_map_lock:
+            del self._uid_result_type_map[uid]
+
+        with self._uid_to_caller_map_lock:
+            del self._uid_to_caller_map[uid]
+
+        with self._uid_pending_function_map_lock:
+            del self._uid_pending_function_map[uid]
+
+    @staticmethod
+    def _hash_excel_function_call(*args:typing.Iterable[str]):
+        return utils.hash_str(", ".join([str(x) for x in args]))
 
     def execute_function_async(self, caller, fname, args):
         try:
@@ -295,29 +325,44 @@ class xlproWorkspace:
             if not func:
                 return f"Function {fname} not found."
 
-            uid = utils.hash_function_call(func, utils.get_args_minus_reserved(func, args), kwargs={})
+            uid = xlproWorkspace._hash_excel_function_call(fname, *args)
+            # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
 
+            logger.debug(f"Calling function '{fname}', uid: '{uid}'")
+
+
+            # return the cached result if it exists
             with self._uid_result_display_map_lock:
                 if uid in self._uid_result_iscomplete_map.keys():
                     return self._uid_result_display_map[uid]
+                
+            # Clear any lingering calculations coming from this caller if the result isnt cached
+            # downstream functions should pick up on these being deleted
+            caller_dispatch = Dispatch(caller)
+            caller_addr = caller_dispatch.Address
+            with self._caller_address_uid_map_lock:
+                # the hash will be constant for a function/args/caller combination so this is valid
+                if caller_addr in self._caller_address_uid_map.keys():
+                    self._clear_uid(self._caller_address_uid_map[caller_addr])
+                self._caller_address_uid_map[uid] = caller_addr
 
             # release the com args for use in another thread. convert them to streams
             args = utils.com_args_release_to_stream_reserved(func, args)
 
             result_type = self._module_function_maps_wrapper.func_name_type_register[fname]
-            # result_type = utils.get_func_result_type(func)
             
             self._uid_result_type_map[uid] = result_type
 
-            # XXX - todo - check if the caller is a range.
-            caller_stream = utils.comarshal_release_and_get_stream(caller)
+            caller_stream = utils.comarshal_release_and_get_stream(caller_dispatch) # this marshal is the OG
             self._uid_to_caller_map[uid] = caller_stream
 
+            # configure default state for result and iscomplete status
             with self._uid_result_display_map_lock:
                 self._uid_result_display_map[uid] = f"Promise<{uid}>"
             with self._uid_result_display_map_lock:
                 self._uid_result_iscomplete_map[uid] = False
 
+            # handle different function types
             if result_type == FunctionTypes.default:
                 f = self._create_worker_func(uid, func, args, kwargs={})
                 self._uid_pending_function_map[uid] = f
@@ -360,7 +405,6 @@ class xlproWorkspace:
         
         return worker
             
-    
     def _shutdown(self):
         for uid, t in self._func_hash_subthread_map.items():
             t:threading.Thread
@@ -376,7 +420,47 @@ class xlproWorkspace:
         funcs = self._get_active_registered_functions()
         return utils.get_xlpro_vb_dynamic_component_contents(funcs)
     
+    def get_caller_stream(self, uid):
+        with self._uid_to_caller_map_lock:
+            return self._uid_to_caller_map[uid]
+    
+    def set_caller_stream(self, uid, val):
+        with self._uid_to_caller_map_lock:
+            self._uid_to_caller_map[uid] = val
 
+    def _get_uid_debug_info(self, uid):
+        a0 = self._uid_result_display_map.get(uid, None)
+        a1 = self._uid_results_map.get(uid, None)
+        a2 = self._uid_result_iscomplete_map.get(uid, None)
+        a3 = self._uid_result_type_map.get(uid, None)
+        a4 = self._uid_pending_function_map.get(uid, None)
+        rng_stream = self.get_caller_stream(uid)
+        pythoncom.CoInitialize()
+        rng_dispatch:xl.Range = utils.comarshal_dispatch_stream(rng_stream)
+        try:
+            a5 = rng_dispatch.Address
+            a6 = rng_dispatch.Formula
+            a7 = rng_dispatch.Value
+        except Exception as e:
+            a5 = e
+            a6 = "ERROR"
+            a7 = "ERROR"
+        self.set_caller_stream(uid, utils.comarshal_release_and_get_stream(rng_dispatch))
+        ret = {
+            "uid": uid,
+            "result_display": a0,
+            "results": a1,
+            "result_iscomplete": a2,
+            "result_type": a3,
+            "pending_function": a4,
+            "Address": a5,
+            "Formula": a6,
+            "Value": a7,
+        }
+        pass
+        pythoncom.CoUninitialize()
+        return ret
+        
 # wrappers must be applied before we pickle the function I believe...
 # @utils.type_converter_wrapper
 # @utils.com_init_dispatch_release_wrapper
@@ -402,6 +486,7 @@ def setup_scope_and_get_function(module_name, module_path, func_name):
     func_map = utils.get_udf_valid_functions_from_module(module_name)
     func = func_map[func_name]
     return func
+
 
 class FigureGeneratingThread:
     """Class which maintains a thread which waits for a process to finish."""
@@ -469,9 +554,7 @@ class FigureGeneratingThread:
         self._return_event.set()
 
 
-
 class WorkerManager:
-
     """Manages function execution for a workspace. Sends results to the results manager"""
     def __init__(self, server:xlproWorkspace):
         self._server = server
@@ -482,8 +565,7 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        return 20
-        # return cfg.max_worker_threads
+        return cfg.max_worker_threads
 
     def start(self):
         self._thread.start()
@@ -503,25 +585,18 @@ class WorkerManager:
             uid = self._server._pending_function_queue.get(timeout=0.01)
             with self._server._uid_pending_function_map_lock:
                 func = self._server._uid_pending_function_map[uid]
-                
+            
             t = threading.Thread(target=func, daemon=True)
             self._threadpool.append(t)
             # XXX - todo - limit the number of attempts for a given function in some way
+            # XXX - todo - support sending terminate command to lingering worker threads
             t.start()
             return
 
         logger.info(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
 
     def _clear_completed_threads(self):
-        # hope the gc collects these!
         self._threadpool = [t for t in self._threadpool if t.is_alive()]
-
-        # thread_idx_pending_del = []
-        # for i, t in enumerate(self._threadpool):
-        #     if not t.is_alive():
-        #         thread_idx_pending_del.append[i]
-        # for i in reversed(thread_idx_pending_del):
-        #     del self._threadpool[i]
 
     def _run(self):
         while not self._stop_event.is_set():
@@ -567,6 +642,42 @@ class ResultsManager:
         with self._server._uid_results_map_lock:
             self._server._uid_results_map[uid] = val
 
+
+    def _recalculate_precedents(self, uid):
+        pythoncom.CoInitialize()
+        caller_dispatch = utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+        precedents_stream = utils.get_precedents_chain(caller_dispatch)
+        
+        precedents_recalculate = []
+        active_formulas = self._server._get_active_registered_functon_names()
+
+        u = [x.AddressLocal for x in precedents_stream]
+
+        for ps_disp in precedents_stream:
+            try:
+                ps_disp:xl.Range
+                formula = ps_disp.Formula2
+                ps_disp.Formula2 = ps_disp.Formula2
+                if utils.formula_is_for_xlpro(formula, active_formulas):
+                    precedents_recalculate.append(ps_disp)
+                else:
+                    utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - obj created in this thread
+            except Exception as e:
+                logger.warning(f"Error during recalculate: {e}")
+                continue
+        v = [x.AddressLocal for x in precedents_recalculate]
+        logger.debug(f"Precedents, '{len(v)}' {v[:min(12, len(v))]}")
+        for ps_disp in precedents_recalculate:
+            try:
+                ps_disp.Formula2 = ps_disp.Formula2
+            except Exception as e:
+                logger.warning(f"Error during recalculate2: {e}")
+                continue
+
+            utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - XXX - todo - check
+        self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
+        pythoncom.CoUninitialize()
+
     def _process_queue_element(self):
         """Processes either the multiprocessing or threaded results queues
         """
@@ -574,17 +685,26 @@ class ResultsManager:
         uid, val = self._server._result_queue.get(timeout=0.01)
         ret = val
 
+        # the uid may have been removed due to irrelevance from the workspace
+        with self._server._uid_pending_function_map_lock:
+            if not uid in self._server._uid_pending_function_map.keys():
+                logger.debug(f"Uid '{uid}' not found as pending function within results manager. Ignoring this")
+                return
+
         # if the result is an exception - we need to handle it
         if isinstance(val, Exception):
             # if the arguments weren't ready - ignore the process request
             if isinstance(val, errors.ArugmentNotReadyException):
-                with self._server._uid_pending_function_map_lock:
-                    #  add the uid back to the pending function queue
-                    self._server._pending_function_queue.put(uid)
-                    logger.info(f"Arguments not ready for uid '{uid}', recycling function...")
-                    with self._server._uid_to_caller_map_lock:
-                        precedents = utils.get_precedents_chain(self._server._uid_to_caller_map)
-                    return
+                logger.info(f"Arguments not ready for uid '{uid}', recycling function...")
+
+                logger.info(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
+                self._server._get_uid_debug_info(uid)
+                self._recalculate_precedents(uid)
+
+                self._server._pending_function_queue.put(uid)
+                self._server._worker_manager.wake()
+                return
+                
             elif isinstance(val, pythoncom.com_error):
                 if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
                     self._server._pending_function_queue.put(uid)
@@ -592,6 +712,7 @@ class ResultsManager:
                     return
             
             ret = str(val) # convert exception to string for it to show in excel.
+
 
         # if it is a valid return, write the result to the cache
         self._set_results_value(uid, ret)
@@ -631,11 +752,6 @@ class ResultsManager:
 
 class ClientManager:
     """Hooks to the excel client so we can trigger events"""
-
-    def __init__(self, server):
-        self._server = server
-        pass
-
     def __init__(self, server:xlproWorkspace):
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
@@ -656,65 +772,78 @@ class ClientManager:
         self._wake_event.set()
     
     def _set_result_display(self, uid, val) -> None:
+        # XXX - todo - move logic to server
         with self._server._uid_result_display_map_lock:
             self._server._uid_result_display_map[uid] = val
 
     def _get_result_display(self, uid):
+        # XXX - todo - move logic to server
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
         
     def _get_value(self, uid):
+        # XXX - todo - move logic to server
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
-
-    def _get_caller(self, uid):
-        with self._server._uid_to_caller_map_lock:
-            return utils.comarshal_dispatch_stream(self._server._uid_to_caller_map[uid])
         
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
-        caller_dispatch = self._get_caller(uid)
-        val = self._get_value(uid)
-        self._set_result_display(uid, val)
+        try:
+            caller_dispatch = self._server.get_caller_stream(uid)
+            val = self._get_value(uid)
+            self._set_result_display(uid, val)
 
-        # update by resetting the formula
-        caller_dispatch.Formula2 = caller_dispatch.Formula2
-
-        utils.comarshal_release_and_get_stream(caller_dispatch)
+            # update by resetting the formula
+            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+        except Exception as e:
+            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            raise e
 
     def _update_client_figure_result(self, uid) -> None:
         """Update the data for the figure case - add a figure image to the spreadsheet"""
-        caller_dispatch = self._get_caller(uid)
-        val = self._get_value(uid)
-        fp, size_inches = val
+        caller_dispatch = self._server.get_caller_stream(uid)
+        try:
+            val = self._get_value(uid)
+            fp, size_inches = val
 
-        size_pt = size_inches * 72
+            size_pt = size_inches * 72
 
-        self._set_result_display(uid, f"Figure @'{str(fp)}'")
+            self._set_result_display(uid, f"Figure @'{str(fp)}'")
 
-        caller_adjacent = caller_dispatch.Cells(2,1)
-        xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
-        width, height = size_pt
+            caller_adjacent = caller_dispatch.Cells(2,1)
+            xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
+            width, height = size_pt
 
-        ws = caller_adjacent.Parent
-        # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
-        ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+            ws = caller_adjacent.Parent
+            # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+            ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
-        caller_dispatch.Formula2 = caller_dispatch.Formula2
+            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
 
-        utils.comarshal_release_and_get_stream(caller_dispatch)
+        except Exception as e:
+            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            raise e
 
     def _process_queue(self):
         """Process the queue at the current point in time. Any failed attempts get
         added back into the queue if appropriate.
         """
-        # XXX - Warning that qsize() is not thread safe. Shouldn't be an issue.
+        # XXX - Warning that qsize() is not thread safe
+        # this prevents inplace recycling and potentially infinite loop
         queue_length = self._server._client_recalculate_queue.qsize()
         for _ in range(queue_length):
             try:
                 uid = self._server._client_recalculate_queue.get()
             except queue.Empty:
                 return
+            
+            with self._server._uid_result_iscomplete_map_lock:
+                if not uid in self._server._uid_result_iscomplete_map.keys():
+                    logger.debug(f"Uid '{uid}' not found as pending function within client manager update. Ignoring this")
+                    return
+
             pass
             # fetch the result type so we know how to handle it
             with self._server._uid_result_type_map_lock:
@@ -751,10 +880,6 @@ class ClientManager:
             finally:
                 # XXX - Marshalling the caller back to the pool in case
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")
-                try:
-                    utils.comarshal_release_and_get_stream(self._get_caller(uid))
-                except:
-                    pass
 
             # if we failed to update, recycle the queue as necessary
             if replace_in_queue:

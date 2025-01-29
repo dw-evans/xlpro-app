@@ -132,7 +132,7 @@ def import_module_with_registration(mname, fpath):
 
 import errors
 import json
-
+import typing
 
 def _default_func_wrapper(func):
     @wraps(func)
@@ -140,6 +140,12 @@ def _default_func_wrapper(func):
         f = func
         utils.validate_args_ready(args, kwargs)
         ppargs, ppkwargs = utils.preprocess_arguments(func=func, args=args, kwargs=kwargs)
+
+        # XXX - todo - could add multilevel nesting to this...
+        all_args = ppargs + [v for v in ppkwargs.values()]
+        for a in all_args:
+            if isinstance(a, typing.Iterable):
+                utils.validate_args_ready(args=a, kwargs={}) 
         
         ret = f(*ppargs, **ppkwargs)
         ret_converted = xlpro_typing.ExcelArrayConverter._convert_back_to_range_format(ret)
