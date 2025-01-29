@@ -296,23 +296,42 @@ class xlproWorkspace:
     def _clear_uid(self, uid):
         """Clear a uid from memory"""
         # XXX - todo - check if this is a valid method to purge an item from the queue.
-        with self._uid_result_display_map_lock:
-            del self._uid_result_display_map[uid]
+        try:
+            with self._uid_result_display_map_lock:
+                del self._uid_result_display_map[uid]
+        except:
+            pass
 
-        with self._uid_results_map_lock:
-            del self._uid_results_map[uid]
+        try:
+            with self._uid_results_map_lock:
+                del self._uid_results_map[uid]
+        except:
+            pass
 
-        with self._uid_result_iscomplete_map_lock:
-            del self._uid_result_iscomplete_map[uid]
+        try:
+            with self._uid_result_iscomplete_map_lock:
+                del self._uid_result_iscomplete_map[uid]
+        except:
+            pass
 
-        with self._uid_result_type_map_lock:
-            del self._uid_result_type_map[uid]
+        try:
+            with self._uid_result_type_map_lock:
+                del self._uid_result_type_map[uid]
+        except:
+            pass
 
-        with self._uid_to_caller_map_lock:
-            del self._uid_to_caller_map[uid]
+        try:
+            with self._uid_to_caller_map_lock:
+                del self._uid_to_caller_map[uid]
+        except:
+            pass
 
-        with self._uid_pending_function_map_lock:
-            del self._uid_pending_function_map[uid]
+        try:
+            with self._uid_pending_function_map_lock:
+                del self._uid_pending_function_map[uid]
+        except:
+            pass
+        pass
 
     @staticmethod
     def _hash_excel_function_call(*args:typing.Iterable[str]):
@@ -344,7 +363,7 @@ class xlproWorkspace:
                 # the hash will be constant for a function/args/caller combination so this is valid
                 if caller_addr in self._caller_address_uid_map.keys():
                     self._clear_uid(self._caller_address_uid_map[caller_addr])
-                self._caller_address_uid_map[uid] = caller_addr
+                self._caller_address_uid_map[caller_addr] = uid
 
             # release the com args for use in another thread. convert them to streams
             args = utils.com_args_release_to_stream_reserved(func, args)
@@ -399,8 +418,11 @@ class xlproWorkspace:
             try:
                 ret = f(*args, **kwargs)
                 self._result_queue.put((uid, ret))
+                logger.info(f"Completed function '{uid}' successfully")
             except Exception as e:
                 self._result_queue.put((uid, e))
+                logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
+            logger.debug("Waking results manager from worker thread...")
             self._results_manager_thread.wake()
         
         return worker
@@ -561,7 +583,8 @@ class WorkerManager:
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
-        self._threadpool:list[threading.Thread] = []
+        # self._threadpool:list[threading.Thread] = []
+        self._threadpool_dict:dict[str, threading.Thread] = {}
 
     @property
     def MAX_THREADS(self):
@@ -581,13 +604,21 @@ class WorkerManager:
         self._wake_event.set()
 
     def _process_function_queue(self):
-        if len(self._threadpool) < self.MAX_THREADS:
+        if len(self._threadpool_dict.keys()) < self.MAX_THREADS:
             uid = self._server._pending_function_queue.get(timeout=0.01)
-            with self._server._uid_pending_function_map_lock:
-                func = self._server._uid_pending_function_map[uid]
+            try:
+                with self._server._uid_pending_function_map_lock:
+                    func = self._server._uid_pending_function_map[uid]
+            except KeyError:
+                logger.warning(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
+                return
             
+            if uid in self._threadpool_dict:
+                logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
+                return
+
             t = threading.Thread(target=func, daemon=True)
-            self._threadpool.append(t)
+            self._threadpool_dict[uid] = t
             # XXX - todo - limit the number of attempts for a given function in some way
             # XXX - todo - support sending terminate command to lingering worker threads
             t.start()
@@ -596,7 +627,7 @@ class WorkerManager:
         logger.info(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
 
     def _clear_completed_threads(self):
-        self._threadpool = [t for t in self._threadpool if t.is_alive()]
+        self._threadpool_dict = {uid: t for uid, t in self._threadpool_dict.items() if t.is_alive()}
 
     def _run(self):
         while not self._stop_event.is_set():
@@ -695,12 +726,13 @@ class ResultsManager:
         if isinstance(val, Exception):
             # if the arguments weren't ready - ignore the process request
             if isinstance(val, errors.ArugmentNotReadyException):
-                logger.info(f"Arguments not ready for uid '{uid}', recycling function...")
+                logger.debug(f"Arguments not ready for uid '{uid}', recycling function...")
 
-                logger.info(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
+                logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
                 self._server._get_uid_debug_info(uid)
                 self._recalculate_precedents(uid)
 
+                logger.debug(f"ResultsManager is waking the worker manager to replace '{uid}'")
                 self._server._pending_function_queue.put(uid)
                 self._server._worker_manager.wake()
                 return
@@ -724,6 +756,7 @@ class ResultsManager:
 
         # signal to the client manager to update the client
         self._server._client_recalculate_queue.put(uid)
+        logger.debug(f"ResultsManager is waking the ClientManager after successful calculation of '{uid}'")
         self._server._client_manager_thread.wake()
 
     def _run(self):
@@ -896,11 +929,10 @@ class ClientManager:
         while not self._stop_event.is_set():
             # wait for ten seconds for an event, otherwise do a queue process to check for 
             # outstanding tasks.
-            logger.info("ClientManager thread is waiting for events or timeout...")
             self._wake_event.wait(timeout=5)
             if self._wake_event.is_set():
+                logger.debug("ClientManager thread woke up for an event!")
                 self._wake_event.clear()
-                logger.info("ClientManager thread woke up for an event!")
             self._process_queue()
 
             # XXX - todo - could check for the exit event during the loop also.
