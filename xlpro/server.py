@@ -225,6 +225,8 @@ class xlproWorkspace:
         self._caller_address_uid_map = {} # uid: address
         self._caller_address_uid_map_lock = threading.Lock()
 
+        self._uid_args_cache = {}
+
         self._pending_function_queue = queue.Queue()
         self._result_queue = queue.Queue() # stores the results as they come in
         self._client_recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
@@ -333,6 +335,12 @@ class xlproWorkspace:
             pass
         pass
 
+        try:
+            del self._uid_args_cache[uid]
+        except:
+            pass
+        pass
+
     @staticmethod
     def _hash_excel_function_call(*args:typing.Iterable[str]):
         return utils.hash_str(", ".join([str(x) for x in args]))
@@ -347,8 +355,9 @@ class xlproWorkspace:
             uid = xlproWorkspace._hash_excel_function_call(fname, *args)
             # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
 
-            logger.debug(f"Calling function '{fname}', uid: '{uid}'")
+            logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
+            self._uid_args_cache[uid] = args
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
@@ -365,8 +374,17 @@ class xlproWorkspace:
                     self._clear_uid(self._caller_address_uid_map[caller_addr])
                 self._caller_address_uid_map[caller_addr] = uid
 
+            if isinstance(args[0][0], list|tuple):
+                if None in args[0][0]:
+                    logger.error(f"Args are fkd '{args}'")
+                    x, y = args[0][0]
+                    pass
+                if args[0][0][1] is not None:
+                    x, y = args[0][0]
+                    pass
+
             # release the com args for use in another thread. convert them to streams
-            args = utils.com_args_release_to_stream_reserved(func, args)
+            # args = utils.com_args_release_to_stream_reserved(func, args)
 
             result_type = self._module_function_maps_wrapper.func_name_type_register[fname]
             
@@ -456,10 +474,10 @@ class xlproWorkspace:
         a2 = self._uid_result_iscomplete_map.get(uid, None)
         a3 = self._uid_result_type_map.get(uid, None)
         a4 = self._uid_pending_function_map.get(uid, None)
-        rng_stream = self.get_caller_stream(uid)
         pythoncom.CoInitialize()
-        rng_dispatch:xl.Range = utils.comarshal_dispatch_stream(rng_stream)
         try:
+            rng_stream = self.get_caller_stream(uid)
+            rng_dispatch:xl.Range = utils.comarshal_dispatch_stream(rng_stream)
             a5 = rng_dispatch.Address
             a6 = rng_dispatch.Formula
             a7 = rng_dispatch.Value
@@ -467,7 +485,11 @@ class xlproWorkspace:
             a5 = e
             a6 = "ERROR"
             a7 = "ERROR"
-        self.set_caller_stream(uid, utils.comarshal_release_and_get_stream(rng_dispatch))
+        try:
+            self.set_caller_stream(uid, utils.comarshal_release_and_get_stream(rng_dispatch))
+        except:
+            pass
+        a8 = self._uid_args_cache.get(uid, None)
         ret = {
             "uid": uid,
             "result_display": a0,
@@ -478,6 +500,7 @@ class xlproWorkspace:
             "Address": a5,
             "Formula": a6,
             "Value": a7,
+            "Args": a8
         }
         pass
         pythoncom.CoUninitialize()
@@ -642,7 +665,7 @@ class WorkerManager:
                 except queue.Empty:
                     break
                 self._clear_completed_threads()
-                time.sleep(0.001) # fairness sleep
+                time.sleep(0.1) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -730,7 +753,7 @@ class ResultsManager:
 
                 logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
                 self._server._get_uid_debug_info(uid)
-                self._recalculate_precedents(uid)
+                # self._recalculate_precedents(uid)
 
                 logger.debug(f"ResultsManager is waking the worker manager to replace '{uid}'")
                 self._server._pending_function_queue.put(uid)
@@ -777,7 +800,7 @@ class ResultsManager:
                     self._process_queue_element()
                 except queue.Empty:
                     break
-                time.sleep(0.01) # fairness sleep
+                time.sleep(0.1) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -822,15 +845,18 @@ class ClientManager:
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
         try:
-            caller_dispatch = self._server.get_caller_stream(uid)
+            caller_dispatch = utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val = self._get_value(uid)
             self._set_result_display(uid, val)
 
             # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
         except Exception as e:
-            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            try:
+                self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
+            except:
+                pass
             raise e
 
     def _update_client_figure_result(self, uid) -> None:
@@ -866,15 +892,18 @@ class ClientManager:
         # XXX - Warning that qsize() is not thread safe
         # this prevents inplace recycling and potentially infinite loop
         queue_length = self._server._client_recalculate_queue.qsize()
+        logger.debug(f"Client manager queue length estimate is {queue_length}")
         for _ in range(queue_length):
             try:
                 uid = self._server._client_recalculate_queue.get()
+                logger.debug(f"Client manager fetched uid '{uid}'")
             except queue.Empty:
+                logger.debug("Client manager queue is empty")
                 return
             
             with self._server._uid_result_iscomplete_map_lock:
                 if not uid in self._server._uid_result_iscomplete_map.keys():
-                    logger.debug(f"Uid '{uid}' not found as pending function within client manager update. Ignoring this")
+                    logger.debug(f"Uid '{uid}' not found as pending function within client manager update. Ignoring this iteration")
                     return
 
             pass
@@ -893,7 +922,8 @@ class ClientManager:
                     self._update_client_figure_result(uid)
                 else:
                     raise Exception("Result type invalid")
-                # if successful we don't need to replace
+                # if successful we don't need to replace#
+                logger.debug(f"Client manager successfully processed uid '{uid}'. Not replacing")
                 replace_in_queue = False
                 # XXX - todo - consider removing the uid after this call
             except pywintypes.com_error as e:
@@ -915,10 +945,13 @@ class ClientManager:
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")
 
             # if we failed to update, recycle the queue as necessary
+
             if replace_in_queue:
+                if "jsonify" in self._server._get_uid_debug_info(uid)["Formula"]:
+                    pass
                 self._server._client_recalculate_queue.put(uid)
 
-            time.sleep(0.001) # fairness sleep
+            time.sleep(0.1) # fairness sleep
 
 
     def _run(self):
@@ -929,7 +962,7 @@ class ClientManager:
         while not self._stop_event.is_set():
             # wait for ten seconds for an event, otherwise do a queue process to check for 
             # outstanding tasks.
-            self._wake_event.wait(timeout=5)
+            self._wake_event.wait(timeout=0.5)
             if self._wake_event.is_set():
                 logger.debug("ClientManager thread woke up for an event!")
                 self._wake_event.clear()
