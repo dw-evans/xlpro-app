@@ -6,5 +6,5 @@ class FunctionTypes:
     @classmethod
     def as_list(cls):
         return [value for key, value in vars(cls).items() if isinstance(value, int)]
-
     
+

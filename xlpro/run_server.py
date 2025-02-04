@@ -24,7 +24,7 @@ config = config.load()
 import os
 
 import file_lock
-import utils
+import _utils
 import psutil
 import errors
 
@@ -106,7 +106,7 @@ def serve():
             print("The process with the lock file is not alive.")
             raise Exception(f"Error in lock file '{config.xlpro_lock_path}' please correct manually.")
         print("The process appears to be alive.")
-        utils.show_warning(
+        _utils.show_warning(
             "xlpro",
             f"""WARNING: Could not acquire the file lock.
   - Another xlpro instance appears to be running at PID: {pid}

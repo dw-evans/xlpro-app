@@ -18,7 +18,6 @@ import win32com.server.policy
 import numpy as np
 import pywintypes
 
-import utils
 
 from win32typelibs import excel as xl
 
@@ -28,16 +27,18 @@ import config
 
 import sys
 import errors
-from xlpro_wrappers import ModuleFunctionMapsWrapper
-from xlpro_enums import FunctionTypes
-import xlpro_wrappers
-
-from win32com.client import Dispatch
 
 cfg = config.load()
 wd = Path(__file__).parent
 logger = logging.getLogger(__name__)
-# logger = logging.getLogger()
+
+import _utils
+from _wrappers import ModuleFunctionMapsWrapper
+from _enums import FunctionTypes
+import _wrappers
+
+
+from win32com.client import Dispatch
 
 def configure_workspace_xlpro_files(wd:Path, cfg:config.Configuration):
     xlpro_dir_path = Path() / wd / cfg.xlpro_directory
@@ -146,13 +147,13 @@ class xlproServer:
         if not uid in self._workspace_map.keys():
             logger.info("Workbook has not been registered, initializing...")
             self.register_and_configure_wb_workspace(wb_dispatch)
-        utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
+        _utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
         return self._workspace_map[uid]
     
     def _get_workspace_uid_from_wb(self, wb_dispatch):
         wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
         wb_path = str(Path(wb.FullName))
-        utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
+        _utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
         return wb_path
         # return utils.hash_str(wb_path)
 
@@ -260,19 +261,19 @@ class xlproWorkspace:
 
     def _register_functions_in_self(self):
         logger.info(f"Re-initializing workspace functions...")
-        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{utils.hash_str(self._wb_uid)}"
-        xlpro_wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
+        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{_utils.hash_str(self._wb_uid)}"
+        _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
         # self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
         self._update_module_func_map_wrapper()
 
         logger.info(f"Reinitialization complete.")
 
     def _get_active_registered_functon_names(self):
-        return [k for k, isactive in self._module_function_maps_wrapper.func_name_isactive_register.items() if isactive]
+        return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
     
     def _get_active_registered_functions(self):
         keys = self._get_active_registered_functon_names()
-        return [self._module_function_maps_wrapper.func_name_register[key] for key in keys]
+        return [self._module_function_maps_wrapper.fname_func_register[key] for key in keys]
     
     def _deregister_functions_in_self(self):
         logger.info(f"Uninitializing workspace functions...")
@@ -293,7 +294,7 @@ class xlproWorkspace:
         pass
 
     def _get_function_by_name(self, fname):
-        return self._module_function_maps_wrapper.func_name_register[fname]
+        return self._module_function_maps_wrapper.fname_func_register[fname]
 
     def _clear_uid(self, uid):
         """Clear a uid from memory"""
@@ -343,7 +344,7 @@ class xlproWorkspace:
 
     @staticmethod
     def _hash_excel_function_call(*args:typing.Iterable[str]):
-        return utils.hash_str(", ".join([str(x) for x in args]))
+        return _utils.hash_str(", ".join([str(x) for x in args]))
 
     def execute_function_async(self, caller, fname, args):
         try:
@@ -386,11 +387,11 @@ class xlproWorkspace:
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
 
-            result_type = self._module_function_maps_wrapper.func_name_type_register[fname]
+            result_type = self._module_function_maps_wrapper.fname_type_register[fname]
             
             self._uid_result_type_map[uid] = result_type
 
-            caller_stream = utils.comarshal_release_and_get_stream(caller_dispatch) # this marshal is the OG
+            caller_stream = _utils.comarshal_release_and_get_stream(caller_dispatch) # this marshal is the OG
             self._uid_to_caller_map[uid] = caller_stream
 
             # configure default state for result and iscomplete status
@@ -432,7 +433,7 @@ class xlproWorkspace:
             raise Exception("kwargs should not be here!")
         
         def worker():
-            f = xlpro_wrappers.generate_wrapped_function(func.__module__, func.__name__)
+            f = _wrappers.generate_wrapped_function(self._temp_module_name, func.__name__)
             try:
                 ret = f(*args, **kwargs)
                 self._result_queue.put((uid, ret))
@@ -458,7 +459,7 @@ class xlproWorkspace:
 
     def _get_vba_sync_text(self) -> str:
         funcs = self._get_active_registered_functions()
-        return utils.get_xlpro_vb_dynamic_component_contents(funcs)
+        return _utils.get_xlpro_vb_dynamic_component_contents(funcs)
     
     def get_caller_stream(self, uid):
         with self._uid_to_caller_map_lock:
@@ -477,7 +478,7 @@ class xlproWorkspace:
         pythoncom.CoInitialize()
         try:
             rng_stream = self.get_caller_stream(uid)
-            rng_dispatch:xl.Range = utils.comarshal_dispatch_stream(rng_stream)
+            rng_dispatch:xl.Range = _utils.comarshal_dispatch_stream(rng_stream)
             a5 = rng_dispatch.Address
             a6 = rng_dispatch.Formula
             a7 = rng_dispatch.Value
@@ -486,7 +487,7 @@ class xlproWorkspace:
             a6 = "ERROR"
             a7 = "ERROR"
         try:
-            self.set_caller_stream(uid, utils.comarshal_release_and_get_stream(rng_dispatch))
+            self.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(rng_dispatch))
         except:
             pass
         a8 = self._uid_args_cache.get(uid, None)
@@ -512,7 +513,7 @@ class xlproWorkspace:
 def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
 
     module_name = f"{cfg.xlpro_functions_stem}_{uid}"
-    utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
+    _utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
     raise NotImplementedError
     func = getattr(sys.modules[module_name], func_name)
 
@@ -527,8 +528,8 @@ def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
     pass
 
 def setup_scope_and_get_function(module_name, module_path, func_name):
-    utils.import_module(module_name, wd / f"{module_name}.py")
-    func_map = utils.get_udf_valid_functions_from_module(module_name)
+    _utils.import_module(module_name, wd / f"{module_name}.py")
+    func_map = _utils.get_udf_valid_functions_from_module(module_name)
     func = func_map[func_name]
     return func
 
@@ -699,8 +700,8 @@ class ResultsManager:
 
     def _recalculate_precedents(self, uid):
         pythoncom.CoInitialize()
-        caller_dispatch = utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
-        precedents_stream = utils.get_precedents_chain(caller_dispatch)
+        caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+        precedents_stream = _utils.get_precedents_chain(caller_dispatch)
         
         precedents_recalculate = []
         active_formulas = self._server._get_active_registered_functon_names()
@@ -712,10 +713,10 @@ class ResultsManager:
                 ps_disp:xl.Range
                 formula = ps_disp.Formula2
                 ps_disp.Formula2 = ps_disp.Formula2
-                if utils.formula_is_for_xlpro(formula, active_formulas):
+                if _utils.formula_is_for_xlpro(formula, active_formulas):
                     precedents_recalculate.append(ps_disp)
                 else:
-                    utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - obj created in this thread
+                    _utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - obj created in this thread
             except Exception as e:
                 logger.warning(f"Error during recalculate: {e}")
                 continue
@@ -728,8 +729,8 @@ class ResultsManager:
                 logger.warning(f"Error during recalculate2: {e}")
                 continue
 
-            utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - XXX - todo - check
-        self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
+            _utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - XXX - todo - check
+        self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         pythoncom.CoUninitialize()
 
     def _process_queue_element(self):
@@ -766,6 +767,7 @@ class ResultsManager:
                     logger.info(f"Call rejected by callee for '{uid}', recycling function...")
                     return
             
+            logger.warning(f"Returned value is a generic exception: {uid}, {val}")
             ret = str(val) # convert exception to string for it to show in excel.
 
 
@@ -845,16 +847,22 @@ class ClientManager:
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
         try:
-            caller_dispatch = utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+            caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val = self._get_value(uid)
+            if isinstance(val, Exception):
+                logger.warning(f"Value is an exception: '{e}', '{uid}'")
             self._set_result_display(uid, val)
 
             # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+        except KeyError as e:
+            # XXX - todo - there is a risk of a keyerror here for some reason
+            logger.error(f"Error during client update: '{uid}', {e}")
+        
         except Exception as e:
             try:
-                self._server.set_caller_stream(uid, utils.comarshal_release_and_get_stream(caller_dispatch))
+                self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
             except:
                 pass
             raise e
@@ -879,10 +887,10 @@ class ClientManager:
             ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
             caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(_utils.comarshal_release_and_get_stream(caller_dispatch))
 
         except Exception as e:
-            self._server.set_caller_stream(utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(_utils.comarshal_release_and_get_stream(caller_dispatch))
             raise e
 
     def _process_queue(self):
@@ -940,6 +948,9 @@ class ClientManager:
 
             except AttributeError as e:
                 logger.warning("AttributeError during cell update, Application may be in dialogue")
+            except Exception as e:
+                logger.critical(f"Error during client queue processing!")
+                raise e
             finally:
                 # XXX - Marshalling the caller back to the pool in case
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")

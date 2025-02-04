@@ -17,7 +17,7 @@ from pathlib import Path
 import hashlib
 import uuid
 from functools import wraps
-import xlpro_typing
+import _types
 import ctypes
 import os
 
@@ -30,7 +30,7 @@ import types
 import sys
 import regex as re
 
-from xlpro_types import xlproptr
+from _types import xlproptr
 import errors
 import json
 
@@ -355,7 +355,7 @@ def convert_xl_2d_types_args(func, args):
     _, args_and_types, _, _ = get_function_signature(func)
     ppargs = []
     for val, (a, t) in zip(args, args_and_types):
-        ppargs.append(xlpro_typing.ExcelArrayConverter(val, t))
+        ppargs.append(_types.ExcelArrayConverter(val, t))
     return ppargs
 
 def convert_xl_2d_types_kwargs(func, kwargs):
@@ -364,7 +364,7 @@ def convert_xl_2d_types_kwargs(func, kwargs):
     for k, v in kwargs.items():
         for a, t in args_and_types:
             if a == k:
-                ppkwargs[a] = xlpro_typing.ExcelArrayConverter(v, t)
+                ppkwargs[a] = _types.ExcelArrayConverter(v, t)
                 break
 
     return ppkwargs
@@ -419,10 +419,10 @@ def hash_cell(rng_dispatch) -> str:
     return f"{wb.FullName}::{ws.Name}::{rng.Address}"
 
 
-from xlpro_typing import list1d, list2d
-def jsonify(*arr:list1d):
+from _types import list1d, list2d
+def jsonify(arr:list2d):
     """Converts range to json string"""
-    from xlpro_typing import ExcelArrayConverter
+    from _types import ExcelArrayConverter
     arr:list2d = ExcelArrayConverter(arr, list2d)
     
     # validate_args_ready(*arr, {})
@@ -460,7 +460,7 @@ def pre_p_an_arg(cval, target_type):
 
     
     # 2. convert an argument to a target type
-    ppval = xlpro_typing.ExcelArrayConverter(cval, target_type)
+    ppval = _types.ExcelArrayConverter(cval, target_type)
     return ppval
 
 def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
@@ -523,6 +523,20 @@ def formula_is_for_xlpro(formula:str, formulas:list[str]):
     return ret
     # return False
 
+
+import inspect
+# def get_caller_globals():
+#     globals_dict:dict = inspect.currentframe().f_back.f_globals
+#     return globals_dict
+
+def get_caller_globals(frame):
+    """Returns the global namespace of the module that called the current function."""
+    # frame = inspect.currentframe()
+    try:
+        caller_frame = frame.f_back  # The frame that called `register`
+        return caller_frame.f_globals  # Get the caller's globals
+    finally:
+        del frame  # Prevent reference cycles
 
 if __name__ == "__main__":
 
