@@ -11,22 +11,22 @@ import win32com.server.policy
 import win32api
 import pywintypes
 import win32event
+import argparse
 
-from server import xlproServer
 
+import sys
+import os
 import logging
 
-import config
-import sys
+from xlpro import config
 
 config = config.load()
 
-import os
-
-import file_lock
-import _utils
+from xlpro.server import xlproServer
+from xlpro import file_lock
+from xlpro import _utils
 import psutil
-import errors
+from xlpro import errors
 
 
 wd = Path(__file__).parent
@@ -195,13 +195,15 @@ def serve():
     logger.info("Graceful exit")
     sys.exit()
 
-import argparse
 
-if __name__ == "__main__":
+
+def main():
+    global parent_pid
     parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
     parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor")
     args = parser.parse_args()
-
     parent_pid = args.parent_pid if args.parent_pid else None
-
     serve()
+
+if __name__ == "__main__":
+    main()

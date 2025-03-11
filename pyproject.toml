@@ -1,0 +1,17 @@
+[project]
+name = "xlpro"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.1",
+    "psutil>=7.0.0",
+    "pywin32>=309",
+    "regex>=2024.11.6",
+    "toml>=0.10.2",
+    "win32typelibs",
+]
+
+[tool.uv.sources]
+win32typelibs = { path = "../win32typelibs" }

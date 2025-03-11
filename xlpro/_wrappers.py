@@ -1,10 +1,12 @@
-import _utils
+from xlpro import _utils
 
 from functools import wraps
 import threading
-from _enums import FunctionTypes
-import _types
-
+from xlpro._enums import FunctionTypes
+from xlpro import _types
+from xlpro import errors
+import json
+import typing
 # XXX - todo - maybe implement threading locks in future.
 # Not sure when you'd ever have multithread during registration unless you were maybe mixing libraries?
 
@@ -74,7 +76,7 @@ def _register_func(func, mname):
 
 
 def _validate_func_type(_type):
-    from server import FunctionTypes
+    from xlpro.server import FunctionTypes
     return _type in FunctionTypes.as_list()
 
 def _register_func_type(func, mname, _type):
@@ -130,9 +132,7 @@ def import_module_with_registration(mname, fpath):
 
 
 
-import errors
-import json
-import typing
+
 
 def _default_func_wrapper(func):
     @wraps(func)

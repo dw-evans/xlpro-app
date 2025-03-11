@@ -17,7 +17,8 @@ from pathlib import Path
 import hashlib
 import uuid
 from functools import wraps
-import _types
+# import ._types
+from xlpro import _types
 import ctypes
 import os
 
@@ -30,8 +31,8 @@ import types
 import sys
 import regex as re
 
-from _types import xlproptr
-import errors
+from xlpro._types import xlproptr
+from xlpro import errors
 import json
 
 
@@ -419,7 +420,7 @@ def hash_cell(rng_dispatch) -> str:
     return f"{wb.FullName}::{ws.Name}::{rng.Address}"
 
 
-from _types import list1d, list2d
+from xlpro._types import list1d, list2d
 def jsonify(arr:list2d):
     """Converts range to json string"""
     from _types import ExcelArrayConverter

@@ -17,25 +17,21 @@ import win32com.server.policy
 
 import numpy as np
 import pywintypes
-
-
 from win32typelibs import excel as xl
-
 import matplotlib.figure
-
-import config
-
 import sys
-import errors
+
+from xlpro import errors
+from xlpro import config
 
 cfg = config.load()
 wd = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
-import _utils
-from _wrappers import ModuleFunctionMapsWrapper
-from _enums import FunctionTypes
-import _wrappers
+from xlpro import _utils
+from xlpro._wrappers import ModuleFunctionMapsWrapper
+from xlpro._enums import FunctionTypes
+from xlpro import _wrappers
 
 
 from win32com.client import Dispatch

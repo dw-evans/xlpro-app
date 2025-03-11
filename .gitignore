@@ -4,7 +4,7 @@
 *.svg
 .venv/
 *.lock
-
+!uv.lock
 
 # --- GO GITIGNORE ---
 # Binaries for programs and plugins
