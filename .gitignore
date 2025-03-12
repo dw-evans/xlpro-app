@@ -5,6 +5,10 @@
 .venv/
 *.lock
 !uv.lock
+.xlpro
+addin/Book1.xlsm
+
+
 
 # --- GO GITIGNORE ---
 # Binaries for programs and plugins

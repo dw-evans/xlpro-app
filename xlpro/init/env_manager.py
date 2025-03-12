@@ -66,6 +66,7 @@ c:/users/daniel.evans/
 
   
 other functions needed
+
   xlpro init
     configures the workbook for xlpro usage
     creates or selects a python environment
