@@ -36,6 +36,27 @@ from xlpro import _wrappers
 
 from win32com.client import Dispatch
 
+def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
+    d = workbook_path.parent / f"{workbook_path.name}.xlpro"
+    d.mkdir(exist_ok=True)
+
+    funcs_path = d / f"functions.py"
+    subroutines_path = d / f"subroutines.py"
+
+    p = funcs_path
+    if not p.exists():
+        with open(p, "w") as f:
+            f.write(f"# > {p.resolve()}\n")
+            f.write(f"# xlpro will automatically detect functions in this file as Excel UDFs.\n\n")
+
+    p = subroutines_path
+    if not p.exists():
+        with open(p, "w") as f:
+            f.write(f"# > {p.resolve()}\n")
+            f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
+
+    return d
+
 def configure_workspace_xlpro_files(wd:Path, cfg:config.Configuration):
     xlpro_dir_path = Path() / wd / cfg.xlpro_directory
     xlpro_dir_path.mkdir(exist_ok=True)
@@ -198,6 +219,7 @@ class xlproWorkspace:
     def __init__(self, server:xlproServer, wb_uid):
         self._server = server
         self._wb_uid = wb_uid
+        self._wb_path = Path(wb_uid)
         self._wd = None # working directory
 
         self._uid_result_display_map = {} # the result to be displayed
@@ -249,11 +271,11 @@ class xlproWorkspace:
 
     def set_xlpro_working_dir(self, wd:Path):
         logger.info(f"Setting working directory for workspace to '{str(wd)}'")
-        self._wd = wd / cfg.xlpro_directory
-        self._wd.mkdir(parents=True, exist_ok=True)
+        self._wd = initialize_and_get_workspace_xlpro_dir(self._wb_path)
 
     def _configure_xlpro_files(self):
-        configure_workspace_xlpro_files(self._wd.parent, cfg)
+        # configure_workspace_xlpro_files(self._wd.parent, cfg)
+        initialize_and_get_workspace_xlpro_dir(self._wb_path)
 
     def _register_functions_in_self(self):
         logger.info(f"Re-initializing workspace functions...")

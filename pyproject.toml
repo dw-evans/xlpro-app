@@ -18,3 +18,6 @@ dependencies = [
 
 [tool.uv.sources]
 win32typelibs = { path = "../win32typelibs" }
+
+[tool.uv.workspace]
+members = ["xlpro_install/envs/cbbaf652-2b79-46aa-aa6c-0e8838722d2c_3.14.0"]
