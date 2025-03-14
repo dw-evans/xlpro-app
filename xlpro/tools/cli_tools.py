@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def clear_line(count=1):
     for _ in range(count):
-        sys.stdout.write("\033[A\r" + " " * 100 + "\r")  # Overwrite the line with spaces
+        sys.stdout.write("\033[A\r" + " " * 200 + "\r")  # Overwrite the line with spaces
         sys.stdout.flush()
 
 pass
@@ -33,9 +33,24 @@ pass
 
 console = Console(highlight=False)
 
-style_prompt = Style.parse("bold green")
+style_prompt = Style.parse("green")
+style_prompt_boldface = style_prompt + Style.parse("bold")
+
 style_generic_option = Style.parse("cyan")
 style_selected_option = style_generic_option + Style.parse("bold") + Style.parse("reverse")
+
+style_plain = Style.parse("")
+style_plain_boldface = style_plain + Style.parse("bold")
+
+style_success = Style.parse("green")
+style_success_boldface = style_success + Style.parse("bold")
+
+style_error = Style.parse("red")
+style_error_boldface = style_error + Style.parse("bold")
+
+style_warning = Style(color="#FFA500")
+style_warning_boldface = style_warning + Style.parse("bold")
+
 
 XLPRO_ROOT_PATH = Path() / "xlpro_install"
 XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ROOT_PATH / "venv-mappings.json"
@@ -58,15 +73,28 @@ def initialize_xlpro_install_directory():
 def create_venv_path_name():
     return str(uuid.uuid4())
 
+def get_xlpro_python_interpreters() -> list[Path]:
+    xlpro_venv_interepreters = [str(v.resolve()) for x in XLPRO_ENVS_DIR.glob("*") if x.is_dir() and (v:=(x / ".venv/scripts/python.exe")).exists()]
+    return xlpro_venv_interepreters
+
+def get_uv_python_interpreters() -> list[Path]:
+    result = subprocess.run("uv python dir", shell=True, capture_output=True, text=True, check=True)
+    uv_py_dir = Path(result.stdout.split("\n")[0])
+    uv_py_exes = [x for x in uv_py_dir.glob("*/python.exe")]
+    return uv_py_exes
+
+def get_global_python_interpreters():
+    result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
+    ret = result.stdout.split("\n")[:-1]
+    return ret
+
 def select_python_interpreter() -> Path:
     py_path_locations = []
     
-    result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True)
+    result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
     py_path_locations += result.stdout.split("\n")[:-1]
 
-    result = subprocess.run("uv python dir", shell=True, capture_output=True, text=True)
-    uv_py_dir = Path(result.stdout.split("\n")[0])
-    uv_py_exes = [x for x in uv_py_dir.glob("*/python.exe")]
+    uv_py_exes = get_uv_python_interpreters() 
     py_path_locations += uv_py_exes
 
     menu_items = [f"{x}" for x in py_path_locations]
@@ -84,7 +112,7 @@ def select_python_interpreter() -> Path:
         nonlocal s_list
         s_list = []
         s = "Select your python interpreter:"
-        console.print(s, style=style_prompt)
+        console.print(s, style=style_prompt_boldface)
         s_list.append(s)
         for i, item in enumerate(menu_items):
             if i == index:
@@ -114,7 +142,7 @@ def select_python_interpreter() -> Path:
 
 def get_py_exe_version(py_interpreter_path:Path) -> str:
     str_py_interpreter_path = str(py_interpreter_path)
-    result = subprocess.run([str_py_interpreter_path, "--version"], shell=True, capture_output=True, text=True)
+    result = subprocess.run([str_py_interpreter_path, "--version"], shell=True, capture_output=True, text=True, check=True)
     version_match = re.search(r"Python (\d+\.\d+\.\d+)", result.stdout.split("\n")[0])
     return version_match.group(1)
 
@@ -159,6 +187,7 @@ def create_symbolic_venv_from_existing_venv(existing_venv_root_path:Path) -> Non
             
         ],
         cwd=str(xlpro_venv_path.parent),
+        check=True,
     )
     pass
 
@@ -205,7 +234,11 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     return d
 
 def get_python_exe_from_root_venv_path(root_venv_path:Path) -> Path:
-    return root_venv_path / "scripts/python.exe"
+    if (ret:=root_venv_path / "scripts/python.exe").exists():
+        return ret
+    elif (ret:=root_venv_path / ".venv/scripts/python.exe").exists():
+        return ret
+    raise FileNotFoundError
 
 
 def validate_xlpro_workbook_folder(xlpro_folder:Path):
@@ -238,7 +271,7 @@ def scan_for_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
 
 def reinitialize_workbook_for_xlpro(workbook_path:Path) -> Path:
     """Reinitialize the environment for this workbook. Fetches the cached venv used"""
-    found_venv = find_venv_root_path_used_for_workbook_from_map(workbook_path)
+    found_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path)
 
     # handle failed find 
     if not found_venv:
@@ -254,49 +287,155 @@ def reinitialize_workbook_for_xlpro(workbook_path:Path) -> Path:
 
     return Path(found_venv)
 
+def prompt_user_input(prompt:str) -> str:
+    def print_prompt():
+        console.print(f"{prompt} ", style=style_prompt_boldface)
+        ret = input()
+        sys.stdout.flush()
+
+def await_yes_no_input(prompt:str, default:str = "yes") -> str:
+    if not default in ["yes", "no"]:
+        raise Exception
+    
+    lookup = {
+        "yes": "yes",
+        "y": "yes",
+        "no": "no",
+        "n": "no",
+        "": default
+    }
+    def print_prompt():
+        console.print(f"{prompt} ", style=style_prompt_boldface, end="")
+        console.print(f"[{'Y' if default=='yes' else 'y'}/{'N' if default=='no' else 'n'}]:", style=style_prompt)
+        sys.stdout.flush()
+
+    print_prompt()
+    inp = input()
+    while not (v:=inp.lower()) in lookup.keys():
+        console.print(f"{v} not recognized", style=style_error)
+        print_prompt()
+        inp = input()
+    
+    ret = lookup[inp]
+    if ret == "":
+        console.print(default, style=style_plain)
+    return lookup[inp]
+
+
+def get_user_selection(prompt:str, selection_items:list[str], index:int=0) -> str:
+    lines_count = "\n".join([prompt] + selection_items).count("\n") + 1
+
+    def print_selected_line(s:str):
+        console.print("> " + s.replace("\n", "\n  ") + "  ", style=style_selected_option)
+    def print_generic_line(s:str):
+        console.print("  " + s.replace("\n", "\n  "), style=style_generic_option)
+
+    def print_options():
+        for i, item in enumerate(selection_items):
+            if i == index:
+                print_selected_line(item)
+            else:
+                print_generic_line(item)
+
+    def print_prompt():
+        console.print(prompt, style=style_prompt_boldface)
+        
+    print_prompt()
+    print_options()
+    
+    while True:
+        clear_line(lines_count)
+        print_prompt()
+        print_options()
+
+        key = readchar.readkey()
+
+        if key == readchar.key.UP:
+            index = (index - 1) % len(selection_items)  # Move up
+        elif key == readchar.key.DOWN:
+            index = (index + 1) % len(selection_items)  # Move down
+        elif key == readchar.key.ENTER:
+
+            ret = selection_items[index]
+            break
+        time.sleep(0.01)
+
+    return ret
+
 
 def compare_environment_to_requirements_txt(environment_root_path:Path, external_requirements_txt_fp:Path) -> None:
     # environment_root_path = "."
     # external_requirements_txt_fp = "requirements.txt"
+
+    python_exe = get_python_exe_from_root_venv_path(environment_root_path)
+
     result = subprocess.run(
         [
             "uv",
             "pip",
             "sync",
-            "--dry-run"
-            f"{str(external_requirements_txt_fp)}",
+            "--dry-run",
+            "--python",
+            str(python_exe.resolve()),
+            f"{str(external_requirements_txt_fp.resolve())}",
         ], 
         cwd=str(environment_root_path),
         capture_output=True, 
         shell=True,
         text=True,
+        check=True,
     )
+
     lines = result.stderr.split("\n")[:-1]
     if lines[-1] == "Would make no changes":
         logger.debug(f"requirements.txt does match, ok to continue")
     else:
         logger.warning(f"requirements.txt does not match! \nmsg:\n{'  '.join(lines)}\n")
-        input("press enter to update the environment per the above")
-        print("Updating the environment...")
-        result = subprocess.run(
-            [
-                "uv",
-                "pip",
-                "sync",
-                f"{str(external_requirements_txt_fp)}",
-            ], 
-            cwd=str(environment_root_path),
-            capture_output=True, 
-            shell=True,
-            text=True,
-        )
-        print("Updates complete")
+        # input("press enter to update the environment per the above")
+        print_warning("venv requirements do not match target environment, see output below")
+        print_info(f"{'  '.join(lines)}\n")
+        if (v:=await_yes_no_input("Would you like to update the environment")) == "yes":
+            print_info("Updating the environment...")
+            result = subprocess.run(
+                [
+                    "uv",
+                    "pip",
+                    "sync",
+                    "--python",
+                    str(python_exe.resolve()),
+                    f"{str(external_requirements_txt_fp.resolve())}",
+                ], 
+                cwd=str(environment_root_path),
+                capture_output=True, 
+                shell=True,
+                text=True,
+                check=True,
+            )
+            print_success("Updates complete.")
+        elif v == "no":
+            print_warning("Updates skipped, you may be missing requirements for your environment.")
     return
 
-def compare_xlpro_venv_python_interpreter_version_to_required(venv_root:Path, workbook_path:Path):
+def print_info(msg:str):
+    console.print("INFO: ", style=style_plain_boldface, end="")
+    console.print(msg, style=style_plain)
+
+def print_success(msg:str):
+    console.print("SUCCESS: ", style=style_success_boldface, end="")
+    console.print(msg, style=style_success)
+
+def print_warning(msg:str):
+    console.print("WARNING: ", style=style_warning_boldface, end="")
+    console.print(msg, style=style_warning)
+
+def print_error(msg:str):
+    console.print("ERROR: ", style=style_error_boldface, end="")
+    console.print(msg, style=style_error)
+
+def compare_xlpro_venv_python_interpreter_version_to_required(py_interpreter:Path, workbook_path:Path):
     with open(get_xlpro_workbook_directory(workbook_path) / ".python-version", "r") as f:
         required_version = f.read() 
-    active_version = get_py_exe_version(get_python_exe_from_root_venv_path(venv_root))
+    active_version = get_py_exe_version(py_interpreter)
     logger.debug(f"required python version for {workbook_path} is {required_version}, active version is {active_version}")
     return active_version == required_version
 
@@ -359,10 +498,14 @@ def write_venv_to_workbooks_mappings_dict(venv_to_workbooks_map:dict) -> None:
 def store_venv_to_workbook_mapping(workbook_path:str|Path, xlpro_venv_parent_path:str|Path):
     """venv to workbook mapping maps the venv_root_dir.parent (xlpro custom name folder) to the workbook filepath
     i.e. one level above the /.venv folder..."""
+    
     venv_to_workbooks_map = read_venv_to_workbooks_map()
 
-    str_workbook_path = str(workbook_path)
-    str_xlpro_venv_parent_path = str(xlpro_venv_parent_path)
+    str_workbook_path = str(workbook_path.resolve())
+    str_xlpro_venv_parent_path = str(xlpro_venv_parent_path.resolve())
+
+    workbook_path = None
+    xlpro_venv_parent_path = None
 
     # construct reversed dict to check if the workbook isn't linked to a venv
     venv_to_workbooks_map_reversed:dict[str, str] = {}
@@ -374,7 +517,7 @@ def store_venv_to_workbook_mapping(workbook_path:str|Path, xlpro_venv_parent_pat
 
     # remove the existing venv link if it exists per the above dict
     if str_workbook_path in venv_to_workbooks_map_reversed.keys():
-        logger.warning(f"workbook {workbook_path} was previously mapped to {venv_to_workbooks_map_reversed[str_workbook_path]}")
+        logger.warning(f"workbook {str_workbook_path} was previously mapped to {venv_to_workbooks_map_reversed[str_workbook_path]}")
         venv_to_workbooks_map[venv_to_workbooks_map_reversed[str_workbook_path]].remove(str_workbook_path)
 
     # add the new venv to workbook link as a new list item
@@ -392,8 +535,10 @@ def remove_venv_to_workbook_mapping(workbook_path:str|Path, venv_path:str|Path|N
 
     venv_to_workbooks_map = read_venv_to_workbooks_map()
 
-    str_workbook_path = str(workbook_path)
-    str_venv_path = str(venv_path)
+    str_workbook_path = str(workbook_path.resolve())
+    str_venv_path = str(venv_path.resolve())
+    
+
 
     # if only the workbook is given, delete the workbook and its links. E.g. the user wants to unlink a workbook
     if workbook_path and (venv_path is None):
@@ -404,10 +549,13 @@ def remove_venv_to_workbook_mapping(workbook_path:str|Path, venv_path:str|Path|N
     elif venv_path and (workbook_path is None):
         # todo - XXX - test this code
         for k, v, in venv_to_workbooks_map.items():
-            if venv_path in v:
-                venv_to_workbooks_map[k].remove(venv_path)
+            if str_venv_path in v:
+                venv_to_workbooks_map[k].remove(str_venv_path)
         write_venv_to_workbooks_mappings_dict()
         return
+    
+    workbook_path = None
+    venv_path = None
 
     # handle specific venv and workbook link removal
     if not str_venv_path in venv_to_workbooks_map.keys():
@@ -416,13 +564,14 @@ def remove_venv_to_workbook_mapping(workbook_path:str|Path, venv_path:str|Path|N
     if not str_workbook_path in venv_to_workbooks_map[str_venv_path]:
         logger.error(f"workbook_path {str_workbook_path} not found in {XLPRO_VENV_WORKBOOKS_MAP_JSON_FP.name} key {str_venv_path}")
 
-    venv_to_workbooks_map[str_venv_path].remove(str(workbook_path))
+    venv_to_workbooks_map[str_venv_path].remove(str_workbook_path)
     write_venv_to_workbooks_mappings_dict(venv_to_workbooks_map)
 
 
-def find_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) -> None|Path:
+def get_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) -> None|Path:
     """Finds the venv last used for the specified workbook if it exists, else returns None"""
-    str_workbook_path = str(workbook_path)
+    str_workbook_path = str(workbook_path.resolve())
+    workbook_path = None
     venv_to_workbooks_map = read_venv_to_workbooks_map()
     # venv_to_workbooks_map_reversed is {workbook_path: environment_path}
     venv_to_workbooks_map_reversed = {v: k for k, v_list in venv_to_workbooks_map.items() for v in v_list}
@@ -464,12 +613,27 @@ def write_python_version_file(interpreter_path:Path, parent_dir:Path):
     with open(parent_dir / ".python-version", "w") as f:
         f.write(get_py_exe_version(interpreter_path))
 
-def standardize_venv_root_to_parent(venv_root_path:Path) -> Path:
+def standardize_venv_path(venv_root_path:Path) -> Path:
+    # XXX - todo - replace this with the .venv file
     if (venv_root_path / ".venv/scripts/python.exe").exists():
-        return venv_root_path
+        ret = venv_root_path
     elif (venv_root_path / "scripts/python.exe").exists():
-        return venv_root_path.parent
-    raise Exception("invalid venv root path provided")
+        ret = venv_root_path.parent
+    elif venv_root_path.name == "python.exe":
+        ret = venv_root_path.parent.parent.parent
+    else:
+        raise Exception("invalid venv root path provided")
+    return ret
+# def standardize_venv_path(venv_root_path:Path) -> Path:
+#     # XXX - todo - replace this with the .venv file
+#     if (venv_root_path / ".venv/scripts/python.exe").exists():
+#         return venv_root_path / ".venv"
+#     elif (venv_root_path / "scripts/python.exe").exists():
+#         return venv_root_path
+#     elif (venv_root_path / "python.exe").exists():
+#         return venv_root_path.parent.parent
+#     raise Exception("invalid venv root path provided")
+
 
 
 
@@ -520,34 +684,33 @@ def main():
             "matplotlib",
             "pywin32",
         ],
-        cwd=str(standardize_venv_root_to_parent(venv_root_path).resolve()),
+        cwd=str(standardize_venv_path(venv_root_path).resolve()),
         check=True,
         capture_output=True,
     )
 
     pass
-    standardized_venv_root_dir = standardize_venv_root_to_parent(venv_root_path)
+    standardized_venv_root_dir = standardize_venv_path(venv_root_path)
 
     # write_requirements_txt_for_workbook(xlpro_venv_root_path=standardize_venv_root_to_parent(venv_root_path), workbook_path=workbook_path)
     write_requirements_txt_to_folder(standardized_venv_root_dir, xlpro_dir)
-    write_python_version_file(get_python_exe_from_root_venv_path(standardized_venv_root_dir / ".venv"), xlpro_dir)
+    write_python_version_file(get_python_exe_from_root_venv_path(standardized_venv_root_dir), xlpro_dir)
     store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=standardized_venv_root_dir)
 
 
-    env = os.environ.copy()
-    env["PYTHON_EXE"] = str(venv_exe_path.resolve())
     result = subprocess.run(
         [
             "uv",
             "pip",
             "uninstall",
+            "--python",
+            str(venv_exe_path.resolve()),
             "matplotlib",
         ],
-        cwd=str(standardize_venv_root_to_parent(venv_root_path).resolve()),
-        env=env,
+        cwd=str(standardize_venv_path(venv_root_path).resolve()),
         check=True,
+        capture_output=True,
     )
-
 
     pass
 
@@ -559,30 +722,59 @@ def main_but_reinitializing():
     workbook_path.write_text("", encoding="utf-8")
 
     is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
-
     if not is_xlpro:
         raise Exception("oops make the file first dummy")
 
     # retrieve the venv from the cache
-    venv_root_path = find_venv_root_path_used_for_workbook_from_map(workbook_path)
+    venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
     if venv_root_path is None:
         raise Exception("No venv cound be found")
 
     # compare the requirements.txt
-    compare_venv_environment_to_required_environment(venv_root_path)
-    compare_xlpro_venv_python_interpreter_version_to_required(venv_root=venv_root_path / ".venv")
+    standardized_venv_root_path = standardize_venv_path(venv_root_path)
+    compare_venv_environment_to_required_environment(
+        environment_root_path=standardized_venv_root_path, 
+        workbook_path=workbook_path,
+    )
+    compare_xlpro_venv_python_interpreter_version_to_required(
+        py_interpreter=get_python_exe_from_root_venv_path(standardized_venv_root_path), 
+        workbook_path=workbook_path,
+    )
 
-    store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=venv_root_path.parent)
+    store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=standardized_venv_root_path)
 
     pass
 
+def test_changing_venv_for_workbook():
+    workbook_path = Path() / "xlpro_testing/test1/Book1.xlsx"
+    is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
+    if not is_xlpro:
+        raise Exception("oops make the file first dummy")
+
+    ret = get_user_selection("Select an existing interpreter", get_xlpro_python_interpreters() + ["Other"])
+
+    if ret.lower() == "other":
+        venv_path = prompt_user_input("Specify")
+    else:
+        venv_path = ret
+
+    venv_path = Path() / venv_path
+    
+    standardized_venv_path = standardize_venv_path(venv_path)
+    existing_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
+    remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_venv)
+        
 
 
 
 
 if __name__ == "__main__":
-    main()
+    # console.print("\n")
+    # await_yes_no_input("hello")
+    # get_user_selection("get your selection",["a", "b", "c", "d"])
+    # main()
     # main_but_reinitializing()
+    test_changing_venv_for_workbook()
     pass
 
 pass
