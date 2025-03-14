@@ -57,26 +57,6 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
 
     return d
 
-def configure_workspace_xlpro_files(wd:Path, cfg:config.Configuration):
-    xlpro_dir_path = Path() / wd / cfg.xlpro_directory
-    xlpro_dir_path.mkdir(exist_ok=True)
-
-    funcs_path = xlpro_dir_path / f"{cfg.xlpro_functions_stem}.py"
-    subroutines_path = xlpro_dir_path / f"{cfg.xlpro_subroutines_stem}.py"
-
-    p = funcs_path
-    if not p.exists():
-        with open(p, "w") as f:
-            f.write(f"# > {p.resolve()}\n")
-            f.write(f"# xlpro will automatically detect functions in this file as Excel UDFs.\n\n")
-
-    p = subroutines_path
-    if not p.exists():
-        with open(p, "w") as f:
-            f.write(f"# > {p.resolve()}\n")
-            f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
-
-
 class xlproServer:
     _public_methods_ = [
         "getpid",
