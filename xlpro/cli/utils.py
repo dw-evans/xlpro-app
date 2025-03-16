@@ -83,8 +83,8 @@ def initialize_xlpro_install_directory():
             f.write(json.dumps({}))
 
     (XLPRO_ROOT_PATH / "envs").mkdir(exist_ok=True)
- 
-    
+
+
 def create_uuid_str():
     return str(uuid.uuid4())
 
@@ -147,6 +147,14 @@ def select_python_interpreter() -> Path:
         
         time.sleep(0.01)
 
+
+def is_interpreter_virtual(py_interpreter_path:Path) -> bool:
+    if not py_interpreter_path.name == "python.exe":
+        raise Exception("provided path should be path/to/python.exe executable")
+    # ./.venv/pyvenv.cfg will exist for virtual environments
+    if (py_interpreter_path.parent / "pyvenv.cfg").exists():
+         return True
+    return False
 
 def get_py_exe_version(py_interpreter_path:Path) -> str:
     str_py_interpreter_path = str(py_interpreter_path)
@@ -833,11 +841,18 @@ def test_configure_workbook_with_existing_venv():
     workbook_path.parent.mkdir(exist_ok=True)
     workbook_path.write_text("", encoding="utf-8")
 
+
     # initialize the xlpro folder adjacent to the workbook
     xlpro_dir = initialize_and_get_workspace_xlpro_dir(workbook_path)
     
-    user_specified_venv = Path() / prompt_user_valid_file_path("Specify a custom path to the interpreter/environment")
+    user_specified_venv = Path() / prompt_user_valid_file_path(msg:="Specify a custom path to a virtual environment")
+    while not is_interpreter_virtual(user_specified_venv):
+        print_error(f"""the provided environment {user_specified_venv} does not appear to be a virtual environment
+xlpro does not yet support these, please specify a virtual environment instead.""")
+        user_specified_venv = Path() / prompt_user_valid_file_path(msg)
+    
     user_specified_venv_root_dir = get_venv_root_directory(user_specified_venv)
+
     logger.debug(f"normalized {user_specified_venv} to {user_specified_venv_root_dir}")
 
     xlpro_venv_path = create_symbolic_venv_from_existing_venv(existing_venv_root_path=user_specified_venv_root_dir)
