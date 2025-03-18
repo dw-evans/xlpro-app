@@ -1,0 +1,41 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Core Launch (console)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Build and Package XLL",
+            "program": "C:/Program Files/Microsoft Office/root/Office16/EXCEL.EXE",
+            // "args": ["${workspaceFolder}/bin/Debug/net6.0-windows/xlproxll-AddIn.xll"],
+            // "args": ["${workspaceFolder}/bin/Debug/net6.0-windows/xlproxll-AddIn-packed.xll"],
+            "args": ["${workspaceFolder}/bin/Debug/net6.0-windows/publish/xlproxll-AddIn64-packed.xll"],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },      
+    ]
+}
+
+
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": ".NET Core Launch (console)",
+//             "type": "coreclr",
+//             "request": "launch",
+//             "preLaunchTask": "build",
+//             "program": "${workspaceFolder}/bin/Debug/net6.0-windows/ExcelDnaAddinTest.dll",
+//             "args": [],
+//             "cwd": "${workspaceFolder}",
+//             "console": "internalConsole",
+//             "stopAtEntry": false
+//         },
+//         {
+//             "name": ".NET Core Attach",
+//             "type": "coreclr",
+//             "request": "attach"
+//         }
+//     ]
+// }

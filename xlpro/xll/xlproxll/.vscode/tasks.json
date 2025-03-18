@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build and Package XLL",
+        "type": "shell",
+        "command": "dotnet build",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": "$msCompile",
+        "detail": "Builds the project and packages the XLL"
+      },
+      {
+        "label": "Package XLL with ExcelDnaPack",
+        "type": "shell",
+        "command": "C:/Users/Daniel Evans/.dotnet-tools/ExcelDna-1.7.0/ExcelDnaPack.exe",
+        "args": [
+          "${workspaceFolder}/bin/Debug/net6.0-windows/xlproxll-AddIn.dna"
+        ],
+        "dependsOn": ["Build and Package XLL"],
+        "problemMatcher": []
+      }
+    ]
+  }
+  
