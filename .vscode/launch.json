@@ -4,7 +4,15 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name":"Python Debugger: Module",
+            "type":"debugpy",
+            "request":"launch",
+            "module":"xlpro.run_server",
+            "args": [
+                "--debugpy_port=5678"
+            ]
+        },
         {
             "name":"debugpy: remote 5678",
             "type":"debugpy",

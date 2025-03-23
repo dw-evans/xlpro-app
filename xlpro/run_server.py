@@ -27,6 +27,7 @@ from xlpro import file_lock
 from xlpro import _utils
 import psutil
 from xlpro import errors
+import debugpy
 
 
 wd = Path(__file__).parent
@@ -87,30 +88,37 @@ def is_parent_process_closed(pid):
 
 
 def serve():
+    global DEBUGPY_PORT
     logger.debug(f"serve() being run at root directory: {os.getcwd()}")
-    import debugpy
-    debugpy.listen((config.debug_ip, config.debug_port),)
-    logger.info(f"Waiting for client to connect debugger at {(config.debug_ip, config.debug_port)}...")
+
+    debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
+
+    logger.info(f"ready to receive connection to debugger at {(config.debug_ip, DEBUGPY_PORT)}...")
     # debugpy.wait_for_client()
     # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
 
+    xlpro_lock_fp = file_lock.get_xlpro_lockfile_path()
+    if not xlpro_lock_fp.parent.exists():
+        logger.warning(f"{xlpro_lock_fp.parent} does not exist, making parents")
+        xlpro_lock_fp.parent.mkdir()
+
     pass
-    global parent_pid
+    global PARENT_PID
     global SERVER
     try:
-        lock_file_handle = file_lock.acquire_file_and_write_pid(config.xlpro_lock_path)
+        lock_file_handle = file_lock.acquire_file_and_write_pid(str(xlpro_lock_fp))
     except PermissionError as e:
         print("Could not acquire lock on file. Checking validity")
-        pid = file_lock.check_existing_lock_and_pid(config.xlpro_lock_path)
+        pid = file_lock.check_existing_lock_and_pid(xlpro_lock_fp)
         if not pid:
             print("The process with the lock file is not alive.")
-            raise Exception(f"Error in lock file '{config.xlpro_lock_path}' please correct manually.")
+            raise Exception(f"Error in lock file '{xlpro_lock_fp}' please correct manually.")
         print("The process appears to be alive.")
         _utils.show_warning(
             "xlpro",
             f"""WARNING: Could not acquire the file lock.
   - Another xlpro instance appears to be running at PID: {pid}
-  - Delete {config.xlpro_lock_path} if this issue persists.
+  - Delete {xlpro_lock_fp} if this issue persists.
   - This will not have affected your current session if xlpro was already running.""")
         sys.exit(1)
 
@@ -156,10 +164,10 @@ def serve():
     SERVER = xlproServer()
 
     def tidy_up_lock_file():
-        logger.info(f"Releasing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
+        logger.info(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
         file_lock.close_file(handle=lock_file_handle)
-        logger.info(f"Removing lock file '{config.xlpro_lock_path}' handle: '{lock_file_handle}'...")
-        os.remove(config.xlpro_lock_path)
+        logger.info(f"Removing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
+        os.remove(xlpro_lock_fp)
         pass
 
     while True:
@@ -173,9 +181,9 @@ def serve():
                 pwm = pythoncom.PumpWaitingMessages()
             if is_server_pending_close():
                 raise errors.ServerClosedException
-            if parent_pid is not None:
-                if is_parent_process_closed(parent_pid):
-                    raise psutil.NoSuchProcess(parent_pid)
+            if PARENT_PID is not None:
+                if is_parent_process_closed(PARENT_PID):
+                    raise psutil.NoSuchProcess(PARENT_PID)
         except errors.ServerClosedException:
             logger.info("errors.ServerClosedException encountered. Closing the server...")
             tidy_up_lock_file()
@@ -197,12 +205,20 @@ def serve():
 
 
 
+
 def main():
-    global parent_pid
+    global PARENT_PID
+    global DEBUGPY_PORT
+
     parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
+
+    parser.add_argument("--debugpy_port", type=int, required=True, help="The port to configure for debugpy debugging")
     parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor")
+
     args = parser.parse_args()
-    parent_pid = args.parent_pid if args.parent_pid else None
+    PARENT_PID = args.parent_pid if args.parent_pid else None
+    DEBUGPY_PORT = args.debugpy_port if args.debugpy_port else None
+    
     serve()
 
 if __name__ == "__main__":

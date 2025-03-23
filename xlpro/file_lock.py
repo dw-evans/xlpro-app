@@ -128,6 +128,12 @@ def check_existing_lock_and_pid(lock_file):
         pass
     return False
 
+from pathlib import Path
+import sys
+
+def get_xlpro_lockfile_path() -> Path:
+    xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
+    return xlpro_dir / "xlpro.lock"
 
 if __name__ == "__main__":
     import config
@@ -143,5 +149,7 @@ if __name__ == "__main__":
     close_file(handle)
 
     
+
+
 
 

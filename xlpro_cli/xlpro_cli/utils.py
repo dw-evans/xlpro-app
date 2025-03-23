@@ -72,6 +72,8 @@ XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ROOT_PATH / "venv-mappings.json"
 XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
 
 
+
+
 def initialize_xlpro_install_directory():
     try:
         XLPRO_ROOT_PATH.mkdir(exist_ok=True)
@@ -306,7 +308,7 @@ def validate_xlpro_workbook_folder(xlpro_folder:Path):
     return True
 
 
-def scan_for_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
+def is_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
     potential_dir = get_xlpro_workbook_directory(workbook_path)
     if potential_dir.exists():
         validate_xlpro_workbook_folder(potential_dir)
@@ -710,6 +712,51 @@ def write_settings_json_python_path(parent_dir:Path, absolute_python_exe_path:Pa
     logger.warning(f"created settings.json at {settings_json_path}. Ensure you run the 'Python: Clear Workspace Interpreter' command from the command pallette")
     return settings_json_path
 
+def write_launch_json(parent_dir:Path, debugpy_port:int=5678):
+    if not isinstance(debugpy_port, int):
+        raise TypeError
+    
+    configuration_dict = {
+        "name": f"xlpro debugpy",
+        "type": "debugpy",
+        "request": "attach",
+        "subProcess": True,
+        "connect": {
+            "host": "localhost",
+            "port": debugpy_port,
+        },
+        "pathMappings": [
+            {
+                "localRoot": "${{workspaceFolder}}",
+                "remoteRoot": "${{workspaceFolder}}",
+            }
+        ]
+    }
+    configurations_dict = {
+        "version": "0.2.0",
+        "configurations": [
+            configuration_dict
+        ]
+    }
+
+    fp = parent_dir / ".vscode/launch.json"
+    # if fp.exists():
+    #     logger.warning(f"launch configurations already exists at {fp}, saving duplicate before overwriting")
+    #     is_saved_successfully = False
+    #     i = 1
+    #     while not is_saved_successfully:
+    #         if i > 100:
+    #             logger.warning("what on earth is going on, iters > 100, giving up on this...")
+    #             break
+    #         new_fp = fp.parent / f"{fp.stem}_{i}.json"
+    #         if not new_fp.exists():
+    #             shutil.copy2(fp, new_fp)
+    #             logger.warning(f"copied file to {new_fp} to preserve user data")
+    #             break
+    #         i += 1
+        
+    write_json_file(parent_dir / ".vscode/launch.json", configurations_dict)
+
 def write_python_version_file_for_venv(interpreter_path:Path, parent_dir:Path):
     with open(parent_dir / ".python-version", "w") as f:
         f.write(get_py_exe_version(interpreter_path))
@@ -777,6 +824,8 @@ def write_server_environment_settings(workbook_path:Path, active_venv:Path):
     # write settings.json to server location for IDE integration
     venv_exe_path = get_python_exe_from_xlpro_root_venv_path(active_venv_standardized_fp)
     write_settings_json_python_path(xlpro_server_dir, venv_exe_path)
+    # write launch.json for debug server support
+    write_launch_json(xlpro_server_dir)
 
 def write_local_environment_settings(active_venv:Path):
     """Writes the following data to path/to/local/xlpro/venv/XXX/.venv/../.xlpro/
@@ -807,168 +856,6 @@ def write_local_venv_workbook_link_data(workbook_path:Path, active_venv:Path):
     print_info(f"no existing interpreter found for {workbook_path}")
     print_info(f"creating new link between {workbook_path} and {active_venv_standardized_fp}")
     store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=active_venv_standardized_fp)
-
-
-def main():
-    """
-    Layout:
-        A user has a chosen workbook and calls xlpro init workbook_path 
-        Steps:
-            Prompt the user to 
-                create a virtual environment
-                (select a virtual environment and create a symlinked venv)
-            init the local xlpro virtual environment
-            init the adjacent xlpro directory
-            create the settings.json
-            ...
-            on any change:
-                write the requirements.txt to the xlpro destination directory
-    """
-    initialize_xlpro_install_directory()
-    workbook_path = Path() / "xlpro_testing/test1/Book1.xlsx"
-    workbook_path.parent.mkdir(exist_ok=True)
-    workbook_path.write_text("", encoding="utf-8")
-
-    # prompt the user to select the interpreter
-    selected_py_interpreter = select_python_interpreter()
-    # create the xlpro venv
-    venv_root_path = create_xlpro_venv_from_interpreter_and_get_root_path(selected_py_interpreter)
-    venv_exe_path = get_python_exe_from_xlpro_root_venv_path(venv_root_path)
-
-    # initialize the xlpro directory adjacent to the workbook
-    xlpro_dir = initialize_and_get_workspace_xlpro_dir(workbook_path)
-    # write the settings.json to the xlpro directory
-    write_settings_json_python_path(xlpro_dir, venv_exe_path)
-
-    subprocess.run(["where", "uv"], capture_output=True)
-    subprocess.run(["uv", "pip", "list"], capture_output=True)
-
-    # env = os.environ.copy()
-    # env["PYTHON_EXE"] = str(venv_exe_path.resolve())
-
-    subprocess.run(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            str(venv_exe_path.resolve()),
-            "matplotlib",
-            "pywin32",
-        ],
-        cwd=str(get_venv_root_directory_for_xlpro(venv_root_path).resolve()),
-        check=True,
-        capture_output=True,
-    )
-
-    pass
-    standardized_venv_root_dir = get_venv_root_directory_for_xlpro(venv_root_path)
-
-    # write_requirements_txt_for_workbook(xlpro_venv_root_path=standardize_venv_root_to_parent(venv_root_path), workbook_path=workbook_path)
-    write_requirements_txt_to_folder(standardized_venv_root_dir, xlpro_dir)
-    write_python_version_file_for_venv(get_python_exe_from_xlpro_root_venv_path(standardized_venv_root_dir), xlpro_dir)
-    store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=standardized_venv_root_dir)
-
-    # simulate a missing requirement
-    result = subprocess.run(
-        [
-            "uv",
-            "pip",
-            "uninstall",
-            "--python",
-            str(venv_exe_path.resolve()),
-            "matplotlib",
-        ],
-        cwd=str(get_venv_root_directory_for_xlpro(venv_root_path).resolve()),
-        check=True,
-        capture_output=True,
-    )
-
-    pass
-
-
-def main_but_reinitializing():
-    workbook_path = Path() / "xlpro_testing/test1/Book1.xlsx"
-    workbook_path.parent.mkdir(exist_ok=True)
-    workbook_path.write_text("", encoding="utf-8")
-
-    is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
-    if not is_xlpro:
-        raise Exception("oops make the file first dummy")
-
-    # retrieve the venv from the cache
-    venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
-    if venv_root_path is None:
-        raise Exception("No venv cound be found")
-
-    # compare the requirements.txt
-    standardized_venv_root_path = get_venv_root_directory_for_xlpro(venv_root_path)
-    dlg_compare_venv_environment_to_required_environment(
-        environment_root_path=standardized_venv_root_path, 
-        workbook_path=workbook_path,
-    )
-    is_py_interpreter_version_match_to_server_config(
-        py_interpreter=get_python_exe_from_xlpro_root_venv_path(standardized_venv_root_path), 
-        workbook_path=workbook_path,
-    )
-    store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=standardized_venv_root_path)
-    pass
-
-
-def test_changing_venv_for_workbook():
-    workbook_path = Path() / "xlpro_testing/test1/Book1.xlsx"
-    is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
-    if not is_xlpro:
-        raise Exception("oops make the file first dummy")
-
-    ret = get_user_selection("Select an existing interpreter", get_xlpro_python_interpreters() + ["Other"])
-
-    if ret.lower() == "other":
-        venv_path = prompt_user_input("Specify")
-    else:
-        venv_path = ret
-
-    venv_path = Path() / venv_path
-    
-    venv_path_standardized = get_venv_root_directory_for_xlpro(venv_path)
-    existing_venv = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
-    remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_venv)
-    store_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=venv_path_standardized)
-        
-
-def test_configure_workbook_with_existing_venv():
-    workbook_path = Path() / "xlpro_testing/test1/Book1_existing_venv.xlsx"
-    workbook_path.parent.mkdir(exist_ok=True)
-    workbook_path.write_text("", encoding="utf-8")
-
-
-    # initialize the xlpro folder adjacent to the workbook
-    xlpro_dir = initialize_and_get_workspace_xlpro_dir(workbook_path)
-    
-    user_specified_venv = Path() / prompt_user_valid_file_path(msg:="Specify a custom path to a virtual environment")
-    while not is_interpreter_virtual(user_specified_venv):
-        print_error(f"""the provided environment {user_specified_venv} does not appear to be a virtual environment
-xlpro does not yet support these, please specify a virtual environment instead.""")
-        user_specified_venv = Path() / prompt_user_valid_file_path(msg)
-    
-    user_specified_venv_root_dir = get_venv_root_directory(user_specified_venv)
-
-    logger.debug(f"normalized {user_specified_venv} to {user_specified_venv_root_dir}")
-
-    xlpro_venv_path = create_symbolic_venv_from_existing_venv(existing_venv_root_path=user_specified_venv_root_dir)
-    
-    # write settings.json
-    xlpro_venv_exe_path = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_path)
-    write_settings_json_python_path(xlpro_dir, xlpro_venv_exe_path)
-
-    logger.debug(f"created venv at {xlpro_venv_path} symlinked to {user_specified_venv_root_dir}")
-
-    # store the xlpro venv folder path in the map 
-    xlpro_venv_path_standardized = get_venv_root_directory_for_xlpro(xlpro_venv_path)
-    store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=xlpro_venv_path_standardized)
-
-    pass
-
 
 
 class venv_types:
@@ -1079,7 +966,6 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
     return (ret, rettype)
     
 
-
 def xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
     nb: compatibility checks are crude, only checks if the x.xx python version string is a match."""
@@ -1121,7 +1007,7 @@ def xlpro_initialize_workbook(workbook_path:Path):
         return new_venv_path
     
 
-    is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
+    is_xlpro = is_existing_xlpro_workbook_folder(workbook_path=workbook_path)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
 
     # if it is already an xlpro file, 
@@ -1154,7 +1040,6 @@ def xlpro_initialize_workbook(workbook_path:Path):
         venv_root_path = initialize_workbook_with_new_venv(version_required=None)
 
 
-
 def xlpro_on_save_to_server(workbook_path:Path):
     """code run to save the environment configuration to the server location"""
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -1174,8 +1059,85 @@ def xlpro_change_workbook_venv(workbook_path:Path):
     xlpro_on_save_to_server(workbook_path=workbook_path)
 
 
-def test_py_exe():
-    pass
+
+import socket
+
+def get_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 0))  # Binding to port 0 tells OS to assign a free port
+        _, port = s.getsockname()
+        return port
+
+def check_port(host, port):
+    try:
+        # Create a socket object
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)  # Optional: Set timeout to avoid hanging forever
+        # Try to connect to the given host and port
+        sock.connect((host, port))
+    except socket.error:
+        return False  # Port is closed or unreachable
+    finally:
+        sock.close()
+    return True  # Port is open
+
+
+def update_workbook_debugpy_port(workbook_path:Path, port:int) -> None:
+    """Takes an xlpro venv interpreter and workbook path, 
+    stores the interpreter path to debug port map, and updates the server launch.json for the correct port
+    """
+    xlpro_wd = get_xlpro_workbook_directory(workbook_path)
+    print_info(f"updating debugpy port for {workbook_path} to {port}...")
+    write_launch_json(xlpro_wd, port)
+    print_success(f"updated debugpy port for {workbook_path} to {port} (.vscode/launch.json)")
+
+
+def read_configurations_json(workbook_path:Path) -> int:
+    d = read_json_file(get_xlpro_workbook_directory(workbook_path) / ".vscode/launch.json")
+    return d
+
+def read_xlpro_debug_configuration_port(workbook_path:Path):
+    d = read_configurations_json(workbook_path)
+    xlpro_config = d["configurations"][0]
+    if not xlpro_config["name"] == "xlpro debugpy":
+        print_error(msg:=f"could not locate the xlpro configuration for {workbook_path}")
+        raise Exception(msg)
+    ret = xlpro_config["connect"]["port"]
+    if not isinstance(ret, int):
+        raise TypeError
+    return ret
+
+
+def start_venv_xlpro_server_for_workbook(workbook_path:Path):
+    """spins up the xlpro server on a port specified in the launch.json debug configuration"""
+
+    py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+    py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
+    # look for the current launch json configuration
+    port = read_xlpro_debug_configuration_port(workbook_path)
+    workbook_xlpro_wd = get_xlpro_workbook_directory(workbook_path)
+
+    if not check_port("localhost", port):
+        print_warning(f"currently specified port {port} in launch.json is not available, finding another")
+        port = get_free_port()
+        print_info(f"free port found, {port}")
+        write_launch_json(workbook_xlpro_wd, port)
+    
+    update_workbook_debugpy_port(workbook_path=workbook_path, port=port)
+    print_info(f"spinning up xlpro server for {py_interpreter_path} with debugpy port {port}")
+    # if a python process already exists based on the lockfile, this will close itself!
+    result = subprocess.Popen(
+        [
+            str(py_interpreter_path),
+            # "-Xfrozen_modules=off"
+            "-m",
+            "xlpro.run_server",
+            f"--debugpy_port={str(port)}",
+        ],
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
+    )
+    pid = result.pid
+
 
 if __name__ == "__main__":
     # get_user_selection("select an option", ["a", "b", "c", "d"])
