@@ -162,7 +162,16 @@ def compare_py_version_t2(py_version_1:str, py_version_2:str) -> bool:
 
 def get_py_exe_version(py_interpreter_path:Path) -> str:
     str_py_interpreter_path = str(py_interpreter_path)
-    result = subprocess.run([str_py_interpreter_path, "--version"], shell=True, capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        [
+            str_py_interpreter_path, 
+            "--version",
+        ], 
+        shell=True, 
+        capture_output=True, 
+        text=True, 
+        # check=True,
+    )
     version_match = re.search(r"Python (\d+\.\d+\.\d+)", result.stdout.split("\n")[0])
     return version_match.group(1)
 
@@ -600,7 +609,7 @@ def store_venv_to_workbook_mapping(workbook_path:str|Path, xlpro_venv_parent_pat
         venv_to_workbooks_map[venv_to_workbooks_map_reversed[str_workbook_path]].remove(str_workbook_path)
 
     # add the new venv to workbook link as a new list item
-    if not xlpro_venv_parent_path in venv_to_workbooks_map.keys():
+    if not str_xlpro_venv_parent_path in venv_to_workbooks_map.keys():
         venv_to_workbooks_map[str_xlpro_venv_parent_path] = []
     venv_to_workbooks_map[str_xlpro_venv_parent_path].append(str_workbook_path)
 
@@ -778,11 +787,13 @@ def write_local_venv_workbook_link_data(workbook_path:Path, active_venv:Path):
 
     existing_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
     if existing_venv is not None:
-        print_info(f"removing existing link for {workbook_path} to {existing_venv}")
+        print_info(f"overwriting existing link for {workbook_path} to {existing_venv}")
         remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_venv)
+        store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=active_venv_standardized_fp)
+        return
     
-    # register the venv with the map
-    print_info(f"adding existing link for {workbook_path} to {existing_venv}")
+    print_info(f"no existing interpreter found for {workbook_path}")
+    print_info(f"creating new link between {workbook_path} and {active_venv_standardized_fp}")
     store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=active_venv_standardized_fp)
 
 
@@ -948,7 +959,14 @@ xlpro does not yet support these, please specify a virtual environment instead."
 
 
 
-def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Path:
+class venv_types:
+    SYSTEM_INTERPRETER = "system"
+    REUSED_LOCAL_VENV = "reused"
+    UV_DOWNLOAD_NEW_VENV = "uv-download"
+    REUSED_XLPRO_VENV = "reused-xlpro"
+
+def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None) -> tuple[Path, venv_types]:
+
     result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
     py_path_locations_system = result.stdout.split("\n")[:-1]
 
@@ -958,8 +976,9 @@ def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Pat
     ]
 
     xlpro_exes = get_xlpro_python_interpreters()
+    local_version_str1 = "(xlpro-local)"
     menu_items += [
-        f"(xlpro)      {x}" for x in xlpro_exes
+        f"{local_version_str1}      {x}" for x in xlpro_exes
     ]
 
     uv_py_exes = get_uv_python_interpreters() 
@@ -972,17 +991,18 @@ def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Pat
         f"{uv_dl_prefix} Python 3.13",
         f"{uv_dl_prefix} Python 3.14",
         other_version_str:="(uv-download) Other [specify version]",
-        local_version_str:="(local) Other [specify path]"
+        local_version_str2:="(local) Reuse other [specify path]"
     ]
 
 
     def convert_to_path(s:str):
-        return re.match(r"^\(.+\)\s+(.*)$", ret).group(1)
-
+        return re.match(r"^\(.+\)\s+(.*)$", s).group(1)
 
     prompt = "Select your python interpreter" + ("" if version_required is None else f"[requires {version_required}]")
+
     ret = get_user_selection(prompt=prompt, selection_items=menu_items)
 
+    rettype:venv_types = None
     # handle uv other version
     if ret == other_version_str:
         uv_py_version = prompt_user_input(msg:="Provide a python version to download e.g. 3.12.2")
@@ -991,6 +1011,7 @@ def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Pat
                 print_error(f"provided version {uv_py_version} is not compatible with {version_required}, please correct")
                 uv_py_version = prompt_user_input(msg)
         ret = uv_download_python_version(uv_py_version)
+        rettype = venv_types.UV_DOWNLOAD_NEW_VENV
 
     # handle specific download request (must occur after handling uv other version for namespace clash)
     elif ret.startswith(uv_dl_prefix):
@@ -998,11 +1019,21 @@ def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Pat
         if version_required is not None:
             while not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"provided version {provided_py_version} is not compatible with {version_required}, restarting this dialogue")
-                ret = dlg_select_and_create_valid_python_interpreter(version_required=version_required)
+                ret = dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required)
         ret = uv_download_python_version(provided_py_version)
+        rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+
+    # XXX - todo - handle reuse of an xlpro venv...
+    # if the user selects an existing xlpro venv, we don't want to create a new virtual environment.
+    elif ret.startswith(local_version_str1):
+        ret = convert_to_path(ret)
+        ret = Path(ret)        
+        if not ret.exists():
+            raise FileNotFoundError(f"the file does not exist {ret}")
+        rettype = venv_types.REUSED_XLPRO_VENV
 
     # handle mapping to a local virtual environment.
-    elif ret == local_version_str:
+    elif ret == local_version_str2:
         py_path = Path() / prompt_user_input(msg:="Provide a path to a local virtual environment python.exe")
         while not is_interpreter_virtual(py_path):
             print_error("please provide a python executable path")
@@ -1011,39 +1042,70 @@ def dlg_select_and_create_valid_python_interpreter(version_required=None) -> Pat
             while not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"provided version {provided_py_version} is not compatible with {version_required}, please correct")
                 py_path = Path() / prompt_user_input(msg)
-        ret = py_path
-    
+        rettype = venv_types.REUSED_LOCAL_VENV
+
     # for plain virtual environments, convert the input to a path
     else:
         ret = convert_to_path(ret)
         ret = Path(ret)        
         if not ret.exists():
             raise FileNotFoundError(f"the file does not exist {ret}")
+        rettype = venv_types.SYSTEM_INTERPRETER
 
-    return ret
+    if rettype is None:
+        raise Exception
     
+    return (ret, rettype)
+    
+
 
 def xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
     nb: compatibility checks are crude, only checks if the x.xx python version string is a match."""
 
     def initialize_workbook_with_new_venv(version_required=None) -> Path:
-        interpreter_path = dlg_select_and_create_valid_python_interpreter(version_required)
-        xlpro_venv_root_path = create_xlpro_venv_from_interpreter_and_get_root_path(interpreter_path)
+        interpreter_path, request_type = dlg_select_and_optionally_create_valid_python_interpreter(version_required)
+        print_info(f"user requested venv type: {request_type}")
 
+        # handle a virtual environment created from an existing system interpreter or a newly downloaded uv interpreter.
+        if request_type in [venv_types.SYSTEM_INTERPRETER, venv_types.UV_DOWNLOAD_NEW_VENV]:
+            print_info(f"creating new virtual environment from {interpreter_path}...")
+            xlpro_venv_root_path = create_xlpro_venv_from_interpreter_and_get_root_path(interpreter_path)
+            print_success(f"virtual environment creation successful at {xlpro_venv_root_path}")
+        
+        # handle a reused symlinked venv (creates a dummy environment pointing to the original system venv directory)
+        elif request_type == venv_types.REUSED_LOCAL_VENV:
+            print_info(f"registering symlinked interpreter to {interpreter_path}...")
+            user_specified_venv_root_dir = get_venv_root_directory(interpreter_path)
+            xlpro_venv_path = create_symbolic_venv_from_existing_venv(existing_venv_root_path=user_specified_venv_root_dir)
+            xlpro_venv_root_path = get_venv_root_directory_for_xlpro(xlpro_venv_path)
+            print_success(f"symlinked venv maps {interpreter_path} to {xlpro_venv_root_path} creation successful")
+
+        # handle a reused xlpro venv (does not create a new environment)
+        elif request_type == venv_types.REUSED_XLPRO_VENV:
+            print_info(f"re-using existing xlpro interpreter {interpreter_path}...")
+            user_specified_venv_root_dir = get_venv_root_directory(interpreter_path)
+            xlpro_venv_root_path = get_venv_root_directory_for_xlpro(user_specified_venv_root_dir)
+
+        # update the local venv mappings
         print_info(f"updating local venv for {workbook_path} and {xlpro_venv_root_path}...")
         write_local_venv_workbook_link_data(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
-        print_info(f"updating local venv completed successfully.")
+        print_success(f"updating local venv completed successfully.")
 
+        # update the workbook .xlpro directory metadata
         xlpro_on_save_to_server(workbook_path=workbook_path)
 
+        # return the environment path
         new_venv_path = xlpro_venv_root_path
         return new_venv_path
+    
 
     is_xlpro = scan_for_existing_xlpro_workbook_folder(workbook_path=workbook_path)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
 
-    # if it is already an xlpro file, prompt the user to initialize their own environment if one does not already exist
+    # if it is already an xlpro file, 
+    # prompt the user to initialize their own environment if one does not already exist
+    # the user has several options to create a new virtual environment from an intepreter, or map to an existing virtual environment.
     if is_xlpro:
         venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
         xlpro_recommended_py_version = read_python_version_file_within_dir(xlpro_server_dir)
@@ -1064,10 +1126,12 @@ def xlpro_initialize_workbook(workbook_path:Path):
         print_info("comparison complete.")
 
     # if its not an xlpro directory, we can start a new venv for it
+    # the user has the same options to create the environment as above.
     else:
-        print_info(f"workbook is not initialized for xlpro, the following steps will configure your environment")
-        venv_root_path = initialize_workbook_with_new_venv()
-        
+        print_info(f"workbook is not initialized for xlpro, the following steps will configure your environment, no version required")
+        venv_root_path = initialize_workbook_with_new_venv(version_required=None)
+
+
 
 def xlpro_on_save_to_server(workbook_path:Path):
     """code run to save the environment configuration to the server location"""
@@ -1079,7 +1143,7 @@ def xlpro_on_save_to_server(workbook_path:Path):
 
 def xlpro_change_workbook_venv(workbook_path:Path):
     """dialogue to change the venv used for an excel workbook"""
-    new_python_interpreter = dlg_select_and_create_valid_python_interpreter(version_required=None)
+    new_python_interpreter = dlg_select_and_optionally_create_valid_python_interpreter(version_required=None)
     get_venv_root_directory_for_xlpro(new_python_interpreter)
     existing_xlpro_venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
     print_info(f"removing existing binding to {existing_xlpro_venv_root_path} for {workbook_path}")
@@ -1104,11 +1168,11 @@ if __name__ == "__main__":
     xlapp.Visible=False
 
     workbook_paths:list[Path] = []
-    # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-raw" / "book1.xlsx")
+    workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-raw" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-existing-xlpro" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv-download-option" / "book1.xlsx")
-    workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv-download-specify" / "book1.xlsx")
+    # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv-download-specify" / "book1.xlsx")
 
 
     def make_workbook(p:Path):
@@ -1126,6 +1190,12 @@ if __name__ == "__main__":
     pass
     workbook_paths2:list[Path] = []
     workbook_paths2.append(Path() / "xlpro_testing" / "test3-initialize-from-existing-system" / "book1.xlsx")
+
+    for wb_fp in workbook_paths2:
+        print(f"wb_fp is {wb_fp}")
+        make_workbook(wb_fp)
+        xlpro_initialize_workbook(wb_fp)
+        pass
 
     
 
