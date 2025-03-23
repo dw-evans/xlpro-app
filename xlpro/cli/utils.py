@@ -626,15 +626,10 @@ def store_venv_to_workbook_mapping(workbook_path:str|Path, xlpro_venv_parent_pat
 
 
 def remove_venv_to_workbook_mapping(workbook_path:str|Path, venv_path:str|Path|None=None) -> None:
-    # todo - XXX - test this code
-    logger.critical("untested code")
-
     venv_to_workbooks_map = read_venv_to_workbooks_map()
-
+    workbook_path = Path() / workbook_path
     str_workbook_path = str(workbook_path.resolve())
     str_venv_path = str(venv_path.resolve())
-    
-
 
     # if only the workbook is given, delete the workbook and its links. E.g. the user wants to unlink a workbook
     if workbook_path and (venv_path is None):
@@ -697,22 +692,23 @@ def get_valid_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) 
     # do not allow a non-existent venv out of this function!
     if not venv_root_path.exists():
         print_warning(f"path does not exist '{venv_root_path}', removing the link for '{workbook_path}'")
-        remove_venv_to_workbook_mapping(workbook_path, venv_path=venv_root_path)
+        remove_venv_to_workbook_mapping(str_workbook_path, venv_path=venv_root_path)
         return
 
     return venv_root_path
 
 
-def write_settings_json_python_path(parent_dir:Path, python_exe_path:Path) -> Path:
+def write_settings_json_python_path(parent_dir:Path, absolute_python_exe_path:Path) -> Path:
+    if not absolute_python_exe_path.is_absolute():
+        raise Exception(f"python exe path must be absolute (in order to preserve symlinks)")
     vscode_dir = (parent_dir / ".vscode")
     (parent_dir / ".vscode").mkdir(exist_ok=True)
     settings_dict = {}
-    settings_dict["python.defaultInterpreterPath"] = str(python_exe_path.resolve())
+    settings_dict["python.defaultInterpreterPath"] = str(absolute_python_exe_path)
     settings_json_path = vscode_dir / "settings.json"
     write_json_file(settings_json_path, settings_dict)
     logger.warning(f"created settings.json at {settings_json_path}. Ensure you run the 'Python: Clear Workspace Interpreter' command from the command pallette")
     return settings_json_path
-
 
 def write_python_version_file_for_venv(interpreter_path:Path, parent_dir:Path):
     with open(parent_dir / ".python-version", "w") as f:
@@ -1055,6 +1051,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
         while not check:
             print_error(f"path invalid: {str(err)}")
             py_path = Path() / prompt_user_input(msg)
+            check, err = is_interpreter_valid_venv_and_exists(py_path)
+
 
         provided_py_version = get_py_exe_version(py_path)
         if version_required is not None:
