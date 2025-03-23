@@ -145,13 +145,15 @@ def uv_download_python_version(version_str:str) -> Path:
     return found_path_list[0]
     
 
-def is_interpreter_virtual(py_interpreter_path:Path) -> bool:
+def is_interpreter_valid_venv_and_exists(py_interpreter_path:Path) -> tuple[bool, Exception|None]:
     if not py_interpreter_path.name == "python.exe":
-        raise Exception("provided path should be path/to/python.exe executable")
+        return False, Exception("provided path should be path/to/python.exe executable")
+    if not py_interpreter_path.exists():
+        return False, FileNotFoundError("file does not exist")
     # ./.venv/pyvenv.cfg will exist for virtual environments
-    if (py_interpreter_path.parent / "pyvenv.cfg").exists():
-         return True
-    return False
+    if (py_interpreter_path.parent.parent / "pyvenv.cfg").exists():
+         return True, None
+    return False, Exception("other error")
 
 def get_t2_version_str(s:str) -> str:
     return re.search(r'(\d\.\d+)', s).group(1)
@@ -314,7 +316,7 @@ def scan_for_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
 
 def reinitialize_workbook_for_xlpro(workbook_path:Path) -> Path:
     """Reinitialize the environment for this workbook. Fetches the cached venv used"""
-    found_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path)
+    found_venv = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
 
     # handle failed find 
     if not found_venv:
@@ -512,11 +514,13 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
 def dlg_compare_venv_environment_to_required_environment(environment_root_path:Path, workbook_path:Path):
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path)
     required_py_version = read_python_version_file_within_dir(xlpro_server_dir)
+    if not environment_root_path.exists():
+        print_warning(f"path does not exist '{environment_root_path}'")
+        raise FileNotFoundError(f"the environment does not exist, please create another {environment_root_path}")
     active_py_version = get_py_exe_version(get_python_exe_from_xlpro_root_venv_path(environment_root_path))
 
-
     print_info(f"Comparing python version of local environment {environment_root_path} for {workbook_path}...")
-    if compare_py_version_t2(required_py_version, active_py_version):
+    if not compare_py_version_t2(required_py_version, active_py_version):
         print_warning(f"T2 python versions do not match, active: {active_py_version}, suggested: {required_py_version}")
         print_error(f"Unacceptable T2 python version mismatch, you may want to reconfigure your environment if you run into issues.")
         raise Exception("Python version mismatch, please correct. (Risk of overwriting server .python-version is pending development)")
@@ -543,7 +547,7 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
             ">",
             str((xlpro_workbook_dir / 'requirements.txt').resolve()),
         ],
-        cwd=str(xlpro_venv_root_path.resolve()), # PATH EXISTS
+        # cwd=str(xlpro_venv_root_path.resolve()), # PATH EXISTS
         capture_output=True, 
         shell=True,
         check=True,
@@ -575,7 +579,11 @@ def write_json_file(fp:Path, data:dict, indent=2):
     
 
 def read_venv_to_workbooks_map() -> dict[str, list[str]]:
-    return read_json_file(XLPRO_VENV_WORKBOOKS_MAP_JSON_FP)
+    d = read_json_file(XLPRO_VENV_WORKBOOKS_MAP_JSON_FP)
+    # for k, v_list in d.items():
+    #     if not Path(k).exists():
+    #         print_warning(f"xlpro environment {k} does not exist, clearing")
+    return d
 
 
 def write_venv_to_workbooks_mappings_dict(venv_to_workbooks_map:dict) -> None:
@@ -656,7 +664,7 @@ def remove_venv_to_workbook_mapping(workbook_path:str|Path, venv_path:str|Path|N
     write_venv_to_workbooks_mappings_dict(venv_to_workbooks_map)
 
 
-def get_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) -> None|Path:
+def get_valid_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) -> None|Path:
     """Finds the venv last used for the specified workbook if it exists, else returns None"""
     str_workbook_path = str(workbook_path.resolve())
     workbook_path = None
@@ -683,8 +691,16 @@ def get_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) -> Non
                 logger.info(f"could not match the complete path {str_workbook_path} to a venv, but found {k_wb_name} was linked to {len(val)} items.")
                 return val
         return 
-    
-    return Path() / venv_to_workbooks_map_reversed[str_workbook_path]
+
+    venv_root_path = Path() / venv_to_workbooks_map_reversed[str_workbook_path]
+
+    # do not allow a non-existent venv out of this function!
+    if not venv_root_path.exists():
+        print_warning(f"path does not exist '{venv_root_path}', removing the link for '{workbook_path}'")
+        remove_venv_to_workbook_mapping(workbook_path, venv_path=venv_root_path)
+        return
+
+    return venv_root_path
 
 
 def write_settings_json_python_path(parent_dir:Path, python_exe_path:Path) -> Path:
@@ -785,7 +801,7 @@ def write_local_venv_workbook_link_data(workbook_path:Path, active_venv:Path):
     it just adds the new environment to the dict."""
     active_venv_standardized_fp = get_venv_root_directory_for_xlpro(active_venv)
 
-    existing_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
+    existing_venv = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
     if existing_venv is not None:
         print_info(f"overwriting existing link for {workbook_path} to {existing_venv}")
         remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_venv)
@@ -885,7 +901,7 @@ def main_but_reinitializing():
         raise Exception("oops make the file first dummy")
 
     # retrieve the venv from the cache
-    venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
+    venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     if venv_root_path is None:
         raise Exception("No venv cound be found")
 
@@ -919,7 +935,7 @@ def test_changing_venv_for_workbook():
     venv_path = Path() / venv_path
     
     venv_path_standardized = get_venv_root_directory_for_xlpro(venv_path)
-    existing_venv = get_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
+    existing_venv = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
     remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_venv)
     store_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=venv_path_standardized)
         
@@ -1034,14 +1050,18 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
 
     # handle mapping to a local virtual environment.
     elif ret == local_version_str2:
-        py_path = Path() / prompt_user_input(msg:="Provide a path to a local virtual environment python.exe")
-        while not is_interpreter_virtual(py_path):
-            print_error("please provide a python executable path")
+        py_path = Path() / prompt_user_input(msg:="Provide a path to a local virtual environment python.exe")#
+        check, err = is_interpreter_valid_venv_and_exists(py_path)
+        while not check:
+            print_error(f"path invalid: {str(err)}")
+            py_path = Path() / prompt_user_input(msg)
+
         provided_py_version = get_py_exe_version(py_path)
         if version_required is not None:
             while not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"provided version {provided_py_version} is not compatible with {version_required}, please correct")
                 py_path = Path() / prompt_user_input(msg)
+        ret = py_path
         rettype = venv_types.REUSED_LOCAL_VENV
 
     # for plain virtual environments, convert the input to a path
@@ -1055,6 +1075,9 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
     if rettype is None:
         raise Exception
     
+    if not isinstance(ret, Path):
+        raise TypeError
+
     return (ret, rettype)
     
 
@@ -1107,7 +1130,8 @@ def xlpro_initialize_workbook(workbook_path:Path):
     # prompt the user to initialize their own environment if one does not already exist
     # the user has several options to create a new virtual environment from an intepreter, or map to an existing virtual environment.
     if is_xlpro:
-        venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
+        venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+
         xlpro_recommended_py_version = read_python_version_file_within_dir(xlpro_server_dir)
         print_info(f"the recommended py version for this workbook is {xlpro_recommended_py_version}")
         # if the virtual environment does not exist on the user's machine, we must create a new one.
@@ -1135,7 +1159,7 @@ def xlpro_initialize_workbook(workbook_path:Path):
 
 def xlpro_on_save_to_server(workbook_path:Path):
     """code run to save the environment configuration to the server location"""
-    xlpro_venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
+    xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     print_info(f"writing server files for {workbook_path} and {xlpro_venv_root_path}...")
     write_server_environment_settings(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
     print_info(f"writing server files completed successfuly.")
@@ -1145,7 +1169,7 @@ def xlpro_change_workbook_venv(workbook_path:Path):
     """dialogue to change the venv used for an excel workbook"""
     new_python_interpreter = dlg_select_and_optionally_create_valid_python_interpreter(version_required=None)
     get_venv_root_directory_for_xlpro(new_python_interpreter)
-    existing_xlpro_venv_root_path = get_venv_root_path_used_for_workbook_from_map(workbook_path)
+    existing_xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     print_info(f"removing existing binding to {existing_xlpro_venv_root_path} for {workbook_path}")
     remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_xlpro_venv_root_path)
     store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=existing_xlpro_venv_root_path)
@@ -1168,7 +1192,7 @@ if __name__ == "__main__":
     xlapp.Visible=False
 
     workbook_paths:list[Path] = []
-    workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-raw" / "book1.xlsx")
+    # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-raw" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-existing-xlpro" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv" / "book1.xlsx")
     # workbook_paths.append(Path() / "xlpro_testing" / "test2-initialize-from-uv-download-option" / "book1.xlsx")
