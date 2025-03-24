@@ -12,6 +12,7 @@ import json
 import os
 import uuid
 import shutil
+import socket
 
 
 logging.basicConfig(
@@ -201,7 +202,7 @@ def create_xlpro_venv_from_interpreter_and_get_root_path(py_interpreter_path:Pat
         check=True,
     )
     initialize_xlpro_venv_files(xlpro_venv_path)
-    return xlpro_venv_path
+    return xlpro_venv_path.resolve()
 
 
 def create_symbolic_venv_from_existing_venv(existing_venv_root_path:Path) -> Path:
@@ -558,7 +559,12 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
     return outfile
 
 
-def write_requirements_txt_for_workbook(xlpro_venv_root_path:Path, workbook_path):
+
+def write_requirements_txt_for_workbook(workbook_path:Path):
+    xlpro_py_interpreter = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+    if not xlpro_py_interpreter:
+        print_error("interpreter does not exist to write requirements.txt, exiting function")
+        return
     write_requirements_txt_to_folder(
         xlpro_venv_root_path,
         get_xlpro_workbook_directory(workbook_path),
@@ -670,24 +676,7 @@ def get_valid_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) 
     venv_to_workbooks_map_reversed = {v: k for k, v_list in venv_to_workbooks_map.items() for v in v_list}
     if not str_workbook_path in venv_to_workbooks_map_reversed.keys():
         logger.error(f"workbook_path {str_workbook_path} was not found within in {XLPRO_VENV_WORKBOOKS_MAP_JSON_FP.name}. No environment found")
-        return 
-        # look for a filename match
-        # todo - XXX - untested code
-        wb_name = (Path() / str_workbook_path).name
-        venv_to_workbooks_map_reversed_fname_only:dict[str, list[Path]] = {}
-        # venv_to_workbooks_map_reversed_fname_only is {workbook_name: environment_path}
-        for k, v_list in venv_to_workbooks_map_reversed.items():
-            k_wb_name = Path(k).name
-            if not k in venv_to_workbooks_map_reversed_fname_only:
-                venv_to_workbooks_map_reversed_fname_only[k_wb_name] = []
-            for v in v_list:
-                venv_to_workbooks_map_reversed_fname_only[k_wb_name].append(Path(v))
-
-        if k_wb_name in venv_to_workbooks_map_reversed_fname_only.keys():
-            if val:=venv_to_workbooks_map_reversed_fname_only[k_wb_name]:
-                logger.info(f"could not match the complete path {str_workbook_path} to a venv, but found {k_wb_name} was linked to {len(val)} items.")
-                return val
-        return 
+        return None
 
     venv_root_path = Path() / venv_to_workbooks_map_reversed[str_workbook_path]
 
@@ -966,6 +955,34 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
     return (ret, rettype)
     
 
+def install_requirements(py_interpreter_path:Path, requirements:list[str]):
+    if not py_interpreter_path.is_absolute():
+        raise Exception("path must be absolute")
+    result = subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            str(py_interpreter_path),
+        ] + requirements,
+        check=True,
+        capture_output=True,
+        text=True
+    )
+
+def install_default_requirements(py_interpreter_path:Path):
+    path_to_xlpro = Path().resolve()
+    reqs = [
+        "pip",
+        str(path_to_xlpro)
+    ]
+    print_info(f"Installing default requirements for {py_interpreter_path}")
+    install_requirements(py_interpreter_path=py_interpreter_path, requirements=reqs)
+    print_success(f"Default requirements installed for {py_interpreter_path}")
+    
+
+
 def xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
     nb: compatibility checks are crude, only checks if the x.xx python version string is a match."""
@@ -987,12 +1004,18 @@ def xlpro_initialize_workbook(workbook_path:Path):
             xlpro_venv_path = create_symbolic_venv_from_existing_venv(existing_venv_root_path=user_specified_venv_root_dir)
             xlpro_venv_root_path = get_venv_root_directory_for_xlpro(xlpro_venv_path)
             print_success(f"symlinked venv maps {interpreter_path} to {xlpro_venv_root_path} creation successful")
+        
 
         # handle a reused xlpro venv (does not create a new environment)
         elif request_type == venv_types.REUSED_XLPRO_VENV:
             print_info(f"re-using existing xlpro interpreter {interpreter_path}...")
             user_specified_venv_root_dir = get_venv_root_directory(interpreter_path)
             xlpro_venv_root_path = get_venv_root_directory_for_xlpro(user_specified_venv_root_dir)
+
+        # XXX - todo - this shouldn't be a catch all, add logic at some point...
+        xlpro_py_exe = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
+        install_default_requirements(xlpro_py_exe)
+
 
         # update the local venv mappings
         print_info(f"updating local venv for {workbook_path} and {xlpro_venv_root_path}...")
@@ -1045,7 +1068,7 @@ def xlpro_on_save_to_server(workbook_path:Path):
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     print_info(f"writing server files for {workbook_path} and {xlpro_venv_root_path}...")
     write_server_environment_settings(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
-    print_info(f"writing server files completed successfuly.")
+    print_info(f"writing server files completed successfully.")
 
 
 def xlpro_change_workbook_venv(workbook_path:Path):
@@ -1059,8 +1082,6 @@ def xlpro_change_workbook_venv(workbook_path:Path):
     xlpro_on_save_to_server(workbook_path=workbook_path)
 
 
-
-import socket
 
 def get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
