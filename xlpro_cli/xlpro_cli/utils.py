@@ -13,6 +13,7 @@ import os
 import uuid
 import shutil
 import socket
+import winreg
 
 
 logging.basicConfig(
@@ -1157,6 +1158,68 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
         creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
     pid = result.pid
+
+
+def add_to_user_path(p:Path):
+    # Ensure the path is absolute
+    new_path = p.absolute()
+    str_new_path = str(new_path)
+    try:
+        # Open the registry key where user environment variables are stored
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+            
+            # Get the current PATH value
+            try:
+                current_path, _ = winreg.QueryValueEx(key, "Path")
+            except FileNotFoundError:
+                current_path = ""
+
+            # Check if the path is already in PATH
+            if str_new_path in current_path.split(";"):
+                print_info(f"The path '{new_path}' is already in the user PATH.")
+                return
+
+            # Append the new path
+            updated_path = f"{current_path};{new_path}" if current_path else str_new_path
+
+            # Write back to the registry
+            winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, updated_path)
+            print_success(f"Successfully added '{new_path}' to the user PATH.")
+            
+    except Exception as e:
+        print_error(f"Error: {e}")
+
+def remove_from_user_path(p:Path):
+    # Ensure the path is absolute
+    new_path = p.absolute()
+    str_new_path = str(new_path)
+    try:
+        # Open the registry key where user environment variables are stored
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+            
+            # Get the current PATH value
+            try:
+                current_path, _ = winreg.QueryValueEx(key, "Path")
+            except FileNotFoundError:
+                current_path = ""
+
+            # Check if the path is already in PATH
+            if not str_new_path in current_path.split(";"):
+                print_info(f"The path '{new_path}' is already NOT in the user PATH.")
+                return
+
+            current_path_less_requested = current_path.split(";")
+            current_path_less_requested.remove(str_new_path)
+
+            # Append the new path
+            updated_path = ";".join(current_path_less_requested)
+
+            # Write back to the registry
+            winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, updated_path)
+            print_success(f"Successfully removed '{new_path}' from the user PATH.")
+            
+    except Exception as e:
+        print_error(f"Error: {e}")
 
 
 if __name__ == "__main__":
