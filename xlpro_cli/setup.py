@@ -1,16 +1,20 @@
 from setuptools import setup, find_packages
 
+import sys
+from pathlib import Path
+
 setup(
     name="xlpro_cli",
     version='0.1.0',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'xlpcli=xlpro_cli.commands:start_server',
+            'xlpro-cli=xlpro_cli.commands:main',
         ],
     },
     author='Daniel Evans',
-    description='xlpro command line interface',
+    description='xlpro command line interface package',
     url='tbc',
     install_requires=[],
 )
+

@@ -983,7 +983,7 @@ def install_default_requirements(py_interpreter_path:Path):
     
 
 
-def xlpro_initialize_workbook(workbook_path:Path):
+def dlg_xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
     nb: compatibility checks are crude, only checks if the x.xx python version string is a match."""
 
@@ -1029,7 +1029,6 @@ def xlpro_initialize_workbook(workbook_path:Path):
         new_venv_path = xlpro_venv_root_path
         return new_venv_path
     
-
     is_xlpro = is_existing_xlpro_workbook_folder(workbook_path=workbook_path)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
 
@@ -1189,7 +1188,7 @@ if __name__ == "__main__":
     for wb_fp in workbook_paths:
         print(f"wb_fp is {wb_fp}")
         make_workbook(wb_fp)
-        xlpro_initialize_workbook(wb_fp)
+        dlg_xlpro_initialize_workbook(wb_fp)
         pass
 
     pass
@@ -1199,7 +1198,7 @@ if __name__ == "__main__":
     for wb_fp in workbook_paths2:
         print(f"wb_fp is {wb_fp}")
         make_workbook(wb_fp)
-        xlpro_initialize_workbook(wb_fp)
+        dlg_xlpro_initialize_workbook(wb_fp)
         pass
 
     

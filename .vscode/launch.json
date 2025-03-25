@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name":"xlpro_cli.tests.main",
+            "type":"debugpy",
+            "request":"launch",
+            "module":"xlpro_cli.tests.main"
+        },
+        {
             "name":"Python Debugger: Module",
             "type":"debugpy",
             "request":"launch",

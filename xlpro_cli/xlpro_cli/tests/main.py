@@ -4,8 +4,8 @@
 import sys
 sys.path.append(r"C:\Users\Daniel Evans\projects\xlpro")
 # sys.path.append(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_cli")
-from xlpro_cli.xlpro_cli import commands
-from xlpro_cli.xlpro_cli import utils
+from .. import commands
+from .. import utils
 from pathlib import Path
 
 def main():
@@ -17,6 +17,36 @@ def test_install_default_requirements():
     utils.install_default_requirements(Path() / r"C:\Users\Daniel Evans\projects\xlpro\xlpro_install\envs\30baec6d-aa3c-4f55-983a-3cd8f1ae65e9_3.13.2\.venv\Scripts\python.exe")
     pass
 
+def test_init():
+    sys.argv = [
+        "xlpro-cli",
+        "init",
+        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+    ]
+    commands.main()
+
+def test_start():
+    sys.argv = [
+        "xlpro-cli",
+        "start",
+        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+    ]
+    commands.main()
+
+def test_uninit():
+    raise NotImplementedError
+    sys.argv = [
+        "uninit",
+        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+    ]
+    commands.main()
+    
+
 
 if __name__ == "__main__":
-    test_install_default_requirements()
+    # main()
+    # test_install_default_requirements()
+    test_init()
+    test_start()
+
+

@@ -149,7 +149,7 @@ def function_template_with_caller(func:Callable) -> str:
     #     for idx in arg_idxs_to_del:
     #         del arg_declaration_list[idx]
 
-    import server 
+    from xlpro import server 
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
