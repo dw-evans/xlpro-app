@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "xlpro debugpy",
+      "type": "debugpy",
+      "request": "attach",
+      "subProcess": true,
+      "connect": {
+        "host": "localhost",
+        "port": 64399
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${{workspaceFolder}}",
+          "remoteRoot": "${{workspaceFolder}}"
+        }
+      ]
+    }
+  ]
+}

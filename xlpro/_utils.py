@@ -423,7 +423,7 @@ def hash_cell(rng_dispatch) -> str:
 from xlpro._types import list1d, list2d
 def jsonify(arr:list2d):
     """Converts range to json string"""
-    from _types import ExcelArrayConverter
+    from xlpro._types import ExcelArrayConverter
     arr:list2d = ExcelArrayConverter(arr, list2d)
     
     # validate_args_ready(*arr, {})

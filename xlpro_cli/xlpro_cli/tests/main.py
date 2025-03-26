@@ -21,7 +21,8 @@ def test_init():
     sys.argv = [
         "xlpro-cli",
         "init",
-        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+        # r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\book1.xlsx"
     ]
     commands.main()
 
@@ -29,7 +30,8 @@ def test_start():
     sys.argv = [
         "xlpro-cli",
         "start",
-        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+        # r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
+        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\book1.xlsx"
     ]
     commands.main()
 

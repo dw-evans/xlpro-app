@@ -367,20 +367,23 @@ class xlproWorkspace:
             # downstream functions should pick up on these being deleted
             caller_dispatch = Dispatch(caller)
             caller_addr = caller_dispatch.Address
+
             with self._caller_address_uid_map_lock:
                 # the hash will be constant for a function/args/caller combination so this is valid
                 if caller_addr in self._caller_address_uid_map.keys():
                     self._clear_uid(self._caller_address_uid_map[caller_addr])
                 self._caller_address_uid_map[caller_addr] = uid
 
+            # this was originally added to deal with a recalculation order issue where None
+            # would get passed in the args mid calculation cycle
             if isinstance(args[0][0], list|tuple):
                 if None in args[0][0]:
                     logger.error(f"Args are fkd '{args}'")
                     x, y = args[0][0]
                     pass
-                if args[0][0][1] is not None:
-                    x, y = args[0][0]
-                    pass
+                # if args[0][0][1] is not None:
+                #     x, y = args[0][0]
+                #     pass
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)

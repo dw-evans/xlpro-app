@@ -20,13 +20,13 @@
             ]
         },
         {
-            "name":"debugpy: remote 5678",
+            "name":"debugpy: remote port",
             "type":"debugpy",
             "request":"attach",
             "subProcess": true,
             "connect":{
                 "host":"localhost",
-                "port":5678
+                "port":63719
             },
             "pathMappings":[
                 {

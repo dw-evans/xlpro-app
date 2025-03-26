@@ -212,12 +212,12 @@ def main():
 
     parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
 
-    parser.add_argument("--debugpy_port", type=int, required=True, help="The port to configure for debugpy debugging")
+    parser.add_argument("--debugpy_port", type=int, required=False, help="The port to configure for debugpy debugging")
     parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor")
 
     args = parser.parse_args()
     PARENT_PID = args.parent_pid if args.parent_pid else None
-    DEBUGPY_PORT = args.debugpy_port if args.debugpy_port else None
+    DEBUGPY_PORT = args.debugpy_port if args.debugpy_port else 5678
     
     serve()
 

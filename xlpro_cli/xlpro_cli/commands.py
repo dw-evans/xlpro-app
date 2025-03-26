@@ -5,7 +5,11 @@ from . import utils
 import sys
 import argparse
 
+import os
+os.chdir(Path(__file__).parent.parent.parent)
+
 def handle_start_server(args):
+    """Starts the server"""
     workbook_path = Path(args.workbook)
 
     if not workbook_path.exists():
@@ -16,6 +20,9 @@ def handle_start_server(args):
     
     utils.start_venv_xlpro_server_for_workbook(workbook_path)
     pass
+
+def handle_register_workbook_on_server(args):
+    ...
 
 
 def handle_init(args):
