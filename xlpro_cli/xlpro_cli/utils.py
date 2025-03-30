@@ -730,8 +730,8 @@ def write_launch_json(parent_dir:Path, debugpy_port:int=5678):
         },
         "pathMappings": [
             {
-                "localRoot": "${{workspaceFolder}}",
-                "remoteRoot": "${{workspaceFolder}}",
+                "localRoot": r"${workspaceFolder}",
+                "remoteRoot": r"${workspaceFolder}",
             }
         ]
     }

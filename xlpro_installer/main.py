@@ -3,6 +3,7 @@ import winreg
 import logging
 import subprocess
 import shutil
+import os
 
 
 def add_to_user_path(p:Path):
@@ -128,6 +129,25 @@ def install_uv(download=True):
         print(f"could not remove {XLPRO_TEMP_DIR}")
         pass
 
+
+def get_xlstart_path():
+    user_profile = Path(os.environ.get('USERPROFILE'))
+    if not user_profile.exists():
+        raise EnvironmentError("USERPROFILE environment variable not found or invalid.")
+    
+    xlstart_path = user_profile / 'AppData' / 'Roaming' / 'Microsoft' / 'Excel' / 'XLSTART'
+    
+    if xlstart_path.is_dir():
+        return xlstart_path
+    else:
+        raise FileNotFoundError(f"XLSTART folder not found at {xlstart_path}")
+
+# try:
+#     print("XLSTART Path:", get_xlstart_path())
+# except Exception as e:
+#     print(e)
+
+
 def install():
 
     # if XLPRO_INSTALL_DIR.exists():
@@ -160,6 +180,14 @@ def install():
     # install uv.exe in the /bin directory
     install_uv(download=False)
 
+    # install xlpro.xlam
+    src_xlpro_xlam_path = Path("addin/xlpro.xlam")
+    xlstart_path = get_xlstart_path()
+    dst_xlpro_xlam_path = xlstart_path / src_xlpro_xlam_path.name
+    if dst_xlpro_xlam_path.exists():
+        print(f"warning {dst_xlpro_xlam_path} already exists, not copying")
+    else:
+        shutil.copy2(src_xlpro_xlam_path, xlstart_path / src_xlpro_xlam_path.name)
 
     # copy config.toml
     config_path = Path("config.toml")
