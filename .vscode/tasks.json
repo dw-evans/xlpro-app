@@ -2,23 +2,39 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "go compile xlpro",
-            "type": "shell",
-            "command": "go",
-            "args": [
-              "build",
-              "-o",
-              "xlpro.exe",
-              "src/main.go"
-            ],
-            "group": {
-              "kind": "build",
-              "isDefault": true
-            },
-            "problemMatcher": ["$go"],
-            "options": {
-              "cwd": "${workspaceFolder}"
-            }
+          "label": "go compile xlpro",
+          "type": "shell",
+          "command": "go",
+          "args": [
+            "build",
+            "-o",
+            "xlpro.exe",
+            "src/main.go"
+          ],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "problemMatcher": ["$go"],
+          "options": {
+            "cwd": "${workspaceFolder}"
           }
+        },
+        {
+          "label": "compile xlpro-cli",
+          "type": "shell",
+          "command": "pyinstaller",
+          "args": [
+            "main.spec",
+          ],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_cli"
+          }
+        },
     ]
 }

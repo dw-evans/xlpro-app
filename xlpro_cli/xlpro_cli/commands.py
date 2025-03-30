@@ -21,6 +21,7 @@ def handle_start_server(args):
     utils.start_venv_xlpro_server_for_workbook(workbook_path)
     pass
 
+
 def handle_register_workbook_on_server(args):
     ...
 
@@ -39,7 +40,33 @@ def handle_uninit(args):
     raise NotImplementedError
 
 
+
+XLPRO_INSTALL_DIR = (Path() / "xlpro_install").resolve()
+XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
+
+def configure_env():
+    os.environ["PATH"] = f"{XLPRO_BIN_DIR};" + os.environ["PATH"]
+
+
+def load_uv_help() -> str:
+    result = subprocess.run(
+        [
+            "uv",
+            "-h"
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    ret = result.stdout
+    return ret
+
+
+
 def main():
+    configure_env()
+    load_uv_help()
+
     parser = argparse.ArgumentParser(
         prog="xlpro-cli",
         description="xlpro command-line utility",
@@ -53,6 +80,7 @@ def main():
     parser_start = subparsers.add_parser("start", help="run the xlpro server")
     parser_init = subparsers.add_parser("init", help="initialize a workbook for xlpro")
     parser_uninit = subparsers.add_parser("uninit", help="uninitialize a workbook for xlpro")
+    # parser_uv = subparsers.add_parser("uv", help=load_uv_help())
 
     parser_start.add_argument("workbook", type=str, help="workbook to start xlpro server for")
     parser_init.add_argument("workbook", type=str, help="workbook to initialize xlpro for (writes adjacent folder structure)")
@@ -67,4 +95,4 @@ def main():
 
 
 if __name__ == "__main__":
-    handle_start_server()
+    main()

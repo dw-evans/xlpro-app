@@ -26,6 +26,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def is_pyinstaller():
+    return hasattr(sys, '_MEIPASS')
+
+if is_pyinstaller():
+    XLPRO_WD = Path(sys.executable).parent.resolve()
+    # XLPRO_WD = Path() / "C:/Users/Daniel Evans/.xlpro"
+else:
+    # XLPRO_WD = (Path() / "xlpro_install").resolve()
+    XLPRO_WD = Path() / "C:/Users/Daniel Evans/.xlpro"
+
+print("cwd is " + os.getcwd())
+print("cwd is " + os.getcwd())
+# XLPRO_ROOT_PATH = XLPRO_WD / "xlpro_install"
+XLPRO_ROOT_PATH = XLPRO_WD
+XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ROOT_PATH / "venv-mappings.json"
+XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
+
+
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
 
@@ -47,7 +65,6 @@ def clear_line(count=1):
 
 pass
 
-
 console = Console(highlight=False)
 
 style_prompt = Style.parse("green")
@@ -67,12 +84,6 @@ style_error_boldface = style_error + Style.parse("bold")
 
 style_warning = Style(color="#FFA500")
 style_warning_boldface = style_warning + Style.parse("bold")
-
-
-XLPRO_ROOT_PATH = Path() / "xlpro_install"
-XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ROOT_PATH / "venv-mappings.json"
-XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
-
 
 
 
@@ -159,8 +170,10 @@ def is_interpreter_valid_venv_and_exists(py_interpreter_path:Path) -> tuple[bool
          return True, None
     return False, Exception("other error")
 
+
 def get_t2_version_str(s:str) -> str:
     return re.search(r'(\d\.\d+)', s).group(1)
+
 
 def compare_py_version_t2(py_version_1:str, py_version_2:str) -> bool:
     return get_t2_version_str(py_version_1) == get_t2_version_str(py_version_2)
@@ -436,7 +449,6 @@ def get_user_selection(prompt:str, selection_items:list[str], index:int=0) -> st
     return ret
 
 
-
 def print_info(msg:str):
     console.print("INFO: ", style=style_plain_boldface, end="")
     console.print(msg, style=style_plain)
@@ -515,6 +527,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             print_warning("Updates skipped, you may be missing requirements for your environment.")
     return
 
+
 def dlg_compare_venv_environment_to_required_environment(environment_root_path:Path, workbook_path:Path):
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path)
     required_py_version = read_python_version_file_within_dir(xlpro_server_dir)
@@ -558,7 +571,6 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
         # text=True,
     )
     return outfile
-
 
 
 def write_requirements_txt_for_workbook(workbook_path:Path):
@@ -702,6 +714,7 @@ def write_settings_json_python_path(parent_dir:Path, absolute_python_exe_path:Pa
     logger.warning(f"created settings.json at {settings_json_path}. Ensure you run the 'Python: Clear Workspace Interpreter' command from the command pallette")
     return settings_json_path
 
+
 def write_launch_json(parent_dir:Path, debugpy_port:int=5678):
     if not isinstance(debugpy_port, int):
         raise TypeError
@@ -747,9 +760,11 @@ def write_launch_json(parent_dir:Path, debugpy_port:int=5678):
         
     write_json_file(parent_dir / ".vscode/launch.json", configurations_dict)
 
+
 def write_python_version_file_for_venv(interpreter_path:Path, parent_dir:Path):
     with open(parent_dir / ".python-version", "w") as f:
         f.write(get_py_exe_version(interpreter_path))
+
 
 def python_version_string_is_correctly_formatted(s:str) -> bool:
     version_match = re.match(r"(\d+\.\d+\.\d+)", s)
@@ -764,6 +779,7 @@ def read_python_version_file_within_dir(parent_dir:Path) -> str:
     if not python_version_string_is_correctly_formatted(ret):
         raise Exception(f"Python version string {ret} is not correctly formatted within {fp}")
     return ret
+
 
 def get_venv_root_directory_for_xlpro(venv_root_path:Path) -> Path:
     # XXX - todo - replace this with the .venv file
@@ -817,6 +833,7 @@ def write_server_environment_settings(workbook_path:Path, active_venv:Path):
     # write launch.json for debug server support
     write_launch_json(xlpro_server_dir)
 
+
 def write_local_environment_settings(active_venv:Path):
     """Writes the following data to path/to/local/xlpro/venv/XXX/.venv/../.xlpro/
         - requirements.txt
@@ -830,6 +847,7 @@ def write_local_environment_settings(active_venv:Path):
     write_requirements_txt_to_folder(active_venv_standardized_fp, active_venv_xlpro_dir)
     # write .python-version
     write_python_version_file_for_venv(get_python_exe_from_xlpro_root_venv_path(active_venv_standardized_fp), active_venv_xlpro_dir)
+
 
 def write_local_venv_workbook_link_data(workbook_path:Path, active_venv:Path):
     """updates the venv cache, removes the mapping between the existing venv and the workbook if it exists, otherwise
@@ -853,6 +871,7 @@ class venv_types:
     REUSED_LOCAL_VENV = "reused"
     UV_DOWNLOAD_NEW_VENV = "uv-download"
     REUSED_XLPRO_VENV = "reused-xlpro"
+
 
 def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None) -> tuple[Path, venv_types]:
 
@@ -972,8 +991,10 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         text=True
     )
 
+
 def install_default_requirements(py_interpreter_path:Path):
-    path_to_xlpro = Path().resolve()
+    # path_to_xlpro = Path().resolve()
+    path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro")
     reqs = [
         "pip",
         str(path_to_xlpro)
@@ -982,7 +1003,6 @@ def install_default_requirements(py_interpreter_path:Path):
     install_requirements(py_interpreter_path=py_interpreter_path, requirements=reqs)
     print_success(f"Default requirements installed for {py_interpreter_path}")
     
-
 
 def dlg_xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
@@ -1082,12 +1102,12 @@ def xlpro_change_workbook_venv(workbook_path:Path):
     xlpro_on_save_to_server(workbook_path=workbook_path)
 
 
-
 def get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('localhost', 0))  # Binding to port 0 tells OS to assign a free port
         _, port = s.getsockname()
         return port
+
 
 def check_port(host, port):
     try:
@@ -1116,6 +1136,7 @@ def update_workbook_debugpy_port(workbook_path:Path, port:int) -> None:
 def read_configurations_json(workbook_path:Path) -> int:
     d = read_json_file(get_xlpro_workbook_directory(workbook_path) / ".vscode/launch.json")
     return d
+
 
 def read_xlpro_debug_configuration_port(workbook_path:Path):
     d = read_configurations_json(workbook_path)
@@ -1188,6 +1209,7 @@ def add_to_user_path(p:Path):
             
     except Exception as e:
         print_error(f"Error: {e}")
+
 
 def remove_from_user_path(p:Path):
     # Ensure the path is absolute

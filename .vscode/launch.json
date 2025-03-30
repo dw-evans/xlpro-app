@@ -5,10 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name":"xlpro_cli.tests.main",
+            "name":"Python Debugger: Current File absolute path",
             "type":"debugpy",
             "request":"launch",
-            "module":"xlpro_cli.tests.main"
+            "program":"${file}",
+            "console":"integratedTerminal",
+            "cwd": "C:/Users/Daniel Evans",
+        },
+        {
+            "name":"module",
+            "type":"debugpy",
+            "request":"launch",
+            "module":"xlpro_cli.main",
+            "args": [
+                "init",
+                "C:/Users/Daniel Evans/.xlpro-testing/Book1.xlsx"
+            ],
         },
         {
             "name":"Python Debugger: Module",

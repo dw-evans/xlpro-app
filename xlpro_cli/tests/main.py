@@ -2,11 +2,16 @@
 # from xlpro_cli import utils
 # from pathlib import Path
 import sys
-sys.path.append(r"C:\Users\Daniel Evans\projects\xlpro")
-# sys.path.append(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_cli")
-from .. import commands
-from .. import utils
+sys.path.append(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_cli")
+from xlpro_cli import commands
+from xlpro_cli import utils
 from pathlib import Path
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..xlpro_cli import utils
+    from ..xlpro_cli import commands
 
 def main():
     fp = Path() / r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
@@ -17,12 +22,14 @@ def test_install_default_requirements():
     utils.install_default_requirements(Path() / r"C:\Users\Daniel Evans\projects\xlpro\xlpro_install\envs\30baec6d-aa3c-4f55-983a-3cd8f1ae65e9_3.13.2\.venv\Scripts\python.exe")
     pass
 
+WORKBOOK_PATH = r"C:\Users\Daniel Evans\.xlpro-testing\Book1.xlsx"
+
 def test_init():
     sys.argv = [
         "xlpro-cli",
         "init",
-        # r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
-        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\book1.xlsx"
+        WORKBOOK_PATH
+        
     ]
     commands.main()
 
@@ -30,8 +37,7 @@ def test_start():
     sys.argv = [
         "xlpro-cli",
         "start",
-        # r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\test3-initialize-from-existing-system\book1.xlsx"
-        r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\book1.xlsx"
+        WORKBOOK_PATH
     ]
     commands.main()
 
@@ -50,5 +56,6 @@ if __name__ == "__main__":
     # test_install_default_requirements()
     test_init()
     test_start()
+    pass
 
 

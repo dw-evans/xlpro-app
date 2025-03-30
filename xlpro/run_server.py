@@ -219,7 +219,11 @@ def main():
     PARENT_PID = args.parent_pid if args.parent_pid else None
     DEBUGPY_PORT = args.debugpy_port if args.debugpy_port else 5678
     
-    serve()
+    try:
+        serve()
+    except Exception as e:
+        print(e)
+        input("Fatal error encountered. Press enter to exit")
 
 if __name__ == "__main__":
     main()

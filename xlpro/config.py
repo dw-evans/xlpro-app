@@ -2,8 +2,18 @@ from __future__ import annotations
 import toml
 from pathlib import Path
 from dataclasses import dataclass, field
+import sys
 
-config_path = "config.toml"
+
+# def is_pyinstaller():
+#     return hasattr(sys, '_MEIPASS')
+# if is_pyinstaller():
+#     XLPRO_WD = Path(r"C:\Users\Daniel Evans\.xlpro").parent.resolve()
+# else:
+#     XLPRO_WD = Path().resolve()
+print("warning, fetching a specific config.toml path!")
+XLPRO_WD = Path(r"C:\Users\Daniel Evans\.xlpro").resolve()
+config_path = XLPRO_WD / "config.toml"
 
 def load() -> Configuration:
     with open(config_path, "r") as f:
