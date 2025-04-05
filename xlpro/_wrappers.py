@@ -133,8 +133,7 @@ def import_module_with_registration(mname, fpath):
 
 
 
-
-def _default_func_wrapper(func):
+def _pyobj_func_wrapper(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         f = func
@@ -148,16 +147,35 @@ def _default_func_wrapper(func):
                 _utils.validate_args_ready(args=a, kwargs={}) 
         
         ret = f(*ppargs, **ppkwargs)
+        return ret
+    
+    return wrapper
+
+
+def _array_or_value_func_wrapper(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        ret = _pyobj_func_wrapper(func)(*args, **kwargs)
         ret_converted = _types.ExcelArrayConverter._convert_back_to_range_format(ret)
         return ret_converted
     return wrapper
 
-def _jsonified_func_wrapper(func):
+
+def _jsonified_pyobj_func_wrapper(func):
     @wraps(func)
     def wrapper(s):
         _utils.validate_args_ready((s,), {})
         kwargs = json.loads(s)
-        return _default_func_wrapper(func)(**kwargs)
+        return _pyobj_func_wrapper(func)(**kwargs)
+    return wrapper
+
+
+def _jsonified_array_or_value_func_wrapper(func):
+    @wraps(func)
+    def wrapper(s):
+        _utils.validate_args_ready((s,), {})
+        kwargs = json.loads(s)
+        return _array_or_value_func_wrapper(func)(**kwargs)
     return wrapper
 
 
@@ -190,15 +208,27 @@ def wrap_jsonify():
 
 
 def generate_wrapped_function(mname, fname):
+    """primary interface for generating wrapped functions which pre-parse excel arguments."""
     # func = sys.modules[mname][fname]
     func = _module_fname_func_register[mname][fname]
     ftype = _module_fname_type_register[mname][fname]
     # isactive = __module_func_name_isactive_register[mname][fname]
     isjson = _module_fname_isjsonified_register[mname].get(fname, False)
 
-    if ftype == FunctionTypes.default:
+    if ftype == FunctionTypes.py_object:
         if isjson:
-            return _jsonified_func_wrapper(func)
-        return _default_func_wrapper(func)
-    raise Exception("Not supported")
+            return _jsonified_pyobj_func_wrapper(func)
+        return _pyobj_func_wrapper(func)
+    elif ftype == FunctionTypes.array_or_value:
+        if isjson:
+            return _jsonified_array_or_value_func_wrapper(func)
+        return _array_or_value_func_wrapper(func)
+    
+
+    # if ftype in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
+    #     if isjson:
+    #         return _jsonified_array_or_value_func_wrapper(func)
+    #     return _array_or_value_func_wrapper(func)
+
+    raise NotImplementedError("Function type is not supported")
 

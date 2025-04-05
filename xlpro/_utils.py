@@ -87,16 +87,21 @@ vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
     {arg} = {arg}.Value
 EndIf"""
 
+from xlpro._enums import FunctionTypes
+import pandas as pd
 
 def infer_func_result_type_from_type_hints(func) -> int:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     if ret_type == matplotlib.figure.Figure:
-        return 1
-    return 0
+        return FunctionTypes.figure
+    elif ret_type == pd.DataFrame:
+        return FunctionTypes.py_object
+    return FunctionTypes.array_or_value
 
 def infer_function_type(func):
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    raise NotImplementedError
     if ret_type == matplotlib.figure.Figure:
         return 1
     return 0
@@ -448,7 +453,6 @@ def validate_args_ready(args, kwargs):
         if is_arg_promise(arg):
             raise errors.ArugmentNotReadyException
 
-# import copy
 def pre_p_an_arg(cval, target_type):
     # 0. raise error if the argument is currently a promise!
     if is_arg_promise(cval):
@@ -458,6 +462,9 @@ def pre_p_an_arg(cval, target_type):
     # cval = copy.copy(val)
     if xlproptr.is_ptr(cval):
         cval = xlproptr.decode(cval).evaluate()
+
+    # if m:=re.match("^PyObj<(.*)>$"):
+
 
     
     # 2. convert an argument to a target type
@@ -539,6 +546,11 @@ def get_caller_globals(frame):
     finally:
         del frame  # Prevent reference cycles
 
+
+
+
+
+
 if __name__ == "__main__":
 
     # jsonify_func(hash_str)
@@ -563,6 +575,4 @@ if __name__ == "__main__":
 
 
 
-
-    pass
 

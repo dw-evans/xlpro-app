@@ -18,6 +18,7 @@ from win32com.client import GetActiveObject, Dispatch
 import pythoncom
 from win32typelibs import excel as xl
 from pathlib import Path
+import pandas as pd
 
 @dataclass
 class xlproptr:
@@ -225,7 +226,10 @@ class ExcelArrayConverter:
 
     @classmethod
     def _convert_back_to_range_format(cls, val):
-        if isinstance(val, typing.Iterable):
+        if isinstance(val, pd.DataFrame):
+            return val.to_numpy()
+
+        elif isinstance(val, typing.Iterable):
             # wrap any iterable that doesn't have an iterable second type in a list
             if not isinstance(val[0], typing.Iterable):
                 return [val]

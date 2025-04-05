@@ -1,2 +1,5 @@
 *
 !.gitignore
+!main.xlsx.xlpro
+!main.xlsx.xlpro/*
+main.xlsx.xlpro/__pycache__

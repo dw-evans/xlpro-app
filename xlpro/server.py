@@ -32,6 +32,8 @@ from xlpro import _utils
 from xlpro._wrappers import ModuleFunctionMapsWrapper
 from xlpro._enums import FunctionTypes
 from xlpro import _wrappers
+import regex as re
+from copy import deepcopy
 
 
 from win32com.client import Dispatch
@@ -374,16 +376,16 @@ class xlproWorkspace:
                     self._clear_uid(self._caller_address_uid_map[caller_addr])
                 self._caller_address_uid_map[caller_addr] = uid
 
-            # this was originally added to deal with a recalculation order issue where None
-            # would get passed in the args mid calculation cycle
-            if isinstance(args[0][0], list|tuple):
-                if None in args[0][0]:
-                    logger.error(f"Args are fkd '{args}'")
-                    x, y = args[0][0]
-                    pass
-                # if args[0][0][1] is not None:
-                #     x, y = args[0][0]
-                #     pass
+            # # this was originally added to deal with a recalculation order issue where None
+            # # would get passed in the args mid calculation cycle
+            # if isinstance(args[0][0], list|tuple):
+            #     if None in args[0][0]:
+            #         logger.error(f"Args are fkd '{args}'")
+            #         x, y = args[0][0]
+            #         pass
+            #     # if args[0][0][1] is not None:
+            #     #     x, y = args[0][0]
+            #     #     pass
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
@@ -402,7 +404,7 @@ class xlproWorkspace:
                 self._uid_result_iscomplete_map[uid] = False
 
             # handle different function types
-            if result_type == FunctionTypes.default:
+            if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
                 f = self._create_worker_func(uid, func, args, kwargs={})
                 self._uid_pending_function_map[uid] = f
                 self._pending_function_queue.put(uid)
@@ -432,7 +434,16 @@ class xlproWorkspace:
     def _create_worker_func(self, uid, func, args, kwargs):
         if kwargs:
             raise Exception("kwargs should not be here!")
-        
+        pass
+        # check for py object request
+        args0 = deepcopy(args)
+        args = list(args)
+        for i, arg in enumerate(args):
+            if isinstance(arg, str):
+                if m:=re.match(r"PyObj<(.*)>", arg):
+                    with self._uid_results_map_lock:
+                        temp_uid = m.group(1)
+                        args[i] = self._uid_results_map[temp_uid]
         def worker():
             f = _wrappers.generate_wrapped_function(self._temp_module_name, func.__name__)
             try:
@@ -769,7 +780,7 @@ class ResultsManager:
                     return
             
             logger.warning(f"Returned value is a generic exception: {uid}, {val}")
-            ret = str(val) # convert exception to string for it to show in excel.
+            ret = repr(val) # convert exception to string for it to show in excel.
 
 
         # if it is a valid return, write the result to the cache
@@ -845,6 +856,24 @@ class ClientManager:
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
         
+
+    def _update_client_pyobject_result(self, uid) -> None:
+        """Update the data for the py_object case case (row-major arrays, strings, values)"""
+        try:
+            caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+            val = self._get_value(uid)
+            if isinstance(val, Exception):
+                logger.warning(f"Value is an exception: '{e}', '{uid}'")
+            self._set_result_display(uid, f"PyObj<{uid}>")
+
+            # update by resetting the formula
+            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+        except KeyError as e:
+            # XXX - todo - there is a risk of a keyerror here for some reason
+            logger.error(f"Error during client update: '{uid}', {e}")
+
+
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
         try:
@@ -925,10 +954,12 @@ class ClientManager:
 
             # Decide whether to recycle
             try:
-                if result_type == FunctionTypes.default:
+                if result_type == FunctionTypes.array_or_value:
                     self._update_client_default_result(uid)
                 elif result_type == FunctionTypes.figure:
                     self._update_client_figure_result(uid)
+                elif result_type == FunctionTypes.py_object:
+                    self._update_client_pyobject_result(uid)
                 else:
                     raise Exception("Result type invalid")
                 # if successful we don't need to replace#
@@ -1063,9 +1094,8 @@ def exception_return_wrapper(func):
     return wrapper
 
 
+
+
+
 if __name__ == '__main__':
-    ...
-
-    from win32com.client import Dispatch
-
     pass

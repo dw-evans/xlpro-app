@@ -1,7 +1,7 @@
 class FunctionTypes:
-    default = 0
+    array_or_value = 0
     figure = 1
-    # jsonified = 2
+    py_object = 2
 
     @classmethod
     def as_list(cls):
