@@ -240,8 +240,6 @@ class ExcelArrayConverter:
         return val
 
 
-
-
 if __name__ == "__main__":
     r1  = ExcelArrayConverter(((1, 2,),), list1d)
     print(f"r1={r1}")

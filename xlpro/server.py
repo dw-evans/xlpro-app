@@ -352,6 +352,7 @@ class xlproWorkspace:
 
             if not func:
                 return f"Function {fname} not found."
+            
 
             uid = xlproWorkspace._hash_excel_function_call(fname, *args)
             # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
@@ -436,7 +437,7 @@ class xlproWorkspace:
             raise Exception("kwargs should not be here!")
         pass
         # check for py object request
-        args0 = deepcopy(args)
+        # args0 = deepcopy(args)
         args = list(args)
         for i, arg in enumerate(args):
             if isinstance(arg, str):

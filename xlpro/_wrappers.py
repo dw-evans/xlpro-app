@@ -1,5 +1,5 @@
+from __future__ import annotations
 from xlpro import _utils
-
 from functools import wraps
 import threading
 from xlpro._enums import FunctionTypes
@@ -7,8 +7,13 @@ from xlpro import _types
 from xlpro import errors
 import json
 import typing
+
 # XXX - todo - maybe implement threading locks in future.
 # Not sure when you'd ever have multithread during registration unless you were maybe mixing libraries?
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from xlpro._utils import FunctionSignature
 
 # map of func names to functions (not used)
 _module_fname_func_register:dict = {}
@@ -20,6 +25,8 @@ _module_fname_isjsonified_register:dict[dict[str, bool]] = {}
 
 # map of func names to their active status
 _module_fname_isactive_register:dict[dict[str, bool]] = {}
+_module_fname_function_signature_register:dict[dict[str, FunctionSignature]] = {}
+
 
 class ModuleFunctionMapsWrapper:
     """Wrapper for module-specific function registry maps"""
@@ -30,6 +37,7 @@ class ModuleFunctionMapsWrapper:
         self.fname_type_register:dict = _module_fname_type_register[mname]
         self.fname_type_register_isjsonified_register:dict = _module_fname_isjsonified_register[mname]
         self.fname_isactive_register:dict = _module_fname_isactive_register[mname]
+        self.fname_function_signature_register:dict = _module_fname_function_signature_register[mname]
         return
 
 def _remove_module_from_maps(mname):
@@ -39,6 +47,7 @@ def _remove_module_from_maps(mname):
         del _module_fname_type_register[mname]
         del _module_fname_isactive_register[mname]
         del _module_fname_isjsonified_register[mname]
+        del _module_fname_function_signature_register[mname]
     except:
         pass
 
@@ -50,6 +59,7 @@ def _add_module(mname):
         _module_fname_type_register[mname] = {}
         _module_fname_isactive_register[mname] = {}
         _module_fname_isjsonified_register[mname] = {}
+        _module_fname_function_signature_register[mname] = {}
 
 def _func_set_active(func, mname, state:bool): 
     if not isinstance(state, bool):

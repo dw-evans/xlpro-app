@@ -31,9 +31,10 @@ import types
 import sys
 import regex as re
 
-from xlpro._types import xlproptr
+from xlpro._types import xlproptr, ExcelArrayConverter
 from xlpro import errors
 import json
+from xlpro._types import list1d, list2d, ndarray1d, ndarray2d
 
 
 
@@ -90,6 +91,15 @@ EndIf"""
 from xlpro._enums import FunctionTypes
 import pandas as pd
 
+from dataclasses import dataclass
+@dataclass
+class FunctionSignature:
+    fname:str
+    args_and_types:tuple[str, type]
+    return_type:type
+    default_values:dict[str, Any]
+
+
 def infer_func_result_type_from_type_hints(func) -> int:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
@@ -98,13 +108,6 @@ def infer_func_result_type_from_type_hints(func) -> int:
     elif ret_type == pd.DataFrame:
         return FunctionTypes.py_object
     return FunctionTypes.array_or_value
-
-def infer_function_type(func):
-    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
-    raise NotImplementedError
-    if ret_type == matplotlib.figure.Figure:
-        return 1
-    return 0
 
 
 def function_template_with_caller(func:Callable) -> str:
@@ -425,7 +428,6 @@ def hash_cell(rng_dispatch) -> str:
     return f"{wb.FullName}::{ws.Name}::{rng.Address}"
 
 
-from xlpro._types import list1d, list2d
 def jsonify(arr:list2d):
     """Converts range to json string"""
     from xlpro._types import ExcelArrayConverter
@@ -547,8 +549,32 @@ def get_caller_globals(frame):
         del frame  # Prevent reference cycles
 
 
+def show(val):
+    """converts a value to excel-ready representation"""
+    if val is None:
+        raise Exception("cannot show(None)")
+    tval = type(val)
+    val_adj = val
+    tdst:type=None
+    if tval == pd.DataFrame:
+        tdst = ndarray2d
+        val_adj = val.to_numpy()
+    elif tval == pd.Series:
+        tdst = ndarray2d
+        val_adj = val.to_numpy()
+    elif tval in [list1d, list2d, ndarray1d, ndarray2d]:
+        tdst = tval
+    else:
+        raise TypeError("type is not supported")
+    # convert the return value 
+    ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+    return ret
 
-
+def typ(val):
+    if val is None:
+        return None
+    ret = str(type(val))
+    return ret
 
 
 if __name__ == "__main__":

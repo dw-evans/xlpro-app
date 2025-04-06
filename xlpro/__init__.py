@@ -3,6 +3,8 @@ __logger = __logging.getLogger(__name__)
 
 from xlpro._utils import (
     jsonify,
+    show,
+    typ,
 )
 
 from xlpro._wrappers import (
@@ -21,5 +23,7 @@ from xlpro._types import (
     ndarray1d,
     ndarray2d
 )
+
+
 
 
