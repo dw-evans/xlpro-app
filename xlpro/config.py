@@ -40,7 +40,7 @@ class Configuration:
     xlpro_functions_stem:str = field(default="functions")
     xlpro_subroutines_stem:str = field(default="subroutines")
 
-    max_worker_threads:int = field(default=6)
+    max_worker_threads:int = field(default=12)
 
 
 if __name__ == "__main__":

@@ -353,9 +353,18 @@ class xlproWorkspace:
             if not func:
                 return f"Function {fname} not found."
             
-
-            uid = xlproWorkspace._hash_excel_function_call(fname, *args)
+            uid = Dispatch(caller).Address + xlproWorkspace._hash_excel_function_call(fname, *args)
             # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
+
+            # if None in args:
+            #     logger.warning(f"None found in args, skipping {uid}")
+            #     return
+            
+            # for x in args:
+            #     if isinstance(x, str):
+            #         if m:= re.match("^Promise<(.+)>", x):
+            #             logger.warning("Promise found in args, skipping")
+            #             return
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
@@ -363,8 +372,9 @@ class xlproWorkspace:
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
-                if uid in self._uid_result_iscomplete_map.keys():
-                    return self._uid_result_display_map[uid]
+                with self._uid_result_iscomplete_map_lock:
+                    if uid in self._uid_result_iscomplete_map.keys():
+                        return self._uid_result_display_map[uid]
                 
             # Clear any lingering calculations coming from this caller if the result isnt cached
             # downstream functions should pick up on these being deleted
@@ -393,21 +403,27 @@ class xlproWorkspace:
 
             result_type = self._module_function_maps_wrapper.fname_type_register[fname]
             
-            self._uid_result_type_map[uid] = result_type
+            with self._uid_result_type_map_lock:
+                self._uid_result_type_map[uid] = result_type
 
             caller_stream = _utils.comarshal_release_and_get_stream(caller_dispatch) # this marshal is the OG
-            self._uid_to_caller_map[uid] = caller_stream
+            with self._uid_to_caller_map_lock:
+                self._uid_to_caller_map[uid] = caller_stream
 
             # configure default state for result and iscomplete status
             with self._uid_result_display_map_lock:
                 self._uid_result_display_map[uid] = f"Promise<{uid}>"
-            with self._uid_result_display_map_lock:
+            with self._uid_result_iscomplete_map_lock:
                 self._uid_result_iscomplete_map[uid] = False
+
+            # import json
+            # print(json.dumps(self._get_uid_debug_info(uid) , indent=4))
 
             # handle different function types
             if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
                 f = self._create_worker_func(uid, func, args, kwargs={})
-                self._uid_pending_function_map[uid] = f
+                with self._uid_pending_function_map_lock:
+                    self._uid_pending_function_map[uid] = f
                 self._pending_function_queue.put(uid)
                 self._worker_manager.wake()
 
@@ -483,11 +499,16 @@ class xlproWorkspace:
             self._uid_to_caller_map[uid] = val
 
     def _get_uid_debug_info(self, uid):
-        a0 = self._uid_result_display_map.get(uid, None)
-        a1 = self._uid_results_map.get(uid, None)
-        a2 = self._uid_result_iscomplete_map.get(uid, None)
-        a3 = self._uid_result_type_map.get(uid, None)
-        a4 = self._uid_pending_function_map.get(uid, None)
+        with self._uid_result_display_map_lock:
+            a0 = self._uid_result_display_map.get(uid, None)
+        with self._uid_results_map_lock:
+            a1 = self._uid_results_map.get(uid, None)
+        with self._uid_result_iscomplete_map_lock:
+            a2 = self._uid_result_iscomplete_map.get(uid, None)
+        with self._uid_result_type_map_lock:
+            a3 = self._uid_result_type_map.get(uid, None)
+        with self._uid_pending_function_map_lock:
+            a4 = self._uid_pending_function_map.get(uid, None)
         pythoncom.CoInitialize()
         try:
             rng_stream = self.get_caller_stream(uid)
@@ -669,7 +690,7 @@ class WorkerManager:
     def _run(self):
         while not self._stop_event.is_set():
             logger.debug("WorkerManager thread is waiting for events or timeout...")
-            self._wake_event.wait(timeout=5)
+            self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
                 logger.info("WorkerManager thread woke up for an event!")
@@ -679,7 +700,7 @@ class WorkerManager:
                 except queue.Empty:
                     break
                 self._clear_completed_threads()
-                time.sleep(0.1) # fairness sleep
+                time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -726,6 +747,8 @@ class ResultsManager:
                 ps_disp:xl.Range
                 formula = ps_disp.Formula2
                 ps_disp.Formula2 = ps_disp.Formula2
+                if "pd_function_create" in formula:
+                    pass
                 if _utils.formula_is_for_xlpro(formula, active_formulas):
                     precedents_recalculate.append(ps_disp)
                 else:
@@ -744,6 +767,18 @@ class ResultsManager:
 
             _utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - XXX - todo - check
         self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+        pythoncom.CoUninitialize()
+
+    def _emergency_recalculate(self, uid) -> None:
+        """force a recalculate"""
+        raise NotImplementedError("please god dont use this looks dodgy")
+        pythoncom.CoInitialize()
+        try:
+            caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+        except KeyError as e:
+            logger.error(f"Error during forced client update: '{uid}', {e}")
         pythoncom.CoUninitialize()
 
     def _process_queue_element(self):
@@ -765,11 +800,17 @@ class ResultsManager:
             if isinstance(val, errors.ArugmentNotReadyException):
                 logger.debug(f"Arguments not ready for uid '{uid}', recycling function...")
 
-                logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
+                # logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
                 self._server._get_uid_debug_info(uid)
                 # self._recalculate_precedents(uid)
 
-                logger.debug(f"ResultsManager is waking the worker manager to replace '{uid}'")
+                # nudge the client recalculate sequence to correct case where Excel never sends recalculate
+                # command based on the excel recalculation sequence...
+                # XXX - todo - this should only be attempted periodically.
+                # XXX - todo - should probably throw a global exception if this fails outright
+                # self._emergency_recalculate(uid)
+
+                logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
                 self._server._pending_function_queue.put(uid)
                 self._server._worker_manager.wake()
                 return
@@ -784,13 +825,18 @@ class ResultsManager:
             ret = repr(val) # convert exception to string for it to show in excel.
 
 
+        if isinstance(ret, str):
+            if "promise" in ret.lower():
+                pass
+        
         # if it is a valid return, write the result to the cache
         self._set_results_value(uid, ret)
         # signal that it is complete
         with self._server._uid_result_iscomplete_map_lock:
             self._server._uid_result_iscomplete_map[uid] = True
         # remove from the pending function map once successfully completed.
-        del self._server._uid_pending_function_map[uid]
+        with self._server._uid_pending_function_map_lock:
+            del self._server._uid_pending_function_map[uid]
 
         # signal to the client manager to update the client
         self._server._client_recalculate_queue.put(uid)
@@ -804,7 +850,7 @@ class ResultsManager:
         """
         while not self._stop_event.is_set():
             logger.info("ResultsManager thread is waiting for events or timeout...")
-            self._wake_event.wait(timeout=5)
+            self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
                 logger.info("ResultsManager thread woke up for an event!")
@@ -815,7 +861,7 @@ class ResultsManager:
                     self._process_queue_element()
                 except queue.Empty:
                     break
-                time.sleep(0.1) # fairness sleep
+                time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -857,7 +903,6 @@ class ClientManager:
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
         
-
     def _update_client_pyobject_result(self, uid) -> None:
         """Update the data for the py_object case case (row-major arrays, strings, values)"""
         try:
@@ -873,7 +918,6 @@ class ClientManager:
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
             logger.error(f"Error during client update: '{uid}', {e}")
-
 
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
@@ -976,6 +1020,8 @@ class ClientManager:
                 elif VBErrorConverter(e) == VBError.xlCallRejectedByCallee:
                     # Call rejected - excel might be in a dialogue 
                     logger.debug("VB Error - Call rejected, recycling in queue")
+                else:
+                    logger.debug(f"Other COM Error occurred, {e}")
 
                 logger.info(f"Could not recalculate caller_dispatch for uid: '{uid}'")
 
@@ -995,7 +1041,7 @@ class ClientManager:
                     pass
                 self._server._client_recalculate_queue.put(uid)
 
-            time.sleep(0.1) # fairness sleep
+            time.sleep(0.01) # fairness sleep
 
 
     def _run(self):
@@ -1006,7 +1052,7 @@ class ClientManager:
         while not self._stop_event.is_set():
             # wait for ten seconds for an event, otherwise do a queue process to check for 
             # outstanding tasks.
-            self._wake_event.wait(timeout=0.5)
+            self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 logger.debug("ClientManager thread woke up for an event!")
                 self._wake_event.clear()
