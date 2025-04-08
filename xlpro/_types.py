@@ -118,6 +118,12 @@ def compare_generic_aliases(t1, t2):
         raise TypeError("Incompatible types being checked")
     return t_generic.__origin__ == t_other
 
+from typing import Iterable
+@dataclass
+class xlproImage:
+    fp:Path
+    size_pt:Iterable[float]
+    xl_name:str
 
 # XXX - todo - apparently this is sensitive to imports...
 # type checking broke when I refactored, presumably changed the origin of some of the objects?
@@ -169,6 +175,13 @@ class ExcelArrayConverter:
             if tdst == list:
                 return intermediate.tolist()
             return intermediate
+        
+        elif tdst in [tuple,]:
+            # XXX - todo - for some reason Excel doesn't accept a tuple of tuples as a return type. 
+            # Needs to be a numpy array. maybe because it needs to be contigious memory?
+            return np.array(val)
+
+
         else:
             # handle things such as list[float]
             intermediate = np.array(val)

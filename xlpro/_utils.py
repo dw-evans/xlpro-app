@@ -100,13 +100,16 @@ class FunctionSignature:
     default_values:dict[str, Any]
 
 
-def infer_func_result_type_from_type_hints(func) -> int:
+def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
     if ret_type == matplotlib.figure.Figure:
-        return FunctionTypes.figure
+        return FunctionTypes.py_object
     elif ret_type == pd.DataFrame:
         return FunctionTypes.py_object
+    elif ret_type == pd.Series:
+        return FunctionTypes.py_object
+    
     return FunctionTypes.array_or_value
 
 
@@ -511,7 +514,7 @@ class ThreadWithException(threading.Thread):
             if self._target:
                 self._target(*self._args, **self._kwargs)
         except Exception as e:
-            self.exception = e  # Store the exception
+            self.exception = e  # Store the exceptionimport
 
     def get_exception(self):
         return self.exception
@@ -535,9 +538,6 @@ def formula_is_for_xlpro(formula:str, formulas:list[str]):
 
 
 import inspect
-# def get_caller_globals():
-#     globals_dict:dict = inspect.currentframe().f_back.f_globals
-#     return globals_dict
 
 def get_caller_globals(frame):
     """Returns the global namespace of the module that called the current function."""
@@ -548,6 +548,17 @@ def get_caller_globals(frame):
     finally:
         del frame  # Prevent reference cycles
 
+import copy as _copy
+
+def copy(val):
+    """returns a shallow copy of the object"""
+    return _copy.copy(val)
+
+def deepcopy(val):
+    """returns a deep copy of the object"""
+    return _copy.deepcopy(val)
+
+from xlpro._types import xlproImage
 
 def show(val):
     """converts a value to excel-ready representation"""
@@ -556,19 +567,86 @@ def show(val):
     tval = type(val)
     val_adj = val
     tdst:type=None
+
     if tval == pd.DataFrame:
         tdst = ndarray2d
         val_adj = val.to_numpy()
+        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+        return ret
+
     elif tval == pd.Series:
         tdst = ndarray2d
         val_adj = val.to_numpy()
-    elif tval in [list1d, list2d, ndarray1d, ndarray2d]:
+        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+        return ret
+
+    elif tval in [tuple, list1d, list2d, ndarray1d, ndarray2d]:
         tdst = tval
-    else:
-        raise TypeError("type is not supported")
-    # convert the return value 
-    ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
-    return ret
+        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+        return ret
+
+    raise TypeError(f"type {repr(tval)} is not supported")
+
+
+def show_image(val, name:str, 
+    # sizex:float=None, sizey:float=None, dpi:int, format:str,
+    ):
+    if val is None:
+        raise Exception("cannot show(None)")
+    tval = type(val)
+    if tval == matplotlib.figure.Figure:
+        # get the singleton server
+        # import xlpro.server
+        # server = xlpro.server.xlproServer()
+
+        # # find the uid of the workspace from the value received here
+        # if m:=re.match(r"^functions_(.*)$", val.__globals__["name"]):
+        #     uid = m.group(1)
+        # else:
+        #     raise Exception("could not get uid from value")
+        
+        # # get the workspace from the workspace uid
+        # workspace = server.get_workspace_from_uid_thread_safe(uid)
+        
+        # # save the figure as an image in a temporary location
+        # val_uid = workspace.get_uid_of_val_thread_safe(val)
+        tmp:matplotlib.figure.Figure = val
+        # create a tmp folder. This matches where the lockfile is created...
+        tmp_path = Path(sys.executable).parent.parent.parent / ".xlpro/tmp"
+        if not tmp_path.parent.exists():
+            raise FileNotFoundError(f"{tmp_path.parent} does not exist!")
+        tmp_path.mkdir(exist_ok=True)
+
+        fp = tmp_path / f"{uuid.uuid4()}.svg"
+        tmp.savefig(fp)
+
+        # sizex = sizex if sizex is not None else 
+        ret = xlproImage(
+            fp, 
+            np.array(tmp.get_size_inches()) * 72,
+            xl_name=name
+        )
+        tmp.savefig(ret.fp, format="svg", dpi=600, backend="svg")
+
+        # return the xlproImage
+        return ret
+    
+    if tval in [str, Path]:
+        if tval == str:
+            fp = Path(val)
+        elif tval == Path:
+            fp = val
+        if not fp.exists():
+            raise FileNotFoundError(f"File does not exist {fp}")
+        ret = xlproImage(
+            fp=fp,
+            size_pt=(100.0, 100.0),
+            xl_name=name
+        )
+        return ret
+
+    raise TypeError(f"type {repr(tval)} is not supported")
+
 
 def typ(val):
     if val is None:
@@ -578,11 +656,8 @@ def typ(val):
 
 
 if __name__ == "__main__":
-
     # jsonify_func(hash_str)
-
     # a = xlproptr.decode("*<a::b::c>")
-
 
     # Example target function
     def faulty_function():

@@ -234,6 +234,7 @@ def generate_wrapped_function(mname, fname):
             return _jsonified_array_or_value_func_wrapper(func)
         return _array_or_value_func_wrapper(func)
     
+    
 
     # if ftype in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
     #     if isjson:

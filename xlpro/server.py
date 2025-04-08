@@ -35,6 +35,7 @@ from xlpro import _wrappers
 import regex as re
 from copy import deepcopy
 
+from xlpro._types import xlproImage
 
 from win32com.client import Dispatch
 
@@ -97,7 +98,10 @@ class xlproServer:
         if not xlproServer._instance_initialized:
             pythoncom.CoInitialize()
             xlproServer._instance_initialized = True
+            self._workspace_map_lock = threading.Lock()
             self._workspace_map:dict[str, xlproWorkspace] = {} # uid (path) to workspace
+            self._workspace_uid_to_workbook_path_lock = threading.Lock()
+            self._workspace_uid_to_workbook_path:dict[str, str] = {} # uid to workspace path (done to eliminate reference duplication...)
         else:
             # logger.debug("__init__ called however the singleton already exists and has been initialized.")
             pass
@@ -115,25 +119,27 @@ class xlproServer:
     
     def register_and_configure_wb_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
-        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        wb_path = self._get_workspace_uid_from_wb(wb_dispatch)
 
-        if not uid in self._workspace_map.keys():
-            logger.info(f"Creating workspace '{uid}'...")
-            workspace = xlproWorkspace(self, uid)
-            workspace_wd = Path(uid).parent.resolve()
+        if not wb_path in self._workspace_map.keys():
+            logger.info(f"Creating workspace '{wb_path}'...")
+            uid = _utils.hash_str(wb_path)
+            workspace = xlproWorkspace(self, wb_uid=wb_path, uid=uid)
+            workspace_wd = Path(wb_path).parent.resolve()
 
             workspace.set_xlpro_working_dir(workspace_wd)
             workspace.reset()
 
-            self._workspace_map[uid] = workspace
-            logger.info(f"Creation of workspace complete for '{uid}'.")
+            self._workspace_map[wb_path] = workspace
+            self._workspace_uid_to_workbook_path[uid] = wb_path
+            logger.info(f"Creation of workspace complete for '{wb_path}'.")
 
             pass
         else:
-            logger.info(f"Workspace already exists, resetting workspace '{uid}'.")
+            logger.info(f"Workspace already exists, resetting workspace '{wb_path}'.")
             workspace = self._get_workspace_from_wb(wb_dispatch)
             workspace.reset()
-            logger.info(f"Workspace reset complete for '{uid}'.")
+            logger.info(f"Workspace reset complete for '{wb_path}'.")
             
             # logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
             # self.shutdown_workspace_from_dispatch(wb_dispatch)
@@ -196,12 +202,19 @@ class xlproServer:
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace._get_vba_sync_text()
+    
+    def get_workspace_from_uid_thread_safe(self, uid) -> xlproWorkspace:
+        with self._workspace_uid_to_workbook_path_lock:
+            with self._workspace_map_lock:
+                return self._workspace_map[self._workspace_uid_to_workbook_path[uid]]
+
 
 class xlproWorkspace:
-    def __init__(self, server:xlproServer, wb_uid):
+    def __init__(self, server:xlproServer, wb_uid, uid):
         self._server = server
         self._wb_uid = wb_uid
         self._wb_path = Path(wb_uid)
+        self._uid = uid
         self._wd = None # working directory
 
         self._uid_result_display_map = {} # the result to be displayed
@@ -261,7 +274,7 @@ class xlproWorkspace:
 
     def _register_functions_in_self(self):
         logger.info(f"Re-initializing workspace functions...")
-        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{_utils.hash_str(self._wb_uid)}"
+        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{self._uid}"
         _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
         # self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
         self._update_module_func_map_wrapper()
@@ -369,6 +382,8 @@ class xlproWorkspace:
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
             self._uid_args_cache[uid] = args
+            if "hello" in args:
+                pass
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
@@ -420,25 +435,13 @@ class xlproWorkspace:
             # print(json.dumps(self._get_uid_debug_info(uid) , indent=4))
 
             # handle different function types
+            # if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
             if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
                 f = self._create_worker_func(uid, func, args, kwargs={})
                 with self._uid_pending_function_map_lock:
                     self._uid_pending_function_map[uid] = f
                 self._pending_function_queue.put(uid)
                 self._worker_manager.wake()
-
-            elif result_type == FunctionTypes.figure:
-                fig_generating_thread = FigureGeneratingThread(
-                    wd=self._wd,
-                    uid=uid,
-                    func_name=fname,
-                    args=args,
-                    kwargs={},
-                    return_value_queue=self._result_queue, 
-                    return_event=self._results_manager_thread._wake_event,
-                )
-                # self._func_hash_fig_generating_thread_map[uid] = fig_generating_thread
-                fig_generating_thread.start()
 
             # return the (incomplete result)
             with self._uid_result_display_map_lock:
@@ -540,12 +543,18 @@ class xlproWorkspace:
         pass
         pythoncom.CoUninitialize()
         return ret
+    
+    def get_uid_of_val_thread_safe(self, val) -> str:
+        with self._uid_results_map_lock:
+            for k, v in self._uid_results_map.items():
+                if v == val:
+                    return k
+        raise KeyError("value is not present within the uid_results_map")
         
 # wrappers must be applied before we pickle the function I believe...
 # @utils.type_converter_wrapper
 # @utils.com_init_dispatch_release_wrapper
 def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
-
     module_name = f"{cfg.xlpro_functions_stem}_{uid}"
     _utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
     raise NotImplementedError
@@ -944,14 +953,15 @@ class ClientManager:
 
     def _update_client_figure_result(self, uid) -> None:
         """Update the data for the figure case - add a figure image to the spreadsheet"""
-        caller_dispatch = self._server.get_caller_stream(uid)
+        caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
         try:
             val = self._get_value(uid)
-            fp, size_inches = val
-
-            size_pt = size_inches * 72
-
-            self._set_result_display(uid, f"Figure @'{str(fp)}'")
+            if not type(val) == xlproImage:
+                raise TypeError
+            
+            val:xlproImage
+            
+            fp, size_pt, xl_name = val.fp, val.size_pt, val.xl_name
 
             caller_adjacent = caller_dispatch.Cells(2,1)
             xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
@@ -959,13 +969,27 @@ class ClientManager:
 
             ws = caller_adjacent.Parent
             # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
-            ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
+            # look for an existing shape with the same name
+            try:
+                shape = ws.Shapes(xl_name)
+                xpos, ypos = shape.Left, shape.Top
+                shape.Delete()
+            except pythoncom.com_error as e:
+                logger.warning(f"could not find object with name: {xl_name} to delete")
+
+            shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+            shape.Name = xl_name
+
+            # self._set_result_display(uid, f"Image<{fp}>")
+            self._set_result_display(uid, f"Image<{xl_name}>")
+
+            # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(_utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
 
         except Exception as e:
-            self._server.set_caller_stream(_utils.comarshal_release_and_get_stream(caller_dispatch))
+            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
             raise e
 
     def _process_queue(self):
@@ -999,10 +1023,11 @@ class ClientManager:
 
             # Decide whether to recycle
             try:
-                if result_type == FunctionTypes.array_or_value:
-                    self._update_client_default_result(uid)
-                elif result_type == FunctionTypes.figure:
+                value = self._get_value(uid)
+                if type(value) == xlproImage:
                     self._update_client_figure_result(uid)
+                elif result_type == FunctionTypes.array_or_value:
+                    self._update_client_default_result(uid)
                 elif result_type == FunctionTypes.py_object:
                     self._update_client_pyobject_result(uid)
                 else:
@@ -1037,8 +1062,6 @@ class ClientManager:
             # if we failed to update, recycle the queue as necessary
 
             if replace_in_queue:
-                if "jsonify" in self._server._get_uid_debug_info(uid)["Formula"]:
-                    pass
                 self._server._client_recalculate_queue.put(uid)
 
             time.sleep(0.01) # fairness sleep

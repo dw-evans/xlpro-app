@@ -4,7 +4,10 @@ __logger = __logging.getLogger(__name__)
 from xlpro._utils import (
     jsonify,
     show,
+    show_image,
     typ,
+    copy,
+    deepcopy,
 )
 
 from xlpro._wrappers import (
