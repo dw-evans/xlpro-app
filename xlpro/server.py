@@ -978,6 +978,9 @@ class ClientManager:
             
             fp, size_pt, xl_name = val.fp, val.size_pt, val.xl_name
 
+            if not fp.suffix.lower()[1:] in ("emf","wmf","jpg","jpeg","jff","jpe","png","bmp","dib","rle","gif","emz","wmz","tif","tiff","svg","ico","webp"):
+                raise Exception(f"Excel does not support this extension {fp.suffix}")
+
             caller_adjacent = caller_dispatch.Cells(2,1)
             xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
             width, height = size_pt
