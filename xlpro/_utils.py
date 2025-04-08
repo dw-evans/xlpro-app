@@ -585,6 +585,7 @@ def show(val):
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         return ret
 
+    # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
@@ -644,7 +645,8 @@ def show_image(val, name:str,
             xl_name=name
         )
         return ret
-
+    
+    # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
