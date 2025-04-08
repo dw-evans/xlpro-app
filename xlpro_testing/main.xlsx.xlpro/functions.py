@@ -18,8 +18,8 @@ xlpro.register()(xlpro.jsonify)
 xlpro.register()(xlpro.show)
 xlpro.register()(xlpro.show_image)
 xlpro.register()(xlpro.typ)
-xlpro.register()(xlpro.copy)
-xlpro.register()(xlpro.deepcopy)
+xlpro.register()(xlpro.cpy)
+xlpro.register()(xlpro.deepcpy)
 
 def pd_function_create(x) -> pd.DataFrame:
     ret = pd.DataFrame(x[1:], columns=x[0])
@@ -32,4 +32,12 @@ def pd_function_filter(df, col_name) -> pd.DataFrame:
 def plot_function(x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
     fig, ax = plt.subplots()
     ax.plot(x, y)
+    return fig
+
+def add_line(fig, x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
+    fig:matplotlib.figure.Figure
+    ax = fig.axes[0]
+
+    ax.plot(x, y, "g--")
+
     return fig

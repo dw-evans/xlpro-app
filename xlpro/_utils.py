@@ -109,7 +109,6 @@ def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
         return FunctionTypes.py_object
     elif ret_type == pd.Series:
         return FunctionTypes.py_object
-    
     return FunctionTypes.array_or_value
 
 
@@ -436,7 +435,6 @@ def jsonify(arr:list2d):
     from xlpro._types import ExcelArrayConverter
     arr:list2d = ExcelArrayConverter(arr, list2d)
     
-    # validate_args_ready(*arr, {})
 
     if len(arr[0]) != 2:
         raise Exception("Please provide a nx2 array of key:value pairs")
@@ -451,17 +449,21 @@ def jsonify(arr:list2d):
 def is_arg_promise(arg):
     if not isinstance(arg, str):
         return False
-    return re.search(r"^Promise<\w*>", arg)
+    return bool(re.match(r"^Promise<.+>$", arg))
 
 def validate_args_ready(args, kwargs):
     for arg in list(args) + [v for k, v in kwargs.items()]:
         if is_arg_promise(arg):
-            raise errors.ArugmentNotReadyException
+            raise errors.ArugmentNotReadyException()
+        if isinstance(arg, Exception):
+            raise errors.xlproArgumentExceptionError()
 
 def pre_p_an_arg(cval, target_type):
     # 0. raise error if the argument is currently a promise!
     if is_arg_promise(cval):
-        raise errors.ArugmentNotReadyException
+        raise errors.ArugmentNotReadyException()
+    if isinstance(cval, Exception):
+        raise errors.xlproArgumentExceptionError()
     
     # 1. check if its an xlproptr. Replace val with the ptr result
     # cval = copy.copy(val)
@@ -469,8 +471,6 @@ def pre_p_an_arg(cval, target_type):
         cval = xlproptr.decode(cval).evaluate()
 
     # if m:=re.match("^PyObj<(.*)>$"):
-
-
     
     # 2. convert an argument to a target type
     ppval = _types.ExcelArrayConverter(cval, target_type)
@@ -550,11 +550,11 @@ def get_caller_globals(frame):
 
 import copy as _copy
 
-def copy(val):
+def cpy(val):
     """returns a shallow copy of the object"""
     return _copy.copy(val)
 
-def deepcopy(val):
+def deepcpy(val):
     """returns a deep copy of the object"""
     return _copy.deepcopy(val)
 
@@ -584,6 +584,12 @@ def show(val):
         tdst = tval
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         return ret
+
+    elif isinstance(val, Exception):
+        raise val
+    
+    elif tval == str:
+        return val
 
     # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")

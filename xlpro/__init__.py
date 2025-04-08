@@ -6,8 +6,8 @@ from xlpro._utils import (
     show,
     show_image,
     typ,
-    copy,
-    deepcopy,
+    cpy,
+    deepcpy,
 )
 
 from xlpro._wrappers import (

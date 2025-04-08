@@ -1,6 +1,7 @@
 import typing
 from typing import TypeVar, Generic, Any
 import numpy as np
+from xlpro import errors
 
 T = TypeVar('T') # arbitrary
 
@@ -58,7 +59,6 @@ class xlproptr:
         except Exception:
             return False
     
-    
     # def evaluate(self, wb_stream):
     def evaluate(self):
         """Evaluates the cell pointer's value. Returns 2d array for ranges, or a value for
@@ -70,24 +70,32 @@ class xlproptr:
              args[arg_idx] = pparg
              kwargs[arg_key] = pparg
         """
-        # XXX - todo - must improve deferred calculation here!
+        try:
+            # XXX - todo - must improve deferred calculation here!
 
-        # from utils import comarshal_release_and_get_stream, comarshal_dispatch_stream
-        pythoncom.CoInitialize()
-        # wb:xl._Workbook = comarshal_dispatch_stream(wb_stream)
-        # Dip in and out of python com to retrieve the data. Then release.
-        # XXX - todo - Check if getactiveobject is actually good here.
-        # xlapp = GetActiveObject("Excel.Application")
-        xlapp = Dispatch("Excel.Application")
-        # XXX - todo - Check if this wb path matching check is reliable for server locations for example.
-        # e.g. mapped drives may convert to server addresses. I believe resolve() corrects for this...
-        if not Path(self.wb_path).resolve().__str__() in [Path(wb.FullName).resolve().__str__() for wb in xlapp.Workbooks]:
-            xlapp.Workbooks.Open(self.wb_path)
-        ret = xlapp.Workbooks(str(Path(self.wb_path).name)).Sheets(self.ws_name).Range(self.rng_addr).Value
-        xlapp = None
-        # comarshal_release_and_get_stream(wb)
-        pythoncom.CoUninitialize()
-        return ret
+            # from utils import comarshal_release_and_get_stream, comarshal_dispatch_stream
+            pythoncom.CoInitialize()
+            # wb:xl._Workbook = comarshal_dispatch_stream(wb_stream)
+            # Dip in and out of python com to retrieve the data. Then release.
+            # XXX - todo - Check if getactiveobject is actually good here.
+            # xlapp = GetActiveObject("Excel.Application")
+            xlapp = Dispatch("Excel.Application")
+            try:
+                xlapp.Workbooks
+            except AttributeError:
+                raise errors.ExcelNotAccessibleError
+            # XXX - todo - Check if this wb path matching check is reliable for server locations for example.
+            # e.g. mapped drives may convert to server addresses. I believe resolve() corrects for this...
+            if not Path(self.wb_path).resolve().__str__() in [Path(wb.FullName).resolve().__str__() for wb in xlapp.Workbooks]:
+                xlapp.Workbooks.Open(self.wb_path)
+            ret = xlapp.Workbooks(str(Path(self.wb_path).name)).Sheets(self.ws_name).Range(self.rng_addr).Value
+            xlapp = None
+            # comarshal_release_and_get_stream(wb)
+            pythoncom.CoUninitialize()
+            return ret
+        except Exception as e:
+            pass
+            raise e
 
     
     # if any array argument arrives as a string, a pre-process step should be used

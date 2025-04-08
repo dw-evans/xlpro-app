@@ -361,17 +361,18 @@ class xlproWorkspace:
 
     def execute_function_async(self, caller, fname, args):
         try:
+            # if None in args:
+            #     logger.warning(f"None found in args from excel, skipping...")
+            #     return
+            
             func = self._get_function_by_name(fname)
 
             if not func:
-                return f"Function {fname} not found."
+                raise Exception(f"Function {fname} not found.")
             
             uid = Dispatch(caller).Address + xlproWorkspace._hash_excel_function_call(fname, *args)
             # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
 
-            # if None in args:
-            #     logger.warning(f"None found in args, skipping {uid}")
-            #     return
             
             # for x in args:
             #     if isinstance(x, str):
@@ -449,7 +450,7 @@ class xlproWorkspace:
 
         # Return the python exception string as a fallback
         except Exception as e:
-            return str(e)
+            return repr(errors.xlproUnhandledException(repr(e)))
         
     def _create_worker_func(self, uid, func, args, kwargs):
         if kwargs:
@@ -471,6 +472,15 @@ class xlproWorkspace:
                 self._result_queue.put((uid, ret))
                 logger.info(f"Completed function '{uid}' successfully")
             except Exception as e:
+                if isinstance(e, errors.ArugmentNotReadyException):
+                    pass
+                elif isinstance(e, errors.xlproArgumentExceptionError):
+                    pass
+                elif isinstance(e, errors.ExcelNotAccessibleError):
+                    pass
+                elif isinstance(e, errors.xlproUnhandledException):
+                    # raise e
+                    pass
                 self._result_queue.put((uid, e))
                 logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
             logger.debug("Waking results manager from worker thread...")
@@ -830,8 +840,9 @@ class ResultsManager:
                     logger.info(f"Call rejected by callee for '{uid}', recycling function...")
                     return
             
+
             logger.warning(f"Returned value is a generic exception: {uid}, {val}")
-            ret = repr(val) # convert exception to string for it to show in excel.
+            # ret = repr(val) # convert exception to string for it to show in excel.
 
 
         if isinstance(ret, str):
@@ -918,8 +929,10 @@ class ClientManager:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val = self._get_value(uid)
             if isinstance(val, Exception):
-                logger.warning(f"Value is an exception: '{e}', '{uid}'")
-            self._set_result_display(uid, f"PyObj<{uid}>")
+                logger.warning(f"Value is an exception: '{val}', '{uid}'")
+                self._set_result_display(uid, repr(val))
+            else:
+                self._set_result_display(uid, f"PyObj<{uid}>")
 
             # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
@@ -934,8 +947,10 @@ class ClientManager:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val = self._get_value(uid)
             if isinstance(val, Exception):
-                logger.warning(f"Value is an exception: '{e}', '{uid}'")
-            self._set_result_display(uid, val)
+                logger.warning(f"Value is an exception: '{val}', '{uid}'")
+                self._set_result_display(uid, repr(val))
+            else:
+                self._set_result_display(uid, val)
 
             # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
@@ -951,7 +966,7 @@ class ClientManager:
                 pass
             raise e
 
-    def _update_client_figure_result(self, uid) -> None:
+    def _update_client_image_result(self, uid) -> None:
         """Update the data for the figure case - add a figure image to the spreadsheet"""
         caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
         try:
@@ -1025,7 +1040,11 @@ class ClientManager:
             try:
                 value = self._get_value(uid)
                 if type(value) == xlproImage:
-                    self._update_client_figure_result(uid)
+                    self._update_client_image_result(uid)
+                elif isinstance(value, matplotlib.figure.Figure):
+                    self._update_client_pyobject_result(uid)
+
+
                 elif result_type == FunctionTypes.array_or_value:
                     self._update_client_default_result(uid)
                 elif result_type == FunctionTypes.py_object:

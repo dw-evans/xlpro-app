@@ -8,3 +8,16 @@ class ArugmentNotReadyException(Exception):
     Use this error to signal for deferred calculation"""
     def __init__(self, *args):
         super().__init__(*args)
+
+
+class ExcelNotAccessibleError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+class xlproUnhandledException(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+class xlproArgumentExceptionError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
