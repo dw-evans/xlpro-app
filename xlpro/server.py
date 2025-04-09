@@ -58,7 +58,10 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
             f.write(f"# > {p.resolve()}\n")
             f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
 
-    return d
+    return 
+
+def get_workspace_xlpro_dir(workbook_path:Path) -> Path:
+    return workbook_path.parent / f"{workbook_path.name}.xlpro"
 
 class xlproServer:
     _public_methods_ = [
@@ -117,9 +120,18 @@ class xlproServer:
     def force_shutdown(self):
         xlproServer.signal_shutdown()
     
+    def refresh_workspace(self, wb_dispatch):
+        wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
+        if not wb_path in self._workspace_map.keys():
+            raise Exception("wb is not registered")
+        
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        workspace.reset()
+        pass
+    
     def register_and_configure_wb_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
-        wb_path = self._get_workspace_uid_from_wb(wb_dispatch)
+        wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
 
         if not wb_path in self._workspace_map.keys():
             logger.info(f"Creating workspace '{wb_path}'...")
@@ -148,14 +160,14 @@ class xlproServer:
             # logger.info(f"Re-initialization complete")
 
     def _get_workspace_from_wb(self, wb_dispatch):
-        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        uid = self._get_workspace_pathuid_from_wb(wb_dispatch)
         if not uid in self._workspace_map.keys():
             logger.info("Workbook has not been registered, initializing...")
             self.register_and_configure_wb_workspace(wb_dispatch)
         _utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
         return self._workspace_map[uid]
     
-    def _get_workspace_uid_from_wb(self, wb_dispatch):
+    def _get_workspace_pathuid_from_wb(self, wb_dispatch):
         wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
         wb_path = str(Path(wb.FullName))
         _utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
@@ -170,7 +182,7 @@ class xlproServer:
     def register_functions_in_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        workspace._register_functions_in_self()
+        workspace.register_functions_in_self()
 
     def register_functions_in_vba(self, wb_dispatch):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
@@ -179,10 +191,10 @@ class xlproServer:
         # XXX - todo - check this actually does anything meaninfgul
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        uid = self._get_workspace_uid_from_wb(wb_dispatch)
+        uid = self._get_workspace_pathuid_from_wb(wb_dispatch)
         logger.info(f"Shutting down workspace uid:'{uid}'")
         workspace:xlproWorkspace
-        workspace._shutdown()
+        workspace.shutdown()
         del workspace
         del self._workspace_map[uid]
         n_live_workspaces = len(list(self._workspace_map.values())) 
@@ -201,7 +213,7 @@ class xlproServer:
         """Gets the vba code module contents to register the udfs"""
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        return workspace._get_vba_sync_text()
+        return workspace.get_vba_sync_text()
     
     def get_workspace_from_uid_thread_safe(self, uid) -> xlproWorkspace:
         with self._workspace_uid_to_workbook_path_lock:
@@ -217,29 +229,33 @@ class xlproWorkspace:
         self._uid = uid
         self._wd = None # working directory
 
-        self._uid_result_display_map = {} # the result to be displayed
         self._uid_result_display_map_lock = threading.Lock()
+        self._uid_result_display_map:dict=None
 
-        self._uid_results_map = {} # the actual results
         self._uid_results_map_lock = threading.Lock()
+        self._uid_results_map:dict=None
 
-        self._uid_result_iscomplete_map = {}
         self._uid_result_iscomplete_map_lock = threading.Lock()
+        self._uid_result_iscomplete_map:dict=None
 
-        self._uid_result_type_map = {}
         self._uid_result_type_map_lock = threading.Lock()
+        self._uid_result_type_map:dict=None
+
+        self._uid_to_caller_map_lock = threading.Lock() # XXX - todo - not used currently
+        self._uid_to_caller_map:dict=None
+
+        self._uid_pending_function_map_lock = threading.Lock()
+        self._uid_pending_function_map:dict=None
+
+        self._caller_address_uid_map_lock = threading.Lock()
+        self._caller_address_uid_map:dict=None
+
+        self._uid_args_cache_lock = threading.Lock() # XXX - todo - not used.
+        self._uid_args_cache:dict=None
+
+        self.reset_workspace_cache()
 
         # maps the uid to the caller and function hash
-        self._uid_to_caller_map = {}
-        self._uid_to_caller_map_lock = threading.Lock() # XXX - todo - not used currently
-
-        self._uid_pending_function_map = {} # uid: func
-        self._uid_pending_function_map_lock = threading.Lock()
-
-        self._caller_address_uid_map = {} # uid: address
-        self._caller_address_uid_map_lock = threading.Lock()
-
-        self._uid_args_cache = {}
 
         self._pending_function_queue = queue.Queue()
         self._result_queue = queue.Queue() # stores the results as they come in
@@ -266,50 +282,62 @@ class xlproWorkspace:
 
     def set_xlpro_working_dir(self, wd:Path):
         logger.info(f"Setting working directory for workspace to '{str(wd)}'")
-        self._wd = initialize_and_get_workspace_xlpro_dir(self._wb_path)
+        # self._wd = initialize_and_get_workspace_xlpro_dir(self._wb_path)
+        self._wd = get_workspace_xlpro_dir(self._wb_path)
 
-    def _configure_xlpro_files(self):
-        # configure_workspace_xlpro_files(self._wd.parent, cfg)
-        initialize_and_get_workspace_xlpro_dir(self._wb_path)
+    # def _configure_xlpro_files(self):
+    #     # configure_workspace_xlpro_files(self._wd.parent, cfg)
+    #     initialize_and_get_workspace_xlpro_dir(self._wb_path)
 
-    def _register_functions_in_self(self):
-        logger.info(f"Re-initializing workspace functions...")
+    def register_functions_in_self(self):
+        logger.info(f"Registering workspace functions...")
         self._temp_module_name = f"{cfg.xlpro_functions_stem}_{self._uid}"
         _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
         # self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
-        self._update_module_func_map_wrapper()
+        self.update_module_func_map_wrapper()
 
-        logger.info(f"Reinitialization complete.")
+        logger.info(f"Registration complete.")
 
-    def _get_active_registered_functon_names(self):
+    def get_active_registered_functon_names(self):
         return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
     
-    def _get_active_registered_functions(self):
-        keys = self._get_active_registered_functon_names()
+    def get_active_registered_functions(self):
+        keys = self.get_active_registered_functon_names()
         return [self._module_function_maps_wrapper.fname_func_register[key] for key in keys]
     
-    def _deregister_functions_in_self(self):
-        logger.info(f"Uninitializing workspace functions...")
+    def deregister_functions_in_self(self):
+        logger.info(f"Deregistering workspace functions...")
         self._valid_function_names = []
         if self._temp_module_name is not None:
             del sys.modules[self._temp_module_name]
-        logger.info(f"Uninitialization complete.")
+        logger.info(f"Deregistration complete.")
 
-    def _update_module_func_map_wrapper(self):
+    def update_module_func_map_wrapper(self):
         self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
 
     def reset(self):
-        self._configure_xlpro_files()
-        self._deregister_functions_in_self()
-        self._register_functions_in_self()
-        logger.info("Clearing cached results")
-        self._uid_results_map = {}
-        pass
+        # self._configure_xlpro_files()
+        logger.info("Resetting workspace")
+        self.deregister_functions_in_self()
+        self.register_functions_in_self()
+        self.reset_workspace_cache()
 
     def _get_function_by_name(self, fname):
         return self._module_function_maps_wrapper.fname_func_register[fname]
 
-    def _clear_uid(self, uid):
+    def reset_workspace_cache(self):
+        logger.debug("Initializing hashmaps")
+        self._uid_result_display_map = {} # the result to be displayed
+        self._uid_results_map = {} # the actual results
+        self._uid_result_iscomplete_map = {}
+        self._uid_result_type_map = {}
+        self._uid_to_caller_map = {}
+        self._uid_pending_function_map = {} # uid: func
+        self._caller_address_uid_map = {} # uid: address
+        self._uid_args_cache = {}
+
+
+    def clear_uid(self, uid):
         """Clear a uid from memory"""
         # XXX - todo - check if this is a valid method to purge an item from the queue.
         try:
@@ -356,7 +384,7 @@ class xlproWorkspace:
         pass
 
     @staticmethod
-    def _hash_excel_function_call(*args:typing.Iterable[str]):
+    def hash_excel_function_call(*args:typing.Iterable[str]):
         return _utils.hash_str(", ".join([str(x) for x in args]))
 
     def execute_function_async(self, caller, fname, args):
@@ -370,7 +398,7 @@ class xlproWorkspace:
             if not func:
                 raise Exception(f"Function {fname} not found.")
             
-            uid = Dispatch(caller).Address + xlproWorkspace._hash_excel_function_call(fname, *args)
+            uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args)
             # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
 
             
@@ -400,19 +428,8 @@ class xlproWorkspace:
             with self._caller_address_uid_map_lock:
                 # the hash will be constant for a function/args/caller combination so this is valid
                 if caller_addr in self._caller_address_uid_map.keys():
-                    self._clear_uid(self._caller_address_uid_map[caller_addr])
+                    self.clear_uid(self._caller_address_uid_map[caller_addr])
                 self._caller_address_uid_map[caller_addr] = uid
-
-            # # this was originally added to deal with a recalculation order issue where None
-            # # would get passed in the args mid calculation cycle
-            # if isinstance(args[0][0], list|tuple):
-            #     if None in args[0][0]:
-            #         logger.error(f"Args are fkd '{args}'")
-            #         x, y = args[0][0]
-            #         pass
-            #     # if args[0][0][1] is not None:
-            #     #     x, y = args[0][0]
-            #     #     pass
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
@@ -438,7 +455,7 @@ class xlproWorkspace:
             # handle different function types
             # if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
             if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
-                f = self._create_worker_func(uid, func, args, kwargs={})
+                f = self.create_worker_func(uid, func, args, kwargs={})
                 with self._uid_pending_function_map_lock:
                     self._uid_pending_function_map[uid] = f
                 self._pending_function_queue.put(uid)
@@ -452,7 +469,7 @@ class xlproWorkspace:
         except Exception as e:
             return repr(errors.xlproUnhandledException(repr(e)))
         
-    def _create_worker_func(self, uid, func, args, kwargs):
+    def create_worker_func(self, uid, func, args, kwargs):
         if kwargs:
             raise Exception("kwargs should not be here!")
         pass
@@ -488,7 +505,7 @@ class xlproWorkspace:
         
         return worker
             
-    def _shutdown(self):
+    def shutdown(self):
         for uid, t in self._func_hash_subthread_map.items():
             t:threading.Thread
             if t.is_alive():
@@ -499,8 +516,8 @@ class xlproWorkspace:
         #     p:FigureGeneratingThread
         #     p.stop()
 
-    def _get_vba_sync_text(self) -> str:
-        funcs = self._get_active_registered_functions()
+    def get_vba_sync_text(self) -> str:
+        funcs = self.get_active_registered_functions()
         return _utils.get_xlpro_vb_dynamic_component_contents(funcs)
     
     def get_caller_stream(self, uid):
@@ -511,7 +528,7 @@ class xlproWorkspace:
         with self._uid_to_caller_map_lock:
             self._uid_to_caller_map[uid] = val
 
-    def _get_uid_debug_info(self, uid):
+    def get_uid_debug_info(self, uid):
         with self._uid_result_display_map_lock:
             a0 = self._uid_result_display_map.get(uid, None)
         with self._uid_results_map_lock:
@@ -757,7 +774,7 @@ class ResultsManager:
         precedents_stream = _utils.get_precedents_chain(caller_dispatch)
         
         precedents_recalculate = []
-        active_formulas = self._server._get_active_registered_functon_names()
+        active_formulas = self._server.get_active_registered_functon_names()
 
         u = [x.AddressLocal for x in precedents_stream]
 
@@ -820,7 +837,7 @@ class ResultsManager:
                 logger.debug(f"Arguments not ready for uid '{uid}', recycling function...")
 
                 # logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
-                self._server._get_uid_debug_info(uid)
+                self._server.get_uid_debug_info(uid)
                 # self._recalculate_precedents(uid)
 
                 # nudge the client recalculate sequence to correct case where Excel never sends recalculate
