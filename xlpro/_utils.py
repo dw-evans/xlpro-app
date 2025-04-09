@@ -1,4 +1,5 @@
 import win32com.client
+from PIL import Image
 
 
 from pywintypes import IID
@@ -609,6 +610,12 @@ def show(val):
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
+def px_to_pt(px, dpi):
+    return px * 72 / dpi
+
+def pt_to_px(pt, dpi):
+    return pt / 72 * dpi
+
 def show_image(val, name:str, 
     # sizex:float=None, sizey:float=None, dpi:int, format:str,
     ):
@@ -659,9 +666,14 @@ def show_image(val, name:str,
             fp = val
         if not fp.exists():
             raise FileNotFoundError(f"File does not exist {fp}")
+        with Image.open(fp) as img:
+            size = np.array(img.size)
+            dpi = img.info.get("dpi")
+            size_pt = px_to_pt(size, dpi)
+
         ret = xlproImage(
             fp=fp,
-            size_pt=(100.0, 100.0),
+            size_pt=size_pt,
             xl_name=name
         )
         return ret
