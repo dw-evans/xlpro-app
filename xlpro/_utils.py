@@ -451,18 +451,32 @@ def is_arg_promise(arg):
         return False
     return bool(re.match(r"^Promise<.+>$", arg))
 
-def validate_args_ready(args, kwargs):
-    for arg in list(args) + [v for k, v in kwargs.items()]:
-        if is_arg_promise(arg):
-            raise errors.ArugmentNotReadyException()
-        if isinstance(arg, Exception):
-            raise errors.xlproArgumentExceptionError()
+def is_arg_stringified_exception(arg):
+    if not isinstance(arg, str):
+        return False
+    return bool(re.match(r"^\w*((?:error)?(?:exception)?)\(.*\)$", arg, flags=re.IGNORECASE))
+
+def pre_validate_args(args:tuple|list, kwargs:dict):
+    for arg in list(args) + [v for v in kwargs.values()]:
+        pre_validate_arg(arg=arg)
+        
+def pre_validate_arg(arg):
+    if is_arg_promise(arg):
+        raise errors.ArugmentNotReadyException()
+    if isinstance(arg, Exception):
+        raise errors.xlproArgumentExceptionError()
+    if is_arg_stringified_exception(arg):
+        raise errors.xlproArgumentExceptionError()
+
 
 def pre_p_an_arg(cval, target_type):
     # 0. raise error if the argument is currently a promise!
+    # XXX - todo - check if this is redundant, I suspect it is
     if is_arg_promise(cval):
         raise errors.ArugmentNotReadyException()
     if isinstance(cval, Exception):
+        raise errors.xlproArgumentExceptionError()
+    if is_arg_stringified_exception(cval):
         raise errors.xlproArgumentExceptionError()
     
     # 1. check if its an xlproptr. Replace val with the ptr result

@@ -147,14 +147,14 @@ def _pyobj_func_wrapper(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         f = func
-        _utils.validate_args_ready(args, kwargs)
+        _utils.pre_validate_args(args, kwargs)
         ppargs, ppkwargs = _utils.preprocess_arguments(func=func, args=args, kwargs=kwargs)
 
         # XXX - todo - could add multilevel nesting to this...
         all_args = ppargs + [v for v in ppkwargs.values()]
         for a in all_args:
             if isinstance(a, typing.Iterable):
-                _utils.validate_args_ready(args=a, kwargs={}) 
+                _utils.pre_validate_args(args=a, kwargs={}) 
         
         ret = f(*ppargs, **ppkwargs)
         return ret
@@ -174,7 +174,7 @@ def _array_or_value_func_wrapper(func):
 def _jsonified_pyobj_func_wrapper(func):
     @wraps(func)
     def wrapper(s):
-        _utils.validate_args_ready((s,), {})
+        _utils.pre_validate_args((s,), {})
         kwargs = json.loads(s)
         return _pyobj_func_wrapper(func)(**kwargs)
     return wrapper
@@ -183,7 +183,7 @@ def _jsonified_pyobj_func_wrapper(func):
 def _jsonified_array_or_value_func_wrapper(func):
     @wraps(func)
     def wrapper(s):
-        _utils.validate_args_ready((s,), {})
+        _utils.pre_validate_args((s,), {})
         kwargs = json.loads(s)
         return _array_or_value_func_wrapper(func)(**kwargs)
     return wrapper

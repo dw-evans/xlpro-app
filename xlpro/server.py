@@ -833,7 +833,19 @@ class ResultsManager:
                 self._server._pending_function_queue.put(uid)
                 self._server._worker_manager.wake()
                 return
-                
+            
+            elif isinstance(val, errors.xlproArgumentExceptionError):
+                # if an argument is an exception, do not recycle as a pending function
+                # when the root failed one re-executes, it will recalculate the dependents
+                pass
+          
+            elif isinstance(val, errors.ExcelNotAccessibleError):
+                logger.debug(f"ExcelNotAccessible during '{uid}', recycling function...")
+                logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
+                self._server._pending_function_queue.put(uid)
+                self._server._worker_manager.wake()
+                return
+
             elif isinstance(val, pythoncom.com_error):
                 if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
                     self._server._pending_function_queue.put(uid)
@@ -844,11 +856,6 @@ class ResultsManager:
             logger.warning(f"Returned value is a generic exception: {uid}, {val}")
             # ret = repr(val) # convert exception to string for it to show in excel.
 
-
-        if isinstance(ret, str):
-            if "promise" in ret.lower():
-                pass
-        
         # if it is a valid return, write the result to the cache
         self._set_results_value(uid, ret)
         # signal that it is complete
