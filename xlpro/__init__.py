@@ -27,6 +27,10 @@ from xlpro._types import (
     ndarray2d
 )
 
+from xlpro.formatter import (
+    conditional_formatter_example
+)
+
 
 
 

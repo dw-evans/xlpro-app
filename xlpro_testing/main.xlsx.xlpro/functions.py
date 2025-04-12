@@ -20,6 +20,7 @@ xlpro.register()(xlpro.show_image)
 xlpro.register()(xlpro.typ)
 xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
+xlpro.register()(xlpro.conditional_formatter_example)
 
 def pd_function_create(x) -> pd.DataFrame:
     ret = pd.DataFrame(x[1:], columns=x[0])
