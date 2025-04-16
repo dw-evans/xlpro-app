@@ -23,13 +23,15 @@ logger =  logging.getLogger(__name__)
 BASE_PATH = Path(__file__).parent
 if getattr(sys, 'frozen', False):
     # Running in a PyInstaller bundle
-    # BASE_PATH = Path(sys._MEIPASS)
+    BASE_PATH = Path(sys._MEIPASS)
     # BASE_PATH = Path(sys.executable).parent.parent
-    BASE_PATH = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_installer")
+    # BASE_PATH = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_installer")
 else:
     # Running in a normal Python interpreter
     BASE_PATH = Path(__file__).parent
 
+
+IS_FROZEN = getattr(sys, 'frozen', False)
 
 
 def add_to_user_path(p:Path):
@@ -195,9 +197,17 @@ def install():
     (XLPRO_INSTALL_DIR / "venv-mappings.json").write_text("", "utf-8")
     (XLPRO_INSTALL_DIR / "config.toml").write_text("", "utf-8")
 
+    if IS_FROZEN:
+        src_xlpro_cli = BASE_PATH / "assets/xlpro-cli.exe"
+        src_xlpro_xlam_path = BASE_PATH / "assets/xlpro.xlam"
+        config_path = BASE_PATH / "assets/config.toml"
+    else:
+        src_xlpro_cli = BASE_PATH / "../xlpro_cli/dist/xlpro-cli.exe"
+        src_xlpro_xlam_path = BASE_PATH / "../addin/xlpro.xlam"
+        config_path = BASE_PATH / "../config.toml"
+
     logger.info("Fetching xlpro-cli binary")
-    # get xlpro-cli.exe binary
-    src_xlpro_cli = BASE_PATH / "../xlpro_cli" / "dist/xlpro-cli.exe"
+
     dst_xlpro_cli = XLPRO_INSTALL_DIR / src_xlpro_cli.name
     shutil.copy2(src_xlpro_cli, dst_xlpro_cli)
 
@@ -213,8 +223,7 @@ def install():
     logger.info("Attempting to install xlpro.xlam to XLSTART")
     # install xlpro.xlam
 
-    
-    src_xlpro_xlam_path = BASE_PATH / "../addin/xlpro.xlam"
+
     xlstart_path = get_xlstart_path()
 
     dst_xlpro_xlam_path1 = XLPRO_ASSETS_DIR / src_xlpro_xlam_path.name
@@ -230,7 +239,7 @@ def install():
 
     # copy config.toml
     logger.info("Copying config")
-    config_path = BASE_PATH / "../config.toml"
+
     shutil.copy2(config_path, XLPRO_INSTALL_DIR / config_path.name)
 
     logger.info("Installation completed successfully.")

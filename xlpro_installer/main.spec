@@ -10,6 +10,12 @@ datas = []
 # datas += copy_metadata('readchar', recursive=True)
 # datas += copy_metadata('readchar', recursive=True)
 
+datas += [
+    ("../addin/xlpro.xlam", "assets"),
+    ("../xlpro_cli/dist/xlpro-cli.exe", "assets"),
+    ("../config.toml", "assets"),
+]
+
 import sys
 import os
 
