@@ -19,13 +19,13 @@
             "cwd": "C:/Users/Daniel Evans",
         },
         {
-            "name":"module",
+            "name":"xlpro_cli.main",
             "type":"debugpy",
             "request":"launch",
-            "module":"xlpro_cli.main",
+            "program":"xlpro_cli/main.py",
             "args": [
                 "init",
-                "C:/Users/Daniel Evans/.xlpro-testing/Book1.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
             ],
         },
         {

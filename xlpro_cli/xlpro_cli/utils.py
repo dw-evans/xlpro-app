@@ -40,9 +40,9 @@ print("cwd is " + os.getcwd())
 print("cwd is " + os.getcwd())
 # XLPRO_ROOT_PATH = XLPRO_WD / "xlpro_install"
 XLPRO_ROOT_PATH = XLPRO_WD
-XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ROOT_PATH / "venv-mappings.json"
 XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
-
+XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ENVS_DIR / "venv-mappings.json"
+XLPRO_ASSETS_DIR = XLPRO_WD / "assets"
 
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
@@ -278,20 +278,28 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = get_xlpro_workbook_directory(workbook_path)
     d.mkdir(exist_ok=True)
 
-    funcs_path = d / f"functions.py"
-    subroutines_path = d / f"subroutines.py"
+    startfile_dir = XLPRO_ASSETS_DIR / "startfiles"
+    startfile_contents = list(startfile_dir.glob("*"))
 
-    p = funcs_path
-    if not p.exists():
-        with open(p, "w") as f:
-            f.write(f"# > {p.resolve()}\n")
-            f.write(f"# xlpro will automatically detect functions in this file as Excel UDFs.\n\n")
+    for p in startfile_contents:
+        shutil.copy2(p, d / p.name)
 
-    p = subroutines_path
-    if not p.exists():
-        with open(p, "w") as f:
-            f.write(f"# > {p.resolve()}\n")
-            f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
+    # funcs_path = d / f"functions.py"
+    # subroutines_path = d / f"subroutines.py"
+
+    # p = funcs_path
+    # if not p.exists():
+    #     with open(p, "w") as f:
+    #         f.write(f"# > {p.resolve()}\n")
+    #         f.write(f"# xlpro will automatically detect functions in this file as Excel UDFs.\n\n")
+
+    # p = subroutines_path
+    # if not p.exists():
+    #     with open(p, "w") as f:
+    #         f.write(f"# > {p.resolve()}\n")
+    #         f.write(f"# xlpro will automatically detect functions in this file as Excel subroutines.\n\n")
+
+        
     return d
 
 
@@ -991,10 +999,18 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         text=True
     )
 
+def get_xlpro_whl_fp():
+    fps = list(XLPRO_ASSETS_DIR.glob("*.whl"))
+    if len(fps)> 1:
+        raise Exception("multiple wheels found, abandoning")
+    if not fps:
+        raise Exception("no wheels found, abandoning")
+    return fps[0]
 
 def install_default_requirements(py_interpreter_path:Path):
     # path_to_xlpro = Path().resolve()
     path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro")
+    path_to_xlpro = get_xlpro_whl_fp()
     reqs = [
         "pip",
         str(path_to_xlpro)

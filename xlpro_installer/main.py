@@ -196,7 +196,7 @@ def install():
     XLPRO_ASSETS_DIR.mkdir()
     
     logger.info("Creating file templates")
-    (XLPRO_INSTALL_DIR / "venv-mappings.json").write_text("", "utf-8")
+    (XLPRO_ENVS_DIR / "venv-mappings.json").write_text("", "utf-8")
     (XLPRO_INSTALL_DIR / "config.toml").write_text("", "utf-8")
 
     if IS_FROZEN:
