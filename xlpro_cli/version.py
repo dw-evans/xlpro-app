@@ -1,12 +1,13 @@
 
 
 import datetime
-import xlpro
+
+__version__ = "0.0.1.0"
 
 class VersionInfo:
-    VERSION = xlpro.__version__
-    NAME = "xlpro"
-    EXE_NAME = f"{NAME}-v{VERSION}-installer.exe"
+    VERSION = __version__
+    NAME = "xlpro-cli"
+    EXE_NAME = f"{NAME}.exe"
     AUTHOR = "D.Evans"
     DATE = datetime.datetime.now().strftime("%Y-%m-%d")
     DESCRIPTION_SHORT = "xlpro Windows installer (BETA)"

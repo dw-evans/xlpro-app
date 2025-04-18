@@ -14,6 +14,7 @@ import sys
 print("warning, fetching a specific config.toml path!")
 XLPRO_WD = Path(r"C:\Users\Daniel Evans\.xlpro").resolve()
 config_path = XLPRO_WD / "config.toml"
+print(f"i.e. this one {config_path}")
 
 def load() -> Configuration:
     with open(config_path, "r") as f:

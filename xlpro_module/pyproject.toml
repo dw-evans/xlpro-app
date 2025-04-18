@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xlpro"
+version = "0.1.0.0" # Placeholder will be auto-synced
+description = "xlpro internal python module"
+readme = "README.md"
+license = { text = "Proprietary" }
+authors = [{ name = "Daniel Evans", email = "example@email.com" }]
+
+requires-python = ">=3.12"
+dependencies = [
+    # "build>=1.2.2.post1",
+    "debugpy>=1.8.13",
+    "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
+    "psutil>=7.0.0",
+    # "pyinstaller>=6.12.0",
+    # "pyinstaller-versionfile>=3.0.1",
+    "pywin32>=309",
+    # "readchar>=4.2.1",
+    "regex>=2024.11.6",
+    # "rich>=13.9.4",
+    # "setuptools>=77.0.3",
+    "toml>=0.10.2",
+    "typer>=0.15.2",
+    # "win32typelibs",
+]

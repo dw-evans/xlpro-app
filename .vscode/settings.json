@@ -1,4 +1,6 @@
 {
     // "python.defaultInterpreterPath": "C:/Users/Daniel Evans/projects/xlpro/xlpro_install/envs/cbbaf652-2b79-46aa-aa6c-0e8838722d2c_3.14.0/.venv/Scripts/python.exe",
     // "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
+    "python.analysis.extraPaths": ["${workspaceFolder}/xlpro_module"]
 }

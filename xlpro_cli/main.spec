@@ -7,13 +7,13 @@ PyInstaller.config.CONF['workpath'] = "./build"
 PyInstaller.config.CONF['distpath'] = "./dist"
 
 datas = []
-# datas += [
-#     ('utils.py', '.'),
-#     ('commands.py', '.'),
-# ]
 datas += copy_metadata('readchar', recursive=True)
 
-EXE_NAME = "xlpro-cli"
+sys.path.insert(0, os.getcwd())
+import version
+
+EXE_NAME = version.VersionInfo.EXE_NAME
+VERSIONFILE = version.create_version_file_get_path()
 
 a = Analysis(
     ['main.py'],

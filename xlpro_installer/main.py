@@ -101,6 +101,8 @@ XLPRO_BIN_DIR = XLPRO_INSTALL_DIR / "bin"
 XLPRO_ENVS_DIR = XLPRO_INSTALL_DIR / "envs"
 XLPRO_ASSETS_DIR = XLPRO_INSTALL_DIR / "assets"
 
+XLPRO_INSTALLER_ASSETS_DIR = BASE_PATH / "assets"
+
 def get_preinstalled_uv_path():
     return Path() / r"C:\Users\Daniel Evans\.local\bin\uv.exe"
 
@@ -200,14 +202,13 @@ def install():
     if IS_FROZEN:
         src_xlpro_cli = BASE_PATH / "assets/xlpro-cli.exe"
         src_xlpro_xlam_path = BASE_PATH / "assets/xlpro.xlam"
-        config_path = BASE_PATH / "assets/config.toml"
+        src_config_path = BASE_PATH / "assets/config.toml"
     else:
-        src_xlpro_cli = BASE_PATH / "../xlpro_cli/dist/xlpro-cli.exe"
-        src_xlpro_xlam_path = BASE_PATH / "../addin/xlpro.xlam"
-        config_path = BASE_PATH / "../config.toml"
+        src_xlpro_cli = BASE_PATH / "assets/xlpro-cli.exe"
+        src_xlpro_xlam_path = BASE_PATH / "assets/xlpro.xlam"
+        src_config_path = BASE_PATH / "assets/config.toml"
 
     logger.info("Fetching xlpro-cli binary")
-
     dst_xlpro_cli = XLPRO_INSTALL_DIR / src_xlpro_cli.name
     shutil.copy2(src_xlpro_cli, dst_xlpro_cli)
 
@@ -220,16 +221,14 @@ def install():
     install_uv(download=False)
     # install_uv(download=True)
 
-    logger.info("Attempting to install xlpro.xlam to XLSTART")
-    # install xlpro.xlam
 
 
     xlstart_path = get_xlstart_path()
-
     dst_xlpro_xlam_path1 = XLPRO_ASSETS_DIR / src_xlpro_xlam_path.name
 
     shutil.copy2(src_xlpro_xlam_path, dst_xlpro_xlam_path1)
 
+    logger.info("Attempting to install xlpro.xlam to XLSTART")
     dst_xlpro_xlam_path2 = xlstart_path / src_xlpro_xlam_path.name
     if dst_xlpro_xlam_path2.exists():
         logger.warning(f"warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
@@ -239,9 +238,17 @@ def install():
 
     # copy config.toml
     logger.info("Copying config")
+    shutil.copy2(src_config_path, XLPRO_INSTALL_DIR / src_config_path.name)
 
-    shutil.copy2(config_path, XLPRO_INSTALL_DIR / config_path.name)
 
+    logger.info("Copying startfiles assets")
+    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)       
+
+    logger.info("Copying wheel")
+    shutil.copy2(x:=(list(XLPRO_INSTALLER_ASSETS_DIR.glob("*.whl"))[0]), XLPRO_ASSETS_DIR / x.name)       
+
+    # install xlpro.xlam
+    pass
     logger.info("Installation completed successfully.")
 
 def main():

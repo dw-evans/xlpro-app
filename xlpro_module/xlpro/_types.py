@@ -17,7 +17,7 @@ import regex as re
 from dataclasses import dataclass, field
 from win32com.client import GetActiveObject, Dispatch
 import pythoncom
-from win32typelibs import excel as xl
+# from win32typelibs import excel as xl
 from pathlib import Path
 import pandas as pd
 

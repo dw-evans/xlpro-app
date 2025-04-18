@@ -17,7 +17,9 @@ import win32com.server.policy
 
 import numpy as np
 import pywintypes
-from win32typelibs import excel as xl
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from win32typelibs import excel as xl
 import matplotlib.figure
 import sys
 
@@ -168,7 +170,7 @@ class xlproServer:
         return self._workspace_map[uid]
     
     def _get_workspace_pathuid_from_wb(self, wb_dispatch):
-        wb:xl._Workbook = win32com.client.Dispatch(wb_dispatch)
+        wb:"xl._Workbook" = win32com.client.Dispatch(wb_dispatch)
         wb_path = str(Path(wb.FullName))
         _utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
         return wb_path
@@ -542,7 +544,7 @@ class xlproWorkspace:
         pythoncom.CoInitialize()
         try:
             rng_stream = self.get_caller_stream(uid)
-            rng_dispatch:xl.Range = _utils.comarshal_dispatch_stream(rng_stream)
+            rng_dispatch:"xl.Range" = _utils.comarshal_dispatch_stream(rng_stream)
             a5 = rng_dispatch.Address
             a6 = rng_dispatch.Formula
             a7 = rng_dispatch.Value
@@ -780,7 +782,7 @@ class ResultsManager:
 
         for ps_disp in precedents_stream:
             try:
-                ps_disp:xl.Range
+                ps_disp:"xl.Range"
                 formula = ps_disp.Formula2
                 ps_disp.Formula2 = ps_disp.Formula2
                 if "pd_function_create" in formula:

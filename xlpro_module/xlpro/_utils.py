@@ -5,8 +5,10 @@ from PIL import Image
 from pywintypes import IID
 from win32com.client import Dispatch
 
-from win32typelibs import excel as xl
-from win32typelibs import vbide
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from win32typelibs import excel as xl
+    from win32typelibs import vbide
 
 from typing import Any, Callable
 import typing
@@ -170,25 +172,27 @@ def function_template_with_caller(func:Callable) -> str:
 End Function
 """
 
-def get_or_create_codemodule(wb:xl._Workbook, c_name:str) -> vbide._CodeModule:
-    proj:vbide._VBProject = wb.VBProject
+def get_or_create_codemodule(wb:"xl._Workbook", c_name:str) -> "vbide._CodeModule":
+    proj:"vbide._VBProject" = wb.VBProject
 
     if not c_name in [x.Name for x in proj.VBComponents]:
-        comp = proj.VBComponents.Add(vbide.constants.vbext_ct_StdModule)
+        vbext_ct_StdModule            =1          # from enum vbext_ComponentType
+        # comp = proj.VBComponents.Add(vbide.constants.vbext_ct_StdModule)
+        comp = proj.VBComponents.Add(vbext_ct_StdModule)
         comp.Name = c_name
     else:
         comp = proj.VBComponents(c_name)
 
-    codemod:vbide._CodeModule = comp.CodeModule
+    codemod:"vbide._CodeModule" = comp.CodeModule
     return codemod
 
 
-def write_to_vb_module(s:str, vb_codemod:vbide._CodeModule):
+def write_to_vb_module(s:str, vb_codemod:"vbide._CodeModule"):
     vb_codemod.DeleteLines(1, vb_codemod.CountOfLines)
     vb_codemod.AddFromString(s)
     pass
 
-def init_xlpro_vb_dynamic_component(wb:xl._Workbook, func_register:list[Callable]):
+def init_xlpro_vb_dynamic_component(wb:"xl._Workbook", func_register:list[Callable]):
     """Write a list of commands to be registered in vba."""
     vb_dynamic_comdemod = get_or_create_codemodule(wb, VB_DYNAMIC_MODULE_NAME)
     s_list = []
@@ -535,7 +539,7 @@ class ThreadWithException(threading.Thread):
         return self.exception
 
 
-def get_precedents_chain(rng_dispatch:xl.Range):
+def get_precedents_chain(rng_dispatch:"xl.Range"):
     precedents = []
     for cell in rng_dispatch.Precedents:
         precedents.append(cell)

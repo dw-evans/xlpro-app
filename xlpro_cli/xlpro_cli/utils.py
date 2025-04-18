@@ -1251,9 +1251,8 @@ if __name__ == "__main__":
     # test_configure_workbook_with_existing_venv()
 
     from win32com.client import Dispatch
-    from win32typelibs import excel as xl
 
-    xlapp:xl._Application = Dispatch("Excel.Application")
+    xlapp:"xl._Application" = Dispatch("Excel.Application")
     xlapp.Visible=False
 
     workbook_paths:list[Path] = []

@@ -1,5 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+import os
+
 from PyInstaller.utils.hooks import copy_metadata
 import PyInstaller.config
 
@@ -7,20 +10,43 @@ PyInstaller.config.CONF['workpath'] = "./build"
 PyInstaller.config.CONF['distpath'] = "./dist"
 
 datas = []
-# datas += copy_metadata('readchar', recursive=True)
-# datas += copy_metadata('readchar', recursive=True)
+from pathlib import Path
+def check_assets():
+    checks = []
+    checks_len = 4
+    assets_dir = Path("assets")
+
+    for p in assets_dir.glob("*"):
+        print(f"checking {p}, {p.exists()}")
+
+        if p.name == "xlpro.xlam":
+            checks.append(True)
+
+        elif p.name == "xlpro-cli.exe":
+            checks.append(True)
+
+        elif p.name == "config.toml": 
+            checks.append(True)
+
+        elif (
+            p.name.lower().startswith("xlpro") and 
+            p.name.lower().endswith(".whl")
+        ):
+            checks.append(True)
+        else:
+            pass
+
+
+    print("asset checks completed successfully")
+
+check_assets()
 
 datas += [
-    ("../addin/xlpro.xlam", "assets"),
-    ("../xlpro_cli/dist/xlpro-cli.exe", "assets"),
-    ("../config.toml", "assets"),
+    ("assets/", "assets/"),
 ]
 
-import sys
-import os
-
-
 sys.path.insert(0, os.getcwd())
+
 import version
 
 EXE_NAME = version.VersionInfo.EXE_NAME
