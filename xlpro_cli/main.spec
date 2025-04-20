@@ -9,6 +9,7 @@ PyInstaller.config.CONF['distpath'] = "./dist"
 datas = []
 datas += copy_metadata('readchar', recursive=True)
 
+import sys
 sys.path.insert(0, os.getcwd())
 import version
 

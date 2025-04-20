@@ -39,6 +39,14 @@ def handle_init(args):
 def handle_uninit(args):
     raise NotImplementedError
 
+import pythoncom
+def handle_get_guid(args):
+    workbook_path = Path(args.workbook)
+    # py_interpreter_root_dir = utils.get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+    # py_interpreter_path = utils.get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
+    guid = utils.get_interpreter_guid(workbook_path)
+    sys.stderr.write(str(guid))
+    pass
 
 
 XLPRO_INSTALL_DIR = (Path() / "xlpro_install").resolve()
@@ -77,18 +85,23 @@ def main():
         help=""
     )
 
+
     parser_start = subparsers.add_parser("start", help="run the xlpro server")
     parser_init = subparsers.add_parser("init", help="initialize a workbook for xlpro")
     parser_uninit = subparsers.add_parser("uninit", help="uninitialize a workbook for xlpro")
+    parser_get_guid = subparsers.add_parser("guid", help="get the guid for a workbook (if the process is active?)")
     # parser_uv = subparsers.add_parser("uv", help=load_uv_help())
 
     parser_start.add_argument("workbook", type=str, help="workbook to start xlpro server for")
+
     parser_init.add_argument("workbook", type=str, help="workbook to initialize xlpro for (writes adjacent folder structure)")
     parser_uninit.add_argument("workbook", type=str, help="workbook to uninitialize xlpro for (removes adjacent folder structure)")
+    parser_get_guid.add_argument("workbook", type=str, help="workbook to uninitialize xlpro for (removes adjacent folder structure)")
 
     parser_start.set_defaults(func=handle_start_server)
     parser_init.set_defaults(func=handle_init)
     parser_uninit.set_defaults(func=handle_uninit)
+    parser_get_guid.set_defaults(func=handle_get_guid)
 
     args = parser.parse_args()
     args.func(args)

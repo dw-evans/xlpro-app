@@ -89,31 +89,41 @@ def is_parent_process_closed(pid):
 
 def serve():
     global DEBUGPY_PORT
+    global CLSID
+    global WORKBOOK_NAME
+    logger.info(f"xlpro.run_server.main() being run with CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
+
     logger.debug(f"serve() being run at root directory: {os.getcwd()}")
 
-    debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
+    # debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
+    
+    print("warning, manual debugging configured...")
+    debugpy.listen(("localhost", 5679),)
+    print("waiting for client")
+    debugpy.wait_for_client()
 
-    logger.info(f"ready to receive connection to debugger at {(config.debug_ip, DEBUGPY_PORT)}...")
+    logger.info(f"ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
     # debugpy.wait_for_client()
     # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
 
-    xlpro_lock_fp = file_lock.get_xlpro_lockfile_path()
+    xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent() / f"{WORKBOOK_NAME}.xlpro.lock"
     if not xlpro_lock_fp.parent.exists():
         logger.warning(f"{xlpro_lock_fp.parent} does not exist, making parents")
         xlpro_lock_fp.parent.mkdir()
 
     pass
-    global PARENT_PID
+    # global PARENT_PID
     global SERVER
     try:
-        lock_file_handle = file_lock.acquire_file_and_write_pid(str(xlpro_lock_fp))
+        lock_file_handle = file_lock.acquire_file_and_write_datas(str(xlpro_lock_fp), guid=CLSID, debugpy_port=DEBUGPY_PORT)
     except PermissionError as e:
         print("Could not acquire lock on file. Checking validity")
-        pid = file_lock.check_existing_lock_and_pid(xlpro_lock_fp)
-        if not pid:
+        lockfile_contents_dict = file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
+        if not lockfile_contents_dict:
             print("The process with the lock file is not alive.")
             raise Exception(f"Error in lock file '{xlpro_lock_fp}' please correct manually.")
         print("The process appears to be alive.")
+        pid, guid, debugpy_port = [getattr(lockfile_contents_dict, x) for x in ("pid", "guid", "debugpy_port")]
         _utils.show_warning(
             "xlpro",
             f"""WARNING: Could not acquire the file lock.
@@ -127,7 +137,8 @@ def serve():
 
     # we register everything dynamically using the clsid only.
     # the progid must be registered separately with admin elevation
-    clsid = pywintypes.IID(xlproServer._reg_clsid_)
+    # clsid = pywintypes.IID(xlproServer._reg_clsid_)
+    clsid = pywintypes.IID(CLSID)
 
     # overwrite the win32com server policy. Leaves in room to dispatch other objects...?
     # credit to xlwings library for this
@@ -138,6 +149,7 @@ def serve():
             if reqClsid == clsid:
                 # fyi we wrap the clsid IID object (a com-compatible interface) around our COM server
                 SERVER = xlproServer()
+                xlproServer._reg_clsid_ = clsid
                 return win32com.server.util.wrap(SERVER, reqIID)
             else:
                 # return BaseDefaultPolicy._CreateInstance_(self, clsid, reqIID)
@@ -163,6 +175,13 @@ def serve():
     logger.info(f"xlpro server starting on PID: {os.getpid()}")
     SERVER = xlproServer()
 
+    print("XLPROSTART_TRIGGER_OK")
+    print("XLPROSTART_TRIGGER_OK")
+    print("XLPROSTART_TRIGGER_OK")
+    print("XLPROSTART_TRIGGER_OK")
+    print("XLPROSTART_TRIGGER_OK")
+    print("XLPROSTART_TRIGGER_OK")
+
     def tidy_up_lock_file():
         logger.info(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
         file_lock.close_file(handle=lock_file_handle)
@@ -181,45 +200,57 @@ def serve():
                 pwm = pythoncom.PumpWaitingMessages()
             if is_server_pending_close():
                 raise errors.ServerClosedException
-            if PARENT_PID is not None:
-                if is_parent_process_closed(PARENT_PID):
-                    raise psutil.NoSuchProcess(PARENT_PID)
+            # if PARENT_PID is not None:
+            #     if is_parent_process_closed(PARENT_PID):
+            #         raise psutil.NoSuchProcess(PARENT_PID)
         except errors.ServerClosedException:
             logger.info("errors.ServerClosedException encountered. Closing the server...")
-            tidy_up_lock_file()
             break
         except psutil.NoSuchProcess:
             logger.info("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
-            tidy_up_lock_file()
             break
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt encountered. Closing the server...")
-            tidy_up_lock_file()
             break
+        except Exception as e:
+            logger.warning(f"uncaught exception: {e}")
+            break
+    
+    try:
+        tidy_up_lock_file()
+    except:
+        logger.warning("Error during lockfile cleanup")
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()
 
     logger.info("Graceful exit")
+    input("Press Enter to exit")
     sys.exit()
 
 
-
-
 def main():
-    global PARENT_PID
-    global DEBUGPY_PORT
-
-    parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
-
-    parser.add_argument("--debugpy_port", type=int, required=False, help="The port to configure for debugpy debugging")
-    parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor")
-
-    args = parser.parse_args()
-    PARENT_PID = args.parent_pid if args.parent_pid else None
-    DEBUGPY_PORT = args.debugpy_port if args.debugpy_port else 5678
-    
     try:
+        # global PARENT_PID
+        global DEBUGPY_PORT
+        global CLSID
+        global WORKBOOK_NAME
+
+        parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
+        
+        # default_clsid = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
+
+        parser.add_argument("--workbook_path", type=str, required=True, help="The workbook")
+        # parser.add_argument("--guid", type=str, required=False, help="The CLSID to run the server on", default=default_clsid)
+        parser.add_argument("--debugpy_port", type=int, required=False, help="The port to configure for debugpy debugging")
+        # parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor", default=None)
+
+        args = parser.parse_args()
+        # PARENT_PID = args.parent_pid
+        DEBUGPY_PORT = args.debugpy_port
+        CLSID = pythoncom.CreateGuid()
+        WORKBOOK_NAME = Path(args.workbook_path).name
+    
         serve()
     except Exception as e:
         print(e)

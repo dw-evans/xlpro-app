@@ -99,7 +99,7 @@ def write_to_file(handle, data:str):
     return rc
     # return bytes_written.value
 
-def acquire_file_and_write_pid(file_path):
+def acquire_file_and_write_datas(file_path, guid:str, debugpy_port:int):
     """Try to acquire an exclusive lock on the file."""
     handle = _winapi.CreateFile(
         file_path,
@@ -110,30 +110,73 @@ def acquire_file_and_write_pid(file_path):
         FILE_ATTRIBUTE_NORMAL,
         0,
     )
-    write_to_file(handle, str(os.getpid()))
+    
+    write_to_file(handle, f"pid={str(os.getpid())}\n")
+    write_to_file(handle, f"guid={guid}\n")
+    write_to_file(handle, f"debugpy_port={debugpy_port}\n")
+
     return handle
 
 def close_file(handle):
     pass
     _winapi.CloseHandle(handle)
 
-def check_existing_lock_and_pid(lock_file):
+# def check_existing_lock_and_pid(lock_file):
+#     """Check if a process holding the lock is still running."""
+#     try:
+#         with open(lock_file, 'r') as f:
+#             pid = int(f.read().strip())
+#             if psutil.pid_exists(pid):
+#                 return pid  # Process is still running
+#     except (ValueError, FileNotFoundError):
+#         pass
+#     return False
+
+import regex as re
+
+# from dataclasses import dataclass
+# @dataclass
+# class ProcessInfo:
+#     ...
+
+def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
     """Check if a process holding the lock is still running."""
     try:
         with open(lock_file, 'r') as f:
-            pid = int(f.read().strip())
+            contents = f.read().strip() 
+
+            pid = int(re.search("pid=(.+)$", contents, re.MULTILINE).group(1))
+            guid = re.search("guid=(.+)$", contents, re.MULTILINE).group(1)
+            debugpy_port = re.search("debugpy_port=(.+)$", contents, re.MULTILINE).group(1)
+            
             if psutil.pid_exists(pid):
-                return pid  # Process is still running
+                # Process is still running
+                return {
+                    "pid": pid, 
+                    "guid": guid,
+                    "debugpy_port":debugpy_port,
+                }
     except (ValueError, FileNotFoundError):
         pass
-    return False
+    return {}
 
 from pathlib import Path
 import sys
 
-def get_xlpro_lockfile_path() -> Path:
-    xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
+def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
+    if interpreter_path is not None:
+        xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
+    else:
+        xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
     return xlpro_dir / "xlpro.lock"
+
+def get_xlpro_lockfile_path_parent(interpreter_path:Path=None) -> Path:
+    if interpreter_path is not None:
+        xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
+    else:
+        xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
+    return xlpro_dir
+
 
 if __name__ == "__main__":
     import config
@@ -142,9 +185,9 @@ if __name__ == "__main__":
     p = config.xlpro_lock_path
 
     try:
-        handle = acquire_file_and_write_pid(p)
+        handle = acquire_file_and_write_datas(p)
     except Exception as e:
-        b = check_existing_lock_and_pid(p)
+        b = check_lockfile_get_contents_as_dict_if_alive(p)
         pass
     close_file(handle)
 

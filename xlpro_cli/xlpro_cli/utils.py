@@ -14,6 +14,9 @@ import uuid
 import shutil
 import socket
 import winreg
+import psutil
+from pathlib import Path
+import sys
 
 
 logging.basicConfig(
@@ -36,8 +39,7 @@ else:
     # XLPRO_WD = (Path() / "xlpro_install").resolve()
     XLPRO_WD = Path() / "C:/Users/Daniel Evans/.xlpro"
 
-print("cwd is " + os.getcwd())
-print("cwd is " + os.getcwd())
+# print("cwd is " + os.getcwd())
 # XLPRO_ROOT_PATH = XLPRO_WD / "xlpro_install"
 XLPRO_ROOT_PATH = XLPRO_WD
 XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
@@ -84,7 +86,6 @@ style_error_boldface = style_error + Style.parse("bold")
 
 style_warning = Style(color="#FFA500")
 style_warning_boldface = style_warning + Style.parse("bold")
-
 
 
 def initialize_xlpro_install_directory():
@@ -986,18 +987,66 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
 def install_requirements(py_interpreter_path:Path, requirements:list[str]):
     if not py_interpreter_path.is_absolute():
         raise Exception("path must be absolute")
-    result = subprocess.run(
+    # for r in requirements:
+    # result = subprocess.run(
+    #     [
+    #         "uv",
+    #         "pip",
+    #         "install",
+    #         "--python",
+    #         str(py_interpreter_path),
+    #         # r
+    #     ] + requirements,
+    #     check=True,
+    #     capture_output=True,
+    #     text=True
+    # )
+    process = subprocess.Popen(
         [
             "uv",
             "pip",
             "install",
             "--python",
             str(py_interpreter_path),
-        ] + requirements,
+            "pip"
+        ],
         check=True,
-        capture_output=True,
-        text=True
+        # capture_output=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+    for line in process.stdout:
+        print(line, end='')  # Print each line from stdout immediately
+    for line in process.stderr:
+        print(line, end='', file=sys.stderr)  # Print stderr immediately
+    # Wait for the subprocess to finish
+    process.wait()
+
+    path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
+    process = subprocess.Popen(
+        [
+            str(py_interpreter_path),
+            "-m"
+            "pip",
+            "install",
+            "-e",
+            f"{str(path_to_xlpro)}",
+        ],
+        # check=True,
+        # capture_output=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    for line in process.stdout:
+        print(line, end='')  # Print each line from stdout immediately
+    for line in process.stderr:
+        print(line, end='', file=sys.stderr)  # Print stderr immediately
+    # Wait for the subprocess to finish
+    process.wait()
+
+    pass
 
 def get_xlpro_whl_fp():
     fps = list(XLPRO_ASSETS_DIR.glob("*.whl"))
@@ -1009,12 +1058,13 @@ def get_xlpro_whl_fp():
 
 def install_default_requirements(py_interpreter_path:Path):
     # path_to_xlpro = Path().resolve()
-    path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro")
-    path_to_xlpro = get_xlpro_whl_fp()
-    reqs = [
-        "pip",
-        str(path_to_xlpro)
-    ]
+    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
+    # path_to_xlpro = get_xlpro_whl_fp()
+    # reqs = [
+    #     "pip",
+    #     f"-e \"{str(path_to_xlpro)}\"",
+    # ]
+    reqs = []
     print_info(f"Installing default requirements for {py_interpreter_path}")
     install_requirements(py_interpreter_path=py_interpreter_path, requirements=reqs)
     print_success(f"Default requirements installed for {py_interpreter_path}")
@@ -1166,35 +1216,146 @@ def read_xlpro_debug_configuration_port(workbook_path:Path):
     return ret
 
 
+# XXX - todo unify this across xlpro_module...
+def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
+    """Check if a process holding the lock is still running."""
+    try:
+        with open(lock_file, 'r') as f:
+            contents = f.read().strip() 
+
+            pid = re.search("pid=(.+)$", contents, re.MULTILINE).group(1)
+            guid = re.search("guid=(.+)$", contents, re.MULTILINE).group(1)
+            debugpy_port = re.search("debugpy_port=(.+)$", contents, re.MULTILINE).group(1)
+            
+            if psutil.pid_exists(pid):
+                # Process is still running
+                return {
+                    "pid": pid, 
+                    "guid": guid,
+                    "debugpy_port":debugpy_port,
+                }
+    except (ValueError, FileNotFoundError):
+        pass
+    return {}
+
+# XXX - todo unify this across xlpro_module...
+def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
+    if interpreter_path is not None:
+        xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
+    else:
+        xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
+    return xlpro_dir / "xlpro.lock"
+
+
+def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str, int]|None:
+    # get the interpreter from the workbook to determine the lockfile name
+    xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+    interpreter_path = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
+
+    import xlpro.file_lock
+    # SEE RUN_SERVER LINE 102
+    xlpro_lock_fp = xlpro.file_lock.get_xlpro_lockfile_path_parent(interpreter_path=interpreter_path) / f"{workbook_path.name}.xlpro.lock"
+    lockfile_contents_dict = xlpro.file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
+    # xlpro_lock_fp = get_xlpro_lockfile_path(interpreter_path=interpreter_path)
+    # lockfile_contents_dict = check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
+
+    # if we get data back, the process is alive so we should use this data.
+    if lockfile_contents_dict:
+        pid, guid, debugpy_port = [lockfile_contents_dict.get(x) for x in ("pid", "guid", "debugpy_port")]
+        return pid, guid, debugpy_port
+    
+    return 
+
+
+def get_interpreter_pid(interpreter_path:Path):
+    check = get_running_pid_guid_port_for_workbook(interpreter_path)
+    if check is not None:
+        pid, guid, port = check
+        return pid
+    
+def get_interpreter_guid(interpreter_path:Path):
+    """gets the guid of the running interpreter"""
+    check = get_running_pid_guid_port_for_workbook(interpreter_path)
+    if check is not None:
+        pid, guid, port = check
+        return guid
+    
+def get_interpreter_port(interpreter_path:Path):
+    check = get_running_pid_guid_port_for_workbook(interpreter_path)
+    if check is not None:
+        pid, guid, port = check
+        return port
+        
+
 def start_venv_xlpro_server_for_workbook(workbook_path:Path):
     """spins up the xlpro server on a port specified in the launch.json debug configuration"""
 
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+
+    if py_interpreter_root_dir is None:
+        print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
+        input("Press enter to exit")
+        sys.exit()
+
     py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
     # look for the current launch json configuration
     port = read_xlpro_debug_configuration_port(workbook_path)
     workbook_xlpro_wd = get_xlpro_workbook_directory(workbook_path)
 
+    # existing_port = get_interpreter_port(py_interpreter_path)
+    # if existing_port:
+    #     port = existing_port
+        
     if not check_port("localhost", port):
         print_warning(f"currently specified port {port} in launch.json is not available, finding another")
         port = get_free_port()
         print_info(f"free port found, {port}")
         write_launch_json(workbook_xlpro_wd, port)
     
+    # guid = None
+    # # overwrite the port and guid
+    # check = get_running_pid_guid_port_for_interpreter(py_interpreter_path)
+    # if check:
+    #     pid, guid, port = check
+    #     print_info(f"Existing server found at pid:{pid}, guid:{guid}, port:{port}")
+
     update_workbook_debugpy_port(workbook_path=workbook_path, port=port)
     print_info(f"spinning up xlpro server for {py_interpreter_path} with debugpy port {port}")
     # if a python process already exists based on the lockfile, this will close itself!
-    result = subprocess.Popen(
+    process = subprocess.Popen(
         [
             str(py_interpreter_path),
             # "-Xfrozen_modules=off"
             "-m",
             "xlpro.run_server",
             f"--debugpy_port={str(port)}",
+            f"--workbook_path={str(workbook_path)}"
         ],
         creationflags=subprocess.CREATE_NEW_CONSOLE,
+        text=True,
+        # stdout=subprocess.PIPE,
+        # stderr=subprocess.PIPE,
     )
-    pid = result.pid
+    # timeout_sec = 10 # seconds
+    # t0 = time.time()
+    # exit_message = "XLPROSTART_TRIGGER_OK"
+    
+    # for line in process.stdout:
+    #     print(val:=line.decode("utf-8"), end='')  # Print each line from stdout immediately
+    #     if exit_message in val:
+    #         print(f"Trigger message {exit_message} encountered in stdout, no need to continue breaking")
+    #         break
+
+    # for line in process.stderr:
+    #     print(line, end='\n', file=sys.stderr)  # Print stderr immediately
+
+    # if time.time() - t0 > timeout_sec:
+    #     raise TimeoutError()
+
+    # process.wait()
+
+    # result_pid = result.pid
+    pass
 
 
 def add_to_user_path(p:Path):

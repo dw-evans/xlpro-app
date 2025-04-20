@@ -83,7 +83,7 @@ class xlproServer:
         "__dev_shutdown",
     ]
     # _reg_progid_ = config.progid
-    _reg_clsid_ = cfg.clsid
+    _reg_clsid_ = "undefined"
 
     _instance = None  # Singleton instance
     _instance_initialized = False

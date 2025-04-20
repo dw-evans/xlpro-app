@@ -24,8 +24,34 @@
             "request":"launch",
             "program":"xlpro_cli/main.py",
             "args": [
-                "init",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
+                // "init",
+                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
+                // "guid",
+                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
+                // "init",
+                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+                "start",
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+            ],
+        },
+        {
+            "name":"xlpro_cli.main start",
+            "type":"debugpy",
+            "request":"launch",
+            "program":"xlpro_cli/main.py",
+            "args": [
+                "start",
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+            ],
+        },
+        {
+            "name":"xlpro_cli.main guid",
+            "type":"debugpy",
+            "request":"launch",
+            "program":"xlpro_cli/main.py",
+            "args": [
+                "guid",
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
             ],
         },
         {
@@ -44,7 +70,7 @@
             "subProcess": true,
             "connect":{
                 "host":"localhost",
-                "port":63719
+                "port":5679
             },
             "pathMappings":[
                 {

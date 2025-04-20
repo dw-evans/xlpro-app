@@ -164,6 +164,12 @@ def function_template_with_caller(func:Callable) -> str:
 
     from xlpro import server 
 
+    # what was I thinking here, it is already resolved ffs...
+    """
+    Dim guid As String
+    guid = Application.Run("'xlpro.xlam'!xlpro_static.get_workbook_guid_map_value", ThisWorkbook.Name)
+    """
+
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
     Set xlpro = GetObject("new: {server.xlproServer._reg_clsid_}")
