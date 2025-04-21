@@ -95,12 +95,13 @@ def serve():
 
     logger.debug(f"serve() being run at root directory: {os.getcwd()}")
 
-    # debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
-    
-    print("warning, manual debugging configured...")
-    debugpy.listen(("localhost", 5679),)
-    print("waiting for client")
-    debugpy.wait_for_client()
+    if True:
+        debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
+    else:
+        print("warning, manual debugging configured...")
+        debugpy.listen(("localhost", 5679),)
+        print("waiting for client")
+        debugpy.wait_for_client()
 
     logger.info(f"ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
     # debugpy.wait_for_client()

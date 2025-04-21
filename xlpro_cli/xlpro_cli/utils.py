@@ -1010,7 +1010,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
             str(py_interpreter_path),
             "pip"
         ],
-        check=True,
+        # check=True,
         # capture_output=True,
         text=True,
         stdout=subprocess.PIPE,
@@ -1175,19 +1175,27 @@ def get_free_port() -> int:
         return port
 
 
-def check_port(host, port):
+def check_port_old(host, port):
     try:
         # Create a socket object
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)  # Optional: Set timeout to avoid hanging forever
+        sock.settimeout(5)  # Optional: Set timeout to avoid hanging forever
         # Try to connect to the given host and port
         sock.connect((host, port))
-    except socket.error:
+    except socket.error as e:
         return False  # Port is closed or unreachable
     finally:
         sock.close()
     return True  # Port is open
 
+def check_port(host, port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+        
 
 def update_workbook_debugpy_port(workbook_path:Path, port:int) -> None:
     """Takes an xlpro venv interpreter and workbook path, 
@@ -1310,7 +1318,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
         print_warning(f"currently specified port {port} in launch.json is not available, finding another")
         port = get_free_port()
         print_info(f"free port found, {port}")
-        write_launch_json(workbook_xlpro_wd, port)
+        # write_launch_json(workbook_xlpro_wd, port)
     
     # guid = None
     # # overwrite the port and guid
@@ -1341,13 +1349,15 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
     # exit_message = "XLPROSTART_TRIGGER_OK"
     
     # for line in process.stdout:
-    #     print(val:=line.decode("utf-8"), end='')  # Print each line from stdout immediately
-    #     if exit_message in val:
-    #         print(f"Trigger message {exit_message} encountered in stdout, no need to continue breaking")
-    #         break
+    #     print(val:=line, end='')  # Print each line from stdout immediately
+    #     # if exit_message in val:
+    #     #     print(f"Trigger message {exit_message} encountered in stdout, no need to continue breaking")
+    #     #     break
 
     # for line in process.stderr:
-    #     print(line, end='\n', file=sys.stderr)  # Print stderr immediately
+    #     print(line, end='', file=sys.stderr)  # Print stderr immediately
+
+    # input("press enter to exit")
 
     # if time.time() - t0 > timeout_sec:
     #     raise TimeoutError()

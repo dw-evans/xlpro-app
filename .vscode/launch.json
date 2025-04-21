@@ -19,7 +19,7 @@
             "cwd": "C:/Users/Daniel Evans",
         },
         {
-            "name":"xlpro_cli.main",
+            "name":"xlpro_cli.main init",
             "type":"debugpy",
             "request":"launch",
             "program":"xlpro_cli/main.py",
@@ -30,8 +30,8 @@
                 // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
                 // "init",
                 // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
-                "start",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+                "init",
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
             ],
         },
         {

@@ -295,7 +295,6 @@ class xlproWorkspace:
         logger.info(f"Registering workspace functions...")
         self._temp_module_name = f"{cfg.xlpro_functions_stem}_{self._uid}"
         _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
-        # self._valid_function_names = utils.get_function_names_from_module(self._temp_module_name)
         self.update_module_func_map_wrapper()
 
         logger.info(f"Registration complete.")
