@@ -9,7 +9,7 @@ class VersionInfo:
     EXE_NAME = f"{NAME}-v{VERSION}-installer.exe"
     AUTHOR = "D.Evans"
     DATE = datetime.datetime.now().strftime("%Y-%m-%d")
-    DESCRIPTION_SHORT = "xlpro Windows installer (BETA)"
+    DESCRIPTION_SHORT = "xlpro Windows installer"
     COMPANY_NAME="Dash Software"
 
 import pyinstaller_versionfile

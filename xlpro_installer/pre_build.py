@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import shutil
 
-import xlpro.version
+# import xlpro.version
 
 wd = Path(__file__).parent
 

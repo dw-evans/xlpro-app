@@ -1,32 +1,33 @@
 {
     "version": "2.0.0",
     "tasks": [
+        // {
+        //   "label": "go compile xlpro",
+        //   "type": "shell",
+        //   "command": "go",
+        //   "args": [
+        //     "build",
+        //     "-o",
+        //     "xlpro.exe",
+        //     "src/main.go"
+        //   ],
+        //   "group": {
+        //     "kind": "build",
+        //     "isDefault": false
+        //   },
+        //   "problemMatcher": ["$go"],
+        //   "options": {
+        //     "cwd": "${workspaceFolder}"
+        //   }
+        // },
+
+
+        // xlpro_cli
         {
-          "label": "go compile xlpro",
+          "label": "xlpro_cli build",
           "type": "shell",
-          "command": "go",
-          "args": [
-            "build",
-            "-o",
-            "xlpro.exe",
-            "src/main.go"
-          ],
-          "group": {
-            "kind": "build",
-            "isDefault": false
-          },
-          "problemMatcher": ["$go"],
-          "options": {
-            "cwd": "${workspaceFolder}"
-          }
-        },
-        {
-          "label": "compile xlpro-cli",
-          "type": "shell",
-          "command": "pyinstaller",
-          "args": [
-            "main.spec",
-          ],
+          "command": "${workspaceFolder}/.venv/scripts/pyinstaller.exe",
+          "args": ["main.spec",],
           "group": {
             "kind": "build",
             "isDefault": false
@@ -34,6 +35,62 @@
           "problemMatcher": [],
           "options": {
             "cwd": "${workspaceFolder}/xlpro_cli"
+          }
+        },
+
+
+        // xlpro_module
+        {
+          "label": "xlpro_module build wheel",
+          "type": "shell",
+          "command": "${workspaceFolder}/.venv/scripts/python.exe",
+          "args": ["-m", "build", "--wheel"],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "dependsOn": [],
+          "dependsOrder": "sequence",
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_module"
+          }
+        },
+
+
+        // xlpro_installer
+        {
+          "label": "xlpro_installer pre_build",
+          "type": "shell",
+          "command": "${workspaceFolder}/.venv/scripts/python.exe",
+          "args": ["pre_build.py"],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_installer"
+          }
+        },
+        
+        {
+          "label": "xlpro_installer complete_build",
+          "type": "shell",
+          "command": "${workspaceFolder}/.venv/scripts/pyinstaller.exe",
+          "args": ["main.spec"],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "dependsOn": [
+            "xlpro_installer pre_build",
+            // "xlpro_cli build"
+          ],
+          "dependsOrder": "sequence",
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_installer"
           }
         },
     ]

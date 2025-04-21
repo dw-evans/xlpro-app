@@ -49,7 +49,14 @@ sys.path.insert(0, os.getcwd())
 
 import version
 
+WIP_RELEASE = True
+
+from pathlib import Path
 EXE_NAME = version.VersionInfo.EXE_NAME
+
+if WIP_RELEASE: 
+    EXE_NAME = f"{Path(EXE_NAME).stem}_WIP{Path(EXE_NAME).suffix}"
+
 VERSIONFILE = version.create_version_file_get_path()
 
 a = Analysis(

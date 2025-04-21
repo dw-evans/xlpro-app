@@ -706,6 +706,13 @@ def typ(val):
     ret = str(type(val))
     return ret
 
+# def vectorize(func_name:str, args_list) -> list1d:
+#     ret = []
+#     func = 
+
+#     for args in args_list
+#         ret.append()
+
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)

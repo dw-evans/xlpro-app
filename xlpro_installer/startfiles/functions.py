@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.figure
 
-from win32typelibs import excel as xl
+# from win32typelibs import excel as xl
 
 import numpy as np
 

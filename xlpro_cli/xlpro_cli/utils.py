@@ -18,6 +18,7 @@ import psutil
 from pathlib import Path
 import sys
 
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -25,19 +26,15 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
-
 logger = logging.getLogger(__name__)
-
 
 def is_pyinstaller():
     return hasattr(sys, '_MEIPASS')
 
 if is_pyinstaller():
     XLPRO_WD = Path(sys.executable).parent.resolve()
-    # XLPRO_WD = Path() / "C:/Users/Daniel Evans/.xlpro"
 else:
-    # XLPRO_WD = (Path() / "xlpro_install").resolve()
-    XLPRO_WD = Path() / "C:/Users/Daniel Evans/.xlpro"
+    XLPRO_WD = Path(os.environ.get("USERPROFILE")) / ".xlpro"
 
 # print("cwd is " + os.getcwd())
 # XLPRO_ROOT_PATH = XLPRO_WD / "xlpro_install"
@@ -987,58 +984,78 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
 def install_requirements(py_interpreter_path:Path, requirements:list[str]):
     if not py_interpreter_path.is_absolute():
         raise Exception("path must be absolute")
-    # for r in requirements:
-    # result = subprocess.run(
-    #     [
-    #         "uv",
-    #         "pip",
-    #         "install",
-    #         "--python",
-    #         str(py_interpreter_path),
-    #         # r
-    #     ] + requirements,
-    #     check=True,
-    #     capture_output=True,
-    #     text=True
-    # )
-    process = subprocess.Popen(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            str(py_interpreter_path),
-            "pip"
-        ],
-        # check=True,
-        # capture_output=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    for line in process.stdout:
-        print(line, end='')  # Print each line from stdout immediately
-    for line in process.stderr:
-        print(line, end='', file=sys.stderr)  # Print stderr immediately
-    # Wait for the subprocess to finish
-    process.wait()
+    
+    process = None
 
-    path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
-    process = subprocess.Popen(
-        [
-            str(py_interpreter_path),
-            "-m"
+    def install_editable_reqs():
+        nonlocal process
+        process = subprocess.Popen(
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                str(py_interpreter_path),
+                "pip"
+            ],
+            # check=True,
+            # capture_output=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        for line in process.stdout:
+            print(line, end='')  # Print each line from stdout immediately
+        for line in process.stderr:
+            print(line, end='', file=sys.stderr)  # Print stderr immediately
+        # Wait for the subprocess to finish
+        process.wait()
+
+        # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
+        path_to_xlpro = Path(__file__).parent.parent / "xlpro_module"
+        process = subprocess.Popen(
+            [
+                str(py_interpreter_path),
+                "-m"
+                "pip",
+                "install",
+                "-e",
+                f"{str(path_to_xlpro)}",
+            ],
+            # check=True,
+            # capture_output=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    def install_production_reqs():
+        nonlocal process
+        path_to_xlpro_whl = get_xlpro_whl_fp()
+        reqs = [
             "pip",
-            "install",
-            "-e",
-            f"{str(path_to_xlpro)}",
-        ],
-        # check=True,
-        # capture_output=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+            f"{str(path_to_xlpro_whl)}",
+        ]
+        process = subprocess.Popen(
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                str(py_interpreter_path),
+            ] + requirements,
+            # check=True,
+            # capture_output=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        
+    if DEVELOPMENT_INSTALL:
+        install_editable_reqs()
+    else:
+        install_production_reqs()
+    
     for line in process.stdout:
         print(line, end='')  # Print each line from stdout immediately
     for line in process.stderr:

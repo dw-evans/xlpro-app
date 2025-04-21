@@ -8,6 +8,7 @@ import sys
 import logging
 import version
 
+
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
     # filename=config.logging_path,   # The file where logs will be saved
@@ -95,7 +96,9 @@ def remove_from_user_path(p:Path):
     except Exception as e:
         logger.debug(f"Error removing key: {e}")
 
-XLPRO_INSTALL_DIR = (Path(r"C:\Users\Daniel Evans") / ".xlpro").resolve()
+# XLPRO_INSTALL_DIR = (Path(r"C:\Users\Daniel Evans") / ".xlpro").resolve()
+XLPRO_INSTALL_DIR = (Path(os.environ.get("USERPROFILE")) / ".xlpro").resolve()
+
 XLPRO_TEMP_DIR = XLPRO_INSTALL_DIR / "tmp"
 XLPRO_BIN_DIR = XLPRO_INSTALL_DIR / "bin"
 XLPRO_ENVS_DIR = XLPRO_INSTALL_DIR / "envs"
@@ -222,26 +225,30 @@ def install():
     # install_uv(download=True)
 
 
-
-    xlstart_path = get_xlstart_path()
+    logger.info("copying xlam file")
     dst_xlpro_xlam_path1 = XLPRO_ASSETS_DIR / src_xlpro_xlam_path.name
-
     shutil.copy2(src_xlpro_xlam_path, dst_xlpro_xlam_path1)
 
-    logger.info("Attempting to install xlpro.xlam to XLSTART")
-    dst_xlpro_xlam_path2 = xlstart_path / src_xlpro_xlam_path.name
-    if dst_xlpro_xlam_path2.exists():
-        logger.warning(f"warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
-    else:
-        logger.info("Installing xlpro.xlam to XLSTART")
-        shutil.copy2(dst_xlpro_xlam_path1, dst_xlpro_xlam_path2)
+    try:
+        logger.info("Attempting to install xlpro.xlam to XLSTART")
+        xlstart_path = get_xlstart_path()
+        dst_xlpro_xlam_path2 = xlstart_path / src_xlpro_xlam_path.name
+        if dst_xlpro_xlam_path2.exists():
+            logger.warning(f"warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
+        else:
+            logger.info("Installing xlpro.xlam to XLSTART")
+            shutil.copy2(dst_xlpro_xlam_path1, dst_xlpro_xlam_path2)
+            logger.info("xlpro.xlam added successfully to XLSTART")
+
+    except FileNotFoundError:
+        logger.info(f"Could not locate XLSTART directory")
+
 
     # copy config.toml
     logger.info("Copying config")
     shutil.copy2(src_config_path, XLPRO_INSTALL_DIR / src_config_path.name)
 
-
-    logger.info("Copying startfiles assets")
+    logger.info("Copying startfiles")
     shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)       
 
     logger.info("Copying wheel")
@@ -251,13 +258,119 @@ def install():
     pass
     logger.info("Installation completed successfully.")
 
+
+from rich.console import Console
+from rich.style import Style
+
+console = Console(highlight=False)
+
+style_prompt = Style.parse("green")
+style_prompt_boldface = style_prompt + Style.parse("bold")
+
+style_generic_option = Style.parse("cyan")
+style_selected_option = style_generic_option + Style.parse("bold") + Style.parse("reverse")
+
+style_plain = Style.parse("")
+style_plain_boldface = style_plain + Style.parse("bold")
+
+style_success = Style.parse("green")
+style_success_boldface = style_success + Style.parse("bold")
+
+style_error = Style.parse("red")
+style_error_boldface = style_error + Style.parse("bold")
+
+style_warning = Style(color="#FFA500")
+style_warning_boldface = style_warning + Style.parse("bold")
+
+def prompt_yes_no_input(prompt:str, default:str = "yes") -> str:
+    if not default in ["yes", "no"]:
+        raise Exception
+    
+    lookup = {
+        "yes": "yes",
+        "y": "yes",
+        "no": "no",
+        "n": "no",
+        "": default
+    }
+    def print_prompt():
+        console.print(f"{prompt} ", style=style_prompt_boldface, end="")
+        console.print(f"[{'Y' if default=='yes' else 'y'}/{'N' if default=='no' else 'n'}]:", style=style_prompt)
+        sys.stdout.flush()
+
+    print_prompt()
+    inp = input()
+    while not (v:=inp.lower()) in lookup.keys():
+        console.print(f"{v} not recognized", style=style_error)
+        print_prompt()
+        inp = input()
+    
+    ret = lookup[inp]
+    if ret == "":
+        console.print(default, style=style_plain)
+    return lookup[inp]
+
+def can_delete_all(path):
+    all_ok = True
+    files_to_delete = []
+
+    for root, dirs, files in os.walk(path, topdown=False):
+        for name in files:
+            file_path = os.path.join(root, name)
+            if os.access(file_path, os.W_OK):
+                files_to_delete.append(file_path)
+            else:
+                logger.warning(f"Cannot delete (no write access): {file_path}")
+                all_ok = False
+
+        for name in dirs:
+            dir_path = os.path.join(root, name)
+            if not os.access(dir_path, os.W_OK | os.X_OK):
+                logger.warning(f"Cannot delete directory (no write/execute access): {dir_path}")
+                all_ok = False
+
+
+
+    if all_ok:
+        logger.info("All files and directories are deletable.")
+        logger.info(f"{len(files_to_delete)} files will be deleted.")
+        # logger.info("Files that would be deleted:")
+        # for f in files_to_delete:
+        #     logger.info(f"  {f}")
+    else:
+        logger.critical("Some files or directories cannot be deleted")
+
+    return all_ok
+
+
 def main():
+    if XLPRO_INSTALL_DIR.exists():
+        logger.warning(f"{XLPRO_INSTALL_DIR} already exists, promping user to uninstall")
+        check = prompt_yes_no_input("Would you like to uninstall xlpro?", default="no")
+        if check == "yes":
+            success_check = can_delete_all(str(XLPRO_INSTALL_DIR))
+            if not success_check:
+                logger.error(f"Could not uninstall xlpro at {XLPRO_INSTALL_DIR}, is it still being used?")
+                logger.critical("Uninstallation aborted")
+            try:
+                logger.info("Uninstallation starting")
+                shutil.rmtree(XLPRO_INSTALL_DIR)
+                # uninstall()
+                logger.info("Uninstallation completed successfully")
+            except Exception as e:
+                logger.error(f"error encountered during uninstall: '{e}'")
+                logger.critical("Uninstallation aborted")
+            finally:
+                input("Press enter to exit.")
+                sys.exit()
+        else:
+            logger.info("Ending")
     try:
         install()
     except Exception as e:
-        logger.critical(f"Fatal error encountered: '{e}'")
+        logger.critical(f"Fatal error encountered during installation: '{e}'")
         input("Press enter to exit.")
-        sys.exit(1)
+        sys.exit()
 
 if __name__ == "__main__":
     main()
