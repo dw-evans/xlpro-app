@@ -172,7 +172,7 @@ def function_template_with_caller(func:Callable) -> str:
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
-    Set xlpro = GetObject("new: {server.xlproServer._reg_clsid_}")
+    Set xlpro = GetObject("new: " & xlpro_guid)
 {'\n'.join(arg_range_conversion_check_list)}
     {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
@@ -199,9 +199,11 @@ def write_to_vb_module(s:str, vb_codemod:"vbide._CodeModule"):
     pass
 
 def init_xlpro_vb_dynamic_component(wb:"xl._Workbook", func_register:list[Callable]):
+    raise NotImplementedError("Obsoleted due to memory issues when calling this from Python")
     """Write a list of commands to be registered in vba."""
     vb_dynamic_comdemod = get_or_create_codemodule(wb, VB_DYNAMIC_MODULE_NAME)
     s_list = []
+
     for f in func_register:
         if not isinstance(f, Callable):
             raise TypeError(f"Item must be a function, {type(f)}, {f}")
@@ -215,6 +217,10 @@ def init_xlpro_vb_dynamic_component(wb:"xl._Workbook", func_register:list[Callab
 
 def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str:
     s_list = []
+
+    from xlpro import server 
+    s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
+
     for f in func_register:
         if not isinstance(f, Callable):
             raise TypeError(f"Item must be a function, {type(f)}, {f}")
@@ -472,11 +478,13 @@ def pre_validate_args(args:tuple|list, kwargs:dict):
         pre_validate_arg(arg=arg)
         
 def pre_validate_arg(arg):
-    if is_arg_promise(arg):
+    if arg is None:
+        raise errors.ExcelArugmentIsNoneException()
+    elif is_arg_promise(arg):
         raise errors.ArugmentNotReadyException()
-    if isinstance(arg, Exception):
+    elif isinstance(arg, Exception):
         raise errors.xlproArgumentExceptionError()
-    if is_arg_stringified_exception(arg):
+    elif is_arg_stringified_exception(arg):
         raise errors.xlproArgumentExceptionError()
 
 

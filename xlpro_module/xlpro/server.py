@@ -492,6 +492,8 @@ class xlproWorkspace:
             except Exception as e:
                 if isinstance(e, errors.ArugmentNotReadyException):
                     pass
+                elif isinstance(e, errors.ExcelArugmentIsNoneException):
+                    pass
                 elif isinstance(e, errors.xlproArgumentExceptionError):
                     pass
                 elif isinstance(e, errors.ExcelNotAccessibleError):
@@ -834,7 +836,8 @@ class ResultsManager:
         # if the result is an exception - we need to handle it
         if isinstance(val, Exception):
             # if the arguments weren't ready - ignore the process request
-            if isinstance(val, errors.ArugmentNotReadyException):
+            # if isinstance(val, errors.ArugmentNotReadyException):
+            if isinstance(val, (errors.ArugmentNotReadyException, errors.ExcelArugmentIsNoneException)):
                 logger.debug(f"Arguments not ready for uid '{uid}', recycling function...")
 
                 # logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
@@ -961,11 +964,16 @@ class ClientManager:
 
             # update by resetting the formula
             caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+            # self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
             logger.error(f"Error during client update: '{uid}', {e}")
-
+        finally:
+            try:
+                self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+            except:
+                pass
+        
     def _update_client_default_result(self, uid) -> None:
         """Update the data for the default case (row-major arrays, strings, values)"""
         try:
@@ -1072,7 +1080,6 @@ class ClientManager:
                 elif isinstance(value, matplotlib.figure.Figure):
                     self._update_client_pyobject_result(uid)
 
-
                 elif result_type == FunctionTypes.array_or_value:
                     self._update_client_default_result(uid)
                 elif result_type == FunctionTypes.py_object:
@@ -1093,7 +1100,7 @@ class ClientManager:
                     # Call rejected - excel might be in a dialogue 
                     logger.debug("VB Error - Call rejected, recycling in queue")
                 else:
-                    logger.debug(f"Other COM Error occurred, {e}")
+                    logger.debug(f"Other COM Error occurred, {e}, recycling in queue")
 
                 logger.info(f"Could not recalculate caller_dispatch for uid: '{uid}'")
 
