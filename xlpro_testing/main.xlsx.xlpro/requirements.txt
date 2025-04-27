@@ -27,4 +27,4 @@ toml==0.10.2
 typer==0.15.2
 typing-extensions==4.13.2
 tzdata==2025.2
--e file:///C:/Users/Daniel%20Evans/projects/xlpro/xlpro_module
+xlpro @ file:///C:/Users/Daniel%20Evans/.xlpro/assets/xlpro-0.1.0.0-py3-none-any.whl

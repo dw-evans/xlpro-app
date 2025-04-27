@@ -17,6 +17,7 @@ paths = [
     f"../xlpro_module/config.toml",
     f"../xlpro_addin/xlpro.xlam",
     f"../xlpro_cli/dist/xlpro-cli.exe",
+    f"../xlpro_module/examples",
 ]
 
 out_dir = wd / "assets"

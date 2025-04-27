@@ -84,8 +84,9 @@
             "isDefault": false
           },
           "dependsOn": [
+            "xlpro_module build wheel",
+            "xlpro_cli build",
             "xlpro_installer pre_build",
-            // "xlpro_cli build"
           ],
           "dependsOrder": "sequence",
           "problemMatcher": [],

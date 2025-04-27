@@ -49,7 +49,7 @@ def handle_get_guid(args):
     pass
 
 
-XLPRO_INSTALL_DIR = (Path() / "xlpro_install").resolve()
+XLPRO_INSTALL_DIR = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
 XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
 
 def configure_env():

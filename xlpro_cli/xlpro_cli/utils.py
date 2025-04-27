@@ -580,8 +580,8 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
 
 
 def write_requirements_txt_for_workbook(workbook_path:Path):
-    xlpro_py_interpreter = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
-    if not xlpro_py_interpreter:
+    xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+    if not xlpro_venv_root_path:
         print_error("interpreter does not exist to write requirements.txt, exiting function")
         return
     write_requirements_txt_to_folder(
@@ -1043,7 +1043,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
                 "install",
                 "--python",
                 str(py_interpreter_path),
-            ] + requirements,
+            ] + reqs,
             # check=True,
             # capture_output=True,
             text=True,

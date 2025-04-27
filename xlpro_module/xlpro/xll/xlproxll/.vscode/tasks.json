@@ -7,7 +7,7 @@
         "command": "dotnet build",
         "group": {
           "kind": "build",
-          "isDefault": true
+          "isDefault": false
         },
         "problemMatcher": "$msCompile",
         "detail": "Builds the project and packages the XLL"
@@ -19,6 +19,10 @@
         "args": [
           "${workspaceFolder}/bin/Debug/net6.0-windows/xlproxll-AddIn.dna"
         ],
+        "group": {
+          "kind": "build",
+          "isDefault": false
+        },
         "dependsOn": ["Build and Package XLL"],
         "problemMatcher": []
       }

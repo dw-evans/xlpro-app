@@ -8,6 +8,7 @@ import sys
 import logging
 import version
 
+DEVELOPMENT_BUILD = False
 
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
@@ -221,9 +222,12 @@ def install():
 
     logger.info("Downloading uv")
     # install uv.exe in the /bin directory
-    install_uv(download=False)
-    # install_uv(download=True)
-
+    if DEVELOPMENT_BUILD:
+        logger.info("Fetching local uv (developer build)")
+        install_uv(download=False)
+    else:
+        logger.info("Downloading uv (production build)")
+        install_uv(download=True)
 
     logger.info("copying xlam file")
     dst_xlpro_xlam_path1 = XLPRO_ASSETS_DIR / src_xlpro_xlam_path.name
@@ -249,7 +253,10 @@ def install():
     shutil.copy2(src_config_path, XLPRO_INSTALL_DIR / src_config_path.name)
 
     logger.info("Copying startfiles")
-    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)       
+    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)    
+
+    logger.info("Copying examples")
+    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "examples"), XLPRO_ASSETS_DIR / x.name)       
 
     logger.info("Copying wheel")
     shutil.copy2(x:=(list(XLPRO_INSTALLER_ASSETS_DIR.glob("*.whl"))[0]), XLPRO_ASSETS_DIR / x.name)       
