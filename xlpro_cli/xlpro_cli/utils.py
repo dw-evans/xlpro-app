@@ -18,7 +18,7 @@ import psutil
 from pathlib import Path
 import sys
 
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -1012,7 +1012,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         process.wait()
 
         # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
-        path_to_xlpro = Path(__file__).parent.parent / "xlpro_module"
+        path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro_module"
         process = subprocess.Popen(
             [
                 str(py_interpreter_path),

@@ -31,7 +31,7 @@ wd = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
 from xlpro import _utils
-from xlpro._wrappers import ModuleFunctionMapsWrapper
+from xlpro._wrappers import ModuleFunctionMapsWrapper, ModuleSubMapsWrapper
 from xlpro._enums import FunctionTypes
 from xlpro import _wrappers
 import regex as re
@@ -65,6 +65,10 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
 def get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     return workbook_path.parent / f"{workbook_path.name}.xlpro"
 
+
+SUB_CALLER_FLAG_STRING = "SUB_CALLER_FLAG_STRING"
+
+
 class xlproServer:
     _public_methods_ = [
         "getpid",
@@ -74,11 +78,13 @@ class xlproServer:
         "register_functions_in_workspace",
 
         "execute_function_async",
+        "execute_sub_async",
 
         "shutdown_workspace",
         "shutdown",
 
         "get_vba_sync_text",
+        "get_vba_sync_text_subs",
 
         "__dev_shutdown",
     ]
@@ -181,10 +187,18 @@ class xlproServer:
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.execute_function_async(caller=caller, fname=func_name, args=args)
 
+    def execute_sub_async(self, wb_dispatch, func_name):
+        # marshalling ok afaik - excel vba interface
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        return workspace.execute_sub_async(fname=func_name)
+
+
     def register_functions_in_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        workspace.register_functions_in_self()
+        # workspace.register_functions_in_self()
+        workspace.register_subs_in_self()
+        pass
 
     def register_functions_in_vba(self, wb_dispatch):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
@@ -216,6 +230,10 @@ class xlproServer:
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.get_vba_sync_text()
+    def get_vba_sync_text_subs(self, wb_dispatch):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        return workspace.get_vba_sync_text_subs()
+
     
     def get_workspace_from_uid_thread_safe(self, uid) -> xlproWorkspace:
         with self._workspace_uid_to_workbook_path_lock:
@@ -275,6 +293,9 @@ class xlproWorkspace:
         self._worker_manager = WorkerManager(server=self)
         self._worker_manager.start()
 
+        # self._sub_worker_manager = SubWorkerManager(server=self)
+        # self._sub_worker_manager.start()
+
         self._func_hash_subthread_map = {}
         # self._func_hash_fig_generating_thread_map = {}
 
@@ -296,35 +317,67 @@ class xlproWorkspace:
         self._temp_module_name = f"{cfg.xlpro_functions_stem}_{self._uid}"
         _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
         self.update_module_func_map_wrapper()
+        logger.info(f"Registration complete.")
 
+    def register_subs_in_self(self):
+        logger.info(f"Registering workspace subroutines...")
+        self._sub_module_name = f"{cfg.xlpro_subroutines_stem}_{self._uid}"
+        _wrappers.import_module_subs_with_registration(self._sub_module_name, self._wd / f"{cfg.xlpro_subroutines_stem}.py")
+        self.update_module_sub_map_wrapper()
         logger.info(f"Registration complete.")
 
     def get_active_registered_functon_names(self):
         return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
+    def get_active_registered_sub_names(self):
+        return [k for k, isactive in self._module_sub_maps_wrapper.subname_isactive_register.items() if isactive]
     
     def get_active_registered_functions(self):
         keys = self.get_active_registered_functon_names()
         return [self._module_function_maps_wrapper.fname_func_register[key] for key in keys]
+    def get_active_registered_subs(self):
+        keys = self.get_active_registered_sub_names()
+        return [self._module_sub_maps_wrapper.subname_func_register[key] for key in keys]
     
     def deregister_functions_in_self(self):
         logger.info(f"Deregistering workspace functions...")
-        self._valid_function_names = []
+        # self._valid_function_names = []
         if self._temp_module_name is not None:
-            del sys.modules[self._temp_module_name]
+            try:
+                del sys.modules[self._temp_module_name]
+            except KeyError:
+                pass
+        logger.info(f"Deregistration complete.")
+    def deregister_subs_in_self(self):
+        logger.info(f"Deregistering workspace subs...")
+        # self._valid_function_names = []
+        if self._temp_module_name is not None:
+            try:
+                del sys.modules[self._temp_module_name]
+            except KeyError:
+                pass
         logger.info(f"Deregistration complete.")
 
     def update_module_func_map_wrapper(self):
         self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
+    def update_module_sub_map_wrapper(self):
+        self._module_sub_maps_wrapper = ModuleSubMapsWrapper(self._sub_module_name)
+
 
     def reset(self):
         # self._configure_xlpro_files()
         logger.info("Resetting workspace")
         self.deregister_functions_in_self()
         self.register_functions_in_self()
+
+        self.deregister_subs_in_self()
+        self.register_subs_in_self()
+
         self.reset_workspace_cache()
 
     def _get_function_by_name(self, fname):
         return self._module_function_maps_wrapper.fname_func_register[fname]
+    def _get_sub_by_name(self, fname):
+        return self._module_sub_maps_wrapper.subname_func_register[fname]
 
     def reset_workspace_cache(self):
         logger.debug("Initializing hashmaps")
@@ -388,32 +441,55 @@ class xlproWorkspace:
     def hash_excel_function_call(*args:typing.Iterable[str]):
         return _utils.hash_str(", ".join([str(x) for x in args]))
 
+    def execute_sub_async(self, fname):
+        try:
+            func = self._get_sub_by_name(fname)
+            if not func:
+                raise Exception(f"Function {fname} not found.")
+
+            import uuid
+            uid = SUB_CALLER_FLAG_STRING + str(uuid.uuid4())
+
+            logger.debug(f"Calling subroutine '{fname}', uid: '{uid}'")
+
+            # xxx - todo - hack to signal the clientmanager to skip!
+            caller_stream = SUB_CALLER_FLAG_STRING    
+            
+            with self._uid_to_caller_map_lock:
+                self._uid_to_caller_map[uid] = caller_stream
+
+            # configure default state for result and iscomplete status
+            # with self._uid_result_display_map_lock:
+                # self._uid_result_display_map[uid] = f"Promise<{uid}>"
+            with self._uid_result_iscomplete_map_lock:
+                self._uid_result_iscomplete_map[uid] = False
+
+            f = self.create_worker_func_sub(uid, func, args=tuple(), kwargs={})
+            with self._uid_pending_function_map_lock:
+                self._uid_pending_function_map[uid] = f
+            self._pending_function_queue.put(uid)
+            self._worker_manager.wake()
+            return
+        
+        # Return the python exception string as a fallback
+        except Exception as e:
+            logger.critical("error during execute_sub_async please rectify!")
+            raise e
+            # sys.exit()
+            # return 
+            # return repr(errors.xlproUnhandledException(repr(e)))
+        
     def execute_function_async(self, caller, fname, args):
         try:
-            # if None in args:
-            #     logger.warning(f"None found in args from excel, skipping...")
-            #     return
-            
             func = self._get_function_by_name(fname)
-
             if not func:
                 raise Exception(f"Function {fname} not found.")
             
             uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args)
-            # uid = xlproWorkspace._hash_excel_function_call(caller.Address, fname, *args)
-
-            
-            # for x in args:
-            #     if isinstance(x, str):
-            #         if m:= re.match("^Promise<(.+)>", x):
-            #             logger.warning("Promise found in args, skipping")
-            #             return
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
             self._uid_args_cache[uid] = args
-            if "hello" in args:
-                pass
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
@@ -449,9 +525,6 @@ class xlproWorkspace:
                 self._uid_result_display_map[uid] = f"Promise<{uid}>"
             with self._uid_result_iscomplete_map_lock:
                 self._uid_result_iscomplete_map[uid] = False
-
-            # import json
-            # print(json.dumps(self._get_uid_debug_info(uid) , indent=4))
 
             # handle different function types
             # if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
@@ -507,6 +580,20 @@ class xlproWorkspace:
             self._results_manager_thread.wake()
         
         return worker
+    
+    def create_worker_func_sub(self, uid, func, args, kwargs):
+        def worker():
+            try:
+                ret = func(*args, **kwargs)
+                self._result_queue.put((uid, ret))
+                logger.info(f"Completed function '{uid}' successfully")
+            except Exception as e:
+                self._result_queue.put((uid, e))
+                logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
+            logger.debug("Waking results manager from worker thread...")
+            self._results_manager_thread.wake()
+        
+        return worker
             
     def shutdown(self):
         for uid, t in self._func_hash_subthread_map.items():
@@ -522,6 +609,9 @@ class xlproWorkspace:
     def get_vba_sync_text(self) -> str:
         funcs = self.get_active_registered_functions()
         return _utils.get_xlpro_vb_dynamic_component_contents(funcs)
+    def get_vba_sync_text_subs(self) -> str:
+        subs = self.get_active_registered_subs()
+        return _utils.get_xlpro_vb_dynamic_component_contents_subs(subs)
     
     def get_caller_stream(self, uid):
         with self._uid_to_caller_map_lock:
@@ -671,6 +761,7 @@ class FigureGeneratingThread:
         # the return queue should always be the server value return queue 
         self._return_queue.put((uid, val))
         self._return_event.set()
+
 
 
 class WorkerManager:
@@ -1065,15 +1156,29 @@ class ClientManager:
                     return
 
             pass
+
+            # xxx - todo - hack to skip checks on subroutines
+            # subroutines will never need to be recycled by the client manager
+            # subroutines will be recycled by the results manager since there will
+            # never be any result to reach the client.
+            # so we are ok to just skip the loop here, happy days.
+            caller_dispatch = self._server.get_caller_stream(uid)
+            if caller_dispatch is SUB_CALLER_FLAG_STRING:
+                logger.debug("caller_dispatched checked as None, assuming this is a subroutine and skipping further.")
+                time.sleep(0.01) # copy the fairness sleep
+                continue
+            
             # fetch the result type so we know how to handle it
             with self._server._uid_result_type_map_lock:
                 result_type = self._server._uid_result_type_map[uid]
+
             # if we fail to dispatch the range, it was probably deleted.
             # therefore we don't need to replace it in the queue
             replace_in_queue = True
 
             # Decide whether to recycle
             try:
+
                 value = self._get_value(uid)
                 if type(value) == xlproImage:
                     self._update_client_image_result(uid)

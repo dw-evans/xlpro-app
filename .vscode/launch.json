@@ -54,15 +54,18 @@
                 "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
             ],
         },
-        {
-            "name":"Python Debugger: Module",
-            "type":"debugpy",
-            "request":"launch",
-            "module":"xlpro.run_server",
-            "args": [
-                "--debugpy_port=5678"
-            ]
-        },
+        // {
+        //     "name":"xlpro_module run server on port",
+        //     "type":"debugpy",
+        //     "request":"launch",
+        //     "module":"xlpro.run_server",
+        //     "args": [
+        //         "--workbook_path",
+        //         "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx",
+        //         "--debugpy_port",
+        //         "5678"
+        //     ]
+        // },
         {
             "name":"debugpy: remote port",
             "type":"debugpy",
@@ -70,7 +73,7 @@
             "subProcess": true,
             "connect":{
                 "host":"localhost",
-                "port":64923
+                "port":63915
             },
             "pathMappings":[
                 {

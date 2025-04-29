@@ -248,23 +248,28 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description="Build or extract VBA project files.")
     parser.add_argument('--build', action='store_true', help='Build a VBA project into an .xlam file.')
-    parser.add_argument('--extract', action='store_true', help='Extract VBA project files from an .xlam file.')
+    parser.add_argument('--push', action='store_true', help='Build a VBA project into an .xlam file.')
+    # parser.add_argument('--extract', action='store_true', help='Extract VBA project files from an .xlam file.')
 
     args = parser.parse_args()
+
+    # if args.extract:
+    #     print("Running extract process...")
+    #     extract()
 
     if args.build:
         print("Running build process...")
         build()
+    if args.push:
+        print("Pushing to xlstart...")
+        reload_to_xlstart()
 
-    if args.extract:
-        print("Running extract process...")
-        extract()
 
     if not args.build and not args.extract:
         print("No action provided. Use --build or --extract.")
 
 
 if __name__ == "__main__":
-    # extract()
-    build()
-    reload_to_xlstart()
+    main()
+    # build()
+    # reload_to_xlstart()

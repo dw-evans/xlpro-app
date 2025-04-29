@@ -3,6 +3,41 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 23:19:47
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 23:17:31
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 21:48:32
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 21:48:15
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 21:33:05
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
 ' At 2025-04-29, 19:50:33
 ' ### END METADATA ###
 
@@ -329,10 +364,12 @@ End Sub
 
 ' Replacement synchronization functions
 Sub write_vba_sync_module(ByRef wb As Workbook)
-    Dim contents As String
-    Dim comp_name As String
-    contents = get_vba_sync_text(wb)
-    write_text_to_module wb, "xlpro_async", contents
+    Dim contents1 As String
+    contents1 = get_vba_sync_text(wb)
+    write_text_to_module wb, "xlpro_async", contents1
+    Dim contents2 As String
+    contents2 = get_vba_sync_text_subs(wb)
+    write_text_to_module wb, "xlpro_async_subs", contents2
 End Sub
 
 Function get_vba_sync_text(wb As Workbook) As String
@@ -347,6 +384,15 @@ Function get_vba_sync_text(wb As Workbook) As String
 '           vbExclamation, "Warning"
 '    Err.Clear
 '    Exit Function
+
+End Function
+Function get_vba_sync_text_subs(wb As Workbook) As String
+    Dim xlpro_async As Object
+    Dim guid As String
+    guid = get_workbook_guid_map_value(wb.Name)
+    Set xlpro_async = GetObject("new: " & guid)
+    get_vba_sync_text_subs = xlpro_async.get_vba_sync_text_subs(wb)
+    
 End Function
 
 Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As String)

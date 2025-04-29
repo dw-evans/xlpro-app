@@ -144,31 +144,7 @@ def function_template_with_caller(func:Callable) -> str:
     
     a_list = [a for a, t in args_and_types]
 
-    # # handle the reserved caller keyword
-    # arg_idxs_to_del = []
-    # if "caller" in a_list:
-    #     indx = a_list.index("caller")
-    #     arg_idxs_to_del.append(indx)
-    #     arg_conversion_list[indx] = "Application.Caller"
-    
-    # # handle the reserved ActiveWorkbook keyword (pseudo thisworkbook...)
-    # if "thiswb" in a_list:
-    #     indx = a_list.index("thiswb")
-    #     arg_idxs_to_del.append(indx)
-    #     arg_conversion_list[indx] = "ActiveWorkbook"
-
-    # if arg_idxs_to_del:
-    #     arg_idxs_to_del.sort(reverse=True)
-    #     for idx in arg_idxs_to_del:
-    #         del arg_declaration_list[idx]
-
     from xlpro import server 
-
-    # what was I thinking here, it is already resolved ffs...
-    """
-    Dim guid As String
-    guid = Application.Run("'xlpro.xlam'!xlpro_static.get_workbook_guid_map_value", ThisWorkbook.Name)
-    """
 
     return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
@@ -176,6 +152,21 @@ def function_template_with_caller(func:Callable) -> str:
 {'\n'.join(arg_range_conversion_check_list)}
     {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
+"""
+
+def sub_template(func:Callable) -> str:
+    """Returns function template string to send to VBA module.
+    If the reserved `caller` argument is used, pass it to the execute function call.
+    """
+    func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+
+    from xlpro import server 
+
+    return f"""Sub {func_name}()
+    Dim xlpro As Object
+    Set xlpro = GetObject("new: " & xlpro_guid)
+    xlpro.{server.xlproServer.execute_sub_async.__name__} ActiveWorkbook, "{func_name}"
+End Sub
 """
 
 def get_or_create_codemodule(wb:"xl._Workbook", c_name:str) -> "vbide._CodeModule":
@@ -227,6 +218,17 @@ def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str
         s_list.append(function_template_with_caller(f))
     return "\n".join(s_list)
 
+def get_xlpro_vb_dynamic_component_contents_subs(func_register:list[Callable]) -> str:
+    s_list = []
+
+    from xlpro import server 
+    s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
+
+    for f in func_register:
+        if not isinstance(f, Callable):
+            raise TypeError(f"Item must be a function, {type(f)}, {f}")
+        s_list.append(sub_template(f))
+    return "\n".join(s_list)
 
 
 # XXX - todo - get a better understsanding of these COM names, they can't be right lol
@@ -341,10 +343,57 @@ def get_udf_valid_functions_from_module(module_name):
     return functions
 
 
+def count_function_args(func):
+    """
+    Returns the number of required and total arguments of a function.
+
+    Args:
+        func (callable): The function to inspect.
+
+    Returns:
+        dict: A dictionary with counts of 'required' and 'total' arguments.
+    """
+    sig = inspect.signature(func)
+    params = sig.parameters.values()
+
+    required_args = [p for p in params if p.default is inspect.Parameter.empty and p.kind in (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY
+    )]
+    
+    total_args = [p for p in params if p.kind in (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY
+    )]
+
+    return len(total_args)
+
+
+def get_sub_valid_functions_from_module(module_name):
+    """For now, only functions wiht no arguments are supported as subroutines."""
+    module = sys.modules[module_name]
+
+    functions = [
+        v
+        for name in dir(module)
+        if isinstance((v:=getattr(module, name)), types.FunctionType)
+    ]
+    valid_funcs = [
+        v
+        for func in functions
+        if count_function_args(v:=func) == 0
+    ]
+    
+    return valid_funcs
+
+
 def get_udf_valid_function_names_from_module(module_name):
     """Returns a list of function names within a module. Returned names satisfy
     being a valid callable function from Excel
     """
+    raise NotImplementedError
     # Get all functions in the module
     module = sys.modules[module_name]
     functions = [

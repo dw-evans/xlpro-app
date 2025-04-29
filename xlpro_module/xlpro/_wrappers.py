@@ -28,6 +28,71 @@ _module_fname_isactive_register:dict[dict[str, bool]] = {}
 _module_fname_function_signature_register:dict[dict[str, FunctionSignature]] = {}
 
 
+_module_subname_func_register:dict = {}
+_module_func_subname_register:dict = {}
+_module_subname_isactive_register:dict[dict[str, bool]] = {}
+
+
+class ModuleSubMapsWrapper:
+    """Wrapper for module-specific function registry maps"""
+    def __init__(self, mname):
+        self.mname = mname
+        self.subname_func_register:dict = _module_subname_func_register[mname]
+        self.func_subname_register:dict = _module_func_subname_register[mname]
+        self.subname_isactive_register:dict = _module_subname_isactive_register[mname]
+        return
+
+def _remove_subs_module_from_maps(mname):
+    try:
+        del _module_fname_func_register[mname]
+        del _module_subname_isactive_register[mname]
+    except:
+        pass
+
+def _add_sub_module(mname):
+    if not mname in _module_subname_func_register:
+        _module_subname_func_register[mname] = {}
+        _module_func_subname_register[mname] = {}
+        _module_subname_isactive_register[mname] = {}
+        pass
+    ...
+
+def _sub_set_active(func, mname, state:bool):
+    _add_sub_module(mname)
+    fname = func.__name__
+    _module_subname_isactive_register[mname][fname] = state
+
+def _register_sub(func, _mname, _isactive):
+    _add_sub_module(_mname)
+    fname = func.__name__
+    _module_subname_func_register[_mname][fname] = func
+    _module_func_subname_register[_mname][func] = fname
+    _sub_set_active(func, _mname, _isactive)
+
+
+def register_sub(isactive=True):
+    """Primary interface for registration"""
+    mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
+    def wrapper(func):
+        fname = func.__name__
+        if not mname in _module_subname_func_register:
+            _add_sub_module(mname)
+        if not fname in _module_subname_func_register[mname]:
+            _register_sub(func, mname, isactive)
+        return func
+    return wrapper
+
+
+def sub_ignore(func):
+    mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
+    def wrapper(func):
+        # _register(func, mname, _type, False)
+        return func
+    return wrapper
+    ...
+
+
+
 class ModuleFunctionMapsWrapper:
     """Wrapper for module-specific function registry maps"""
     def __init__(self, mname):
@@ -40,7 +105,7 @@ class ModuleFunctionMapsWrapper:
         self.fname_function_signature_register:dict = _module_fname_function_signature_register[mname]
         return
 
-def _remove_module_from_maps(mname):
+def _remove_funcs_module_from_maps(mname):
     try:
         del _module_fname_func_register[mname]
         del _module_func_fname_register[mname]
@@ -52,7 +117,7 @@ def _remove_module_from_maps(mname):
         pass
 
 
-def _add_module(mname):
+def _add_func_module(mname):
     if not mname in _module_fname_func_register:
         _module_fname_func_register[mname] = {}
         _module_func_fname_register[mname] = {}
@@ -64,14 +129,14 @@ def _add_module(mname):
 def _func_set_active(func, mname, state:bool): 
     if not isinstance(state, bool):
         raise TypeError
-    _add_module(mname)
+    _add_func_module(mname)
     fname = func.__name__
     _module_fname_isactive_register[mname][fname] = state
 
 def _func_set_jsonified(func, mname, isjsonified:bool): 
     if not isinstance(isjsonified, bool):
         raise TypeError
-    _add_module(mname)
+    _add_func_module(mname)
     fname = func.__name__
     if isjsonified:
         pass
@@ -79,7 +144,7 @@ def _func_set_jsonified(func, mname, isjsonified:bool):
 
 
 def _register_func(func, mname):
-    _add_module(mname)
+    _add_func_module(mname)
     fname = func.__name__
     _module_fname_func_register[mname][fname] = func
     _module_func_fname_register[mname][func] = fname
@@ -109,7 +174,7 @@ def register(_type:None|int=None, isactive=True):
     def wrapper(func):
         fname = func.__name__
         if not mname in _module_fname_func_register:
-            _add_module(mname)
+            _add_func_module(mname)
         if not fname in _module_fname_func_register[mname]:
             _register(func, mname, _type, isactive)
         return func
@@ -130,13 +195,24 @@ def ignore(_type:None|int=None):
 
 
 def import_module_with_registration(mname, fpath):
-    _remove_module_from_maps(mname)
+    _remove_funcs_module_from_maps(mname)
     
     _utils.import_module(mname, fpath)
 
     valid_functions = _utils.get_udf_valid_functions_from_module(mname)
     for f in valid_functions:
         _register(f, mname, None, True)
+
+
+def import_module_subs_with_registration(mname, fpath):
+    _remove_subs_module_from_maps(mname)
+
+    _utils.import_module(mname, fpath)
+
+    valid_functions = _utils.get_sub_valid_functions_from_module(mname)
+    for f in valid_functions:
+        _register_sub(f, mname, _isactive=True)
+
 
     
 
@@ -234,12 +310,11 @@ def generate_wrapped_function(mname, fname):
             return _jsonified_array_or_value_func_wrapper(func)
         return _array_or_value_func_wrapper(func)
     
-    
-
-    # if ftype in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
-    #     if isjson:
-    #         return _jsonified_array_or_value_func_wrapper(func)
-    #     return _array_or_value_func_wrapper(func)
-
     raise NotImplementedError("Function type is not supported")
 
+
+def generate_wrapped_function_sub(mname, fname):
+    """primary interface for generating wrapped functions which pre-parse excel arguments."""
+    # func = sys.modules[mname][fname]
+    func = _module_fname_func_register[mname][fname]
+    return func

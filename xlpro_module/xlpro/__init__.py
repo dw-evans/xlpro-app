@@ -15,7 +15,8 @@ from xlpro._utils import (
 from xlpro._wrappers import (
     register,
     ignore,
-    wrap_jsonify
+    wrap_jsonify,
+    register_sub
 )
 
 from xlpro._enums import (
