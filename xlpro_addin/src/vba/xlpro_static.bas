@@ -1,4 +1,39 @@
 Attribute VB_Name = "xlpro_static"
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 19:50:33
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 19:50:23
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 19:43:36
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 19:36:36
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-04-29, 19:30:11
+' ### END METADATA ###
+
 Option Explicit
 
 Public Const XLPRO_GUID As String = "{122BB48A-57EF-4775-A28C-3F71ED0D02A7}"
@@ -7,7 +42,8 @@ Public Const VSCODE_PATH As String = "code"
 
 'Public Const XLPRO_CLI_PATH As String = "xlpro-cli"
 
-Public WORKBOOK_GUID_MAP As Scripting.Dictionary
+' Public WORKBOOK_GUID_MAP As Scripting.Dictionary
+Public WORKBOOK_GUID_MAP As Object
 Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
 
 Public WSCRIPT_SHELL As Object
@@ -23,7 +59,8 @@ Public WSCRIPT_SHELL_INITIALIZED As Boolean
 
 Public Sub initialize_workbook_guid_map()
     If Not WORKBOOK_GUID_MAP_INITIALIZED Then
-        Set WORKBOOK_GUID_MAP = New Scripting.Dictionary
+        ' Set WORKBOOK_GUID_MAP = New Scripting.Dictionary
+        Set WORKBOOK_GUID_MAP = CreateObject("Scripting.Dictionary")
         WORKBOOK_GUID_MAP_INITIALIZED = True
     End If
     Debug.Print "WORKBOOK_GUID_MAP initialized"
@@ -50,17 +87,14 @@ Sub UnintializeShell()
 End Sub
 
 Sub set_workbook_guid_map_pairing(wb_name As String, guid As String)
-    initialize_workbook_guid_map
     WORKBOOK_GUID_MAP.Add wb_name, guid
 End Sub
 Sub del_workbook_guid_map_key(wb_name As String)
-    initialize_workbook_guid_map
     If WORKBOOK_GUID_MAP.Exists(wb_name) Then
         WORKBOOK_GUID_MAP.Remove wb_name
     End If
 End Sub
 Public Function get_workbook_guid_map_value(wb_name As String) As String
-    initialize_workbook_guid_map
     If WORKBOOK_GUID_MAP.Exists(wb_name) Then
         get_workbook_guid_map_value = WORKBOOK_GUID_MAP(wb_name)
     Else
@@ -316,8 +350,17 @@ Function get_vba_sync_text(wb As Workbook) As String
 End Function
 
 Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As String)
-    Dim proj As VBIDE.VBProject
+    ' Dim proj As VBIDE.VBProject
+    Dim proj As Object
+
+    ' Dim codemod As VBIDE.codemodule
+    Dim codemod As Object
+
+    ' Dim comp As VBIDE.VBComponent
+    Dim comp As Object
+
     Set proj = wb.VBProject
+
     Dim names() As String ' Dynamic array to store the names
     Dim i As Long
     
@@ -329,15 +372,13 @@ Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As Str
         names(i) = proj.vbcomponents(i).Name ' Extract the .Name property of each element
     Next i
     
-    Dim comp As VBIDE.VBComponent
     If Not IsInArray(c_name, names) Then
-        Set comp = proj.vbcomponents.Add(vbext_ct_StdModule)
+        ' Set comp = proj.vbcomponents.Add(vbext_ct_StdModule)
+        Set comp = proj.vbcomponents.Add(1)
         comp.Name = c_name
     Else:
         Set comp = proj.vbcomponents(c_name)
     End If
-    
-    Dim codemod As VBIDE.codemodule
     
     Set codemod = comp.codemodule
     

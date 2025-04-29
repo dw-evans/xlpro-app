@@ -30,7 +30,7 @@ End Sub
 
 Private Sub app_WorkbookBeforeClose(ByVal wb As Workbook, Cancel As Boolean)
     'uninitialize the workbook on close
-    uninitialize ActiveWorkbook
+    uninitialize wb
 End Sub
 
 ' Overwrite the application onclose behaviour
@@ -39,7 +39,7 @@ Private Sub app_Workbook_BeforeClose(Cancel As Boolean)
     If Not Cancel Then
         'uninitialize the workbook on close
         Debug.Print "Attempting to uninitialize workbook..."
-        uninitialize ActiveWorkbook
+        uninitialize wb
         Debug.Print "Uninitialize completed (maybe?)"
     Else
         Debug.Print "Close canceled, event handler still active."
