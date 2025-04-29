@@ -1,0 +1,26 @@
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"> 
+  <ribbon startFromScratch="false"> 
+    <tabs> 
+      <tab id="CustomTab" label="xlpro"> 
+        <group id="SimpleControls" label="My Group"> 
+          <button id="Button1" imageMso="HappyFace" size="large" 
+                  label="init workbook" 
+                  screentip="init workbook" 
+                  onAction="xlproInit"/> 
+          <button id="Button2" imageMso="HappyFace" size="large" 
+                  label="start py server" 
+                  screentip="start py server" 
+                  onAction="xlproStart"/> 
+          <button id="Button3" imageMso="HappyFace" size="large" 
+                  label="refresh py server" 
+                  screentip="refresh py server" 
+                  onAction="xlproRegister"/> 
+          <button id="Button4" imageMso="HappyFace" size="large" 
+                  label="start vscode" 
+                  screentip="start vs code" 
+                  onAction="xlproStartIDE"/> 
+        </group> 
+      </tab> 
+    </tabs> 
+  </ribbon> 
+</customUI> 

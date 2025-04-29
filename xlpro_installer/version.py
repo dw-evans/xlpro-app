@@ -7,10 +7,10 @@ class VersionInfo:
     VERSION = xlpro.__version__
     NAME = "xlpro"
     EXE_NAME = f"{NAME}-v{VERSION}-installer.exe"
-    AUTHOR = "D.Evans"
+    AUTHOR = "D Evans"
     DATE = datetime.datetime.now().strftime("%Y-%m-%d")
     DESCRIPTION_SHORT = "xlpro Windows installer"
-    COMPANY_NAME="Dash Software"
+    COMPANY_NAME="D Evans"
 
 import pyinstaller_versionfile
 
@@ -20,7 +20,7 @@ wd = Path(__file__).parent
 def create_version_file_get_path() -> str:
     pyinstaller_versionfile.create_versionfile(
         output_file=(ret:=(wd / "version.txt")),
-        version=VersionInfo.VERSION,
+        version=VersionInfo.VERSION + ".0",
         company_name=VersionInfo.COMPANY_NAME,
         file_description=VersionInfo.DESCRIPTION_SHORT,
         internal_name=VersionInfo.NAME,

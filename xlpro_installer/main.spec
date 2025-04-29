@@ -49,7 +49,7 @@ sys.path.insert(0, os.getcwd())
 
 import version
 
-WIP_RELEASE = True
+WIP_RELEASE = False
 
 from pathlib import Path
 EXE_NAME = version.VersionInfo.EXE_NAME

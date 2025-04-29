@@ -8,6 +8,7 @@ dependencies = [
     "build>=1.2.2.post1",
     "debugpy>=1.8.13",
     "matplotlib>=3.10.1",
+    "oletools>=0.60.2",
     "pandas>=2.2.3",
     "psutil>=7.0.0",
     "pyinstaller>=6.12.0",
