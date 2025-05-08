@@ -29,7 +29,7 @@ import subprocess
 from pathlib import Path
 import time
 import sys
-from win32com.client import Dispatch
+from win32com.client.dynamic import Dispatch
 
 wb_path = Path() / r"C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\main.xlsx"
 

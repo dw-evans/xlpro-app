@@ -1,83 +1,11 @@
 Attribute VB_Name = "xlpro_static"
 
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 23:19:47
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 23:17:31
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 21:48:32
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 21:48:15
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 21:33:05
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 19:50:33
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 19:50:23
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 19:43:36
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 19:36:36
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-04-29, 19:30:11
-' ### END METADATA ###
-
 Option Explicit
 
-Public Const XLPRO_GUID As String = "{122BB48A-57EF-4775-A28C-3F71ED0D02A7}"
-Public Const XLPRO_CLI_PATH As String = "C:\Users\Daniel Evans\projects\xlpro\.venv\Scripts\xlpro-cli.exe"
-Public Const VSCODE_PATH As String = "code"
+Public Const XLPRO_GUID As String = ""
+Public Const XLPRO_CLI_PATH As String = "xlpro-cli.exe"
+Public Const VSCODE_PATH As String = "code.exe"
 
-'Public Const XLPRO_CLI_PATH As String = "xlpro-cli"
-
-' Public WORKBOOK_GUID_MAP As Scripting.Dictionary
 Public WORKBOOK_GUID_MAP As Object
 Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
 
@@ -136,20 +64,6 @@ Public Function get_workbook_guid_map_value(wb_name As String) As String
         get_workbook_guid_map_value = ""
     End If
 End Function
-
-'Public Const XLPRO_GUID_NAME As String = "XLPRO_GUID"
-'Sub update_workbook_guid_value(wb As Workbook)
-'    ' stores the workbook guid as a name in the workbook
-'    Dim guid As String
-'    guid = get_workbook_guid_map_value(wb.Name)
-'    ' Add the XLPRO_GUID constant to the workbook names
-'    wb.names.Add Name:=XLPRO_GUID_NAME, RefersTo:="="" & guid & """
-'End Sub
-'
-'Function get_workbook_guid_value(wb As Workbook) As String
-'    ' Fetches the guid from the workbook name
-'    get_workbook_guid_value = Evaluate(wb.names(XLPRO_GUID_NAME).RefersTo)
-'End Function
 
 
 '------------------------------------------------------------------------
@@ -279,8 +193,6 @@ Function get_workbook_guid(wb As Workbook) As String
     Dim line As String
 
     On Error GoTo ErrHandler
-
-
 '    Set shell = CreateObject("WScript.Shell")
 '
     command = """" & XLPRO_CLI_PATH & """" & " guid " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"

@@ -11,9 +11,12 @@ import typing
 # XXX - todo - maybe implement threading locks in future.
 # Not sure when you'd ever have multithread during registration unless you were maybe mixing libraries?
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from xlpro._utils import FunctionSignature
+# from typing import TYPE_CHECKING
+# if TYPE_CHECKING:
+
+from xlpro._utils import FunctionSignature
+from xlpro import _utils
+
 
 # map of func names to functions (not used)
 _module_fname_func_register:dict = {}
@@ -292,6 +295,30 @@ def wrap_jsonify():
         return func
     return wrapper0
 
+import pythoncom
+
+def _com_init_dispatch_release_wrapper(func):
+    """Wraps com object dispatch and release around a func.
+    Also appropriately configures pythoncom coinitialise"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        pythoncom.CoInitialize()
+        # dispatch the args on this thread
+        # only relevant if the reserved dispatch arguments are being used.
+        try:
+            args_dispatched = _utils.com_args_dispatch_reserved(func, args)
+        except Exception as e:
+            raise e
+        ret = func(*args_dispatched, **kwargs)
+
+        # must release after!
+        _utils.com_args_release_to_stream_reserved(func, args_dispatched)
+        pythoncom.CoUninitialize()
+        
+        return ret
+    return wrapper
+
+
 
 def generate_wrapped_function(mname, fname):
     """primary interface for generating wrapped functions which pre-parse excel arguments."""
@@ -301,14 +328,21 @@ def generate_wrapped_function(mname, fname):
     # isactive = __module_func_name_isactive_register[mname][fname]
     isjson = _module_fname_isjsonified_register[mname].get(fname, False)
 
+    retf:callable = None
+
     if ftype == FunctionTypes.py_object:
         if isjson:
-            return _jsonified_pyobj_func_wrapper(func)
-        return _pyobj_func_wrapper(func)
+            retf = _jsonified_pyobj_func_wrapper(func)
+        else:
+            retf = _pyobj_func_wrapper(func)
     elif ftype == FunctionTypes.array_or_value:
         if isjson:
-            return _jsonified_array_or_value_func_wrapper(func)
-        return _array_or_value_func_wrapper(func)
+            retf = _jsonified_array_or_value_func_wrapper(func)
+        else:
+            retf = _array_or_value_func_wrapper(func)
+
+    if retf:
+        return _com_init_dispatch_release_wrapper(retf)
     
     raise NotImplementedError("Function type is not supported")
 

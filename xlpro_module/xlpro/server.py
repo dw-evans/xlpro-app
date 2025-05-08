@@ -39,7 +39,7 @@ from copy import deepcopy
 
 from xlpro._types import xlproImage
 
-from win32com.client import Dispatch
+from win32com.client.dynamic import Dispatch
 
 def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = workbook_path.parent / f"{workbook_path.name}.xlpro"
@@ -482,10 +482,15 @@ class xlproWorkspace:
     def execute_function_async(self, caller, fname, args):
         try:
             func = self._get_function_by_name(fname)
+
             if not func:
                 raise Exception(f"Function {fname} not found.")
             
-            uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args)
+            args = _utils.com_args_release_to_stream_reserved(func, args)      
+
+            args_less_reserved = _utils.get_args_minus_reserved(func, args)
+
+            uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
@@ -494,8 +499,10 @@ class xlproWorkspace:
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
                 with self._uid_result_iscomplete_map_lock:
-                    if uid in self._uid_result_iscomplete_map.keys():
-                        return self._uid_result_display_map[uid]
+                    if self._uid_result_iscomplete_map.get(uid, False):
+                        ret = self._uid_result_display_map[uid]
+                        logger.debug(f"result marked complete, fetched cached result {ret}")
+                        return ret
                 
             # Clear any lingering calculations coming from this caller if the result isnt cached
             # downstream functions should pick up on these being deleted
@@ -572,8 +579,11 @@ class xlproWorkspace:
                 elif isinstance(e, errors.ExcelNotAccessibleError):
                     pass
                 elif isinstance(e, errors.xlproUnhandledException):
-                    # raise e
                     pass
+                elif isinstance(e, AttributeError):
+                    if re.match(r"^<unknown>\..*$", str(e)):
+                        logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
+                        e = errors.xlproLikelyCOMAccessError(str(e))
                 self._result_queue.put((uid, e))
                 logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
             logger.debug("Waking results manager from worker thread...")
@@ -773,6 +783,7 @@ class WorkerManager:
         self._thread = threading.Thread(target=self._run, daemon=True)
         # self._threadpool:list[threading.Thread] = []
         self._threadpool_dict:dict[str, threading.Thread] = {}
+        self._threadpool_dict_lock = threading.Lock()
 
     @property
     def MAX_THREADS(self):
@@ -792,7 +803,10 @@ class WorkerManager:
         self._wake_event.set()
 
     def _process_function_queue(self):
-        if len(self._threadpool_dict.keys()) < self.MAX_THREADS:
+        with self._threadpool_dict_lock:
+            n_items = len(self._threadpool_dict.keys())
+            
+        if n_items < self.MAX_THREADS:
             uid = self._server._pending_function_queue.get(timeout=0.01)
             try:
                 with self._server._uid_pending_function_map_lock:
@@ -801,12 +815,13 @@ class WorkerManager:
                 logger.warning(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
                 return
             
-            if uid in self._threadpool_dict:
-                logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
-                return
+            with self._threadpool_dict_lock:
+                if uid in self._threadpool_dict:
+                    logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
+                    return
 
-            t = threading.Thread(target=func, daemon=True)
-            self._threadpool_dict[uid] = t
+                t = threading.Thread(target=func, daemon=True)
+                self._threadpool_dict[uid] = t
             # XXX - todo - limit the number of attempts for a given function in some way
             # XXX - todo - support sending terminate command to lingering worker threads
             t.start()
@@ -819,7 +834,7 @@ class WorkerManager:
 
     def _run(self):
         while not self._stop_event.is_set():
-            logger.debug("WorkerManager thread is waiting for events or timeout...")
+            # logger.debug("WorkerManager thread is waiting for events or timeout...")
             self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
@@ -911,6 +926,11 @@ class ResultsManager:
             logger.error(f"Error during forced client update: '{uid}', {e}")
         pythoncom.CoUninitialize()
 
+    def signal_worker_manager_to_recalculate(self, uid):
+        logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
+        self._server._pending_function_queue.put(uid)
+        self._server._worker_manager.wake()
+
     def _process_queue_element(self):
         """Processes either the multiprocessing or threaded results queues
         """
@@ -930,20 +950,8 @@ class ResultsManager:
             # if isinstance(val, errors.ArugmentNotReadyException):
             if isinstance(val, (errors.ArugmentNotReadyException, errors.ExcelArugmentIsNoneException)):
                 logger.debug(f"Arguments not ready for uid '{uid}', recycling function...")
-
-                # logger.debug(f"Arguments not ready for uid '{uid}', Attempting to recalculate precedents...")
                 self._server.get_uid_debug_info(uid)
-                # self._recalculate_precedents(uid)
-
-                # nudge the client recalculate sequence to correct case where Excel never sends recalculate
-                # command based on the excel recalculation sequence...
-                # XXX - todo - this should only be attempted periodically.
-                # XXX - todo - should probably throw a global exception if this fails outright
-                # self._emergency_recalculate(uid)
-
-                logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
-                self._server._pending_function_queue.put(uid)
-                self._server._worker_manager.wake()
+                self.signal_worker_manager_to_recalculate(uid)
                 return
             
             elif isinstance(val, errors.xlproArgumentExceptionError):
@@ -952,18 +960,41 @@ class ResultsManager:
                 pass
           
             elif isinstance(val, errors.ExcelNotAccessibleError):
+                # recycle if excel is not accessible
                 logger.debug(f"ExcelNotAccessible during '{uid}', recycling function...")
-                logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
-                self._server._pending_function_queue.put(uid)
-                self._server._worker_manager.wake()
+                self.signal_worker_manager_to_recalculate(uid)
                 return
 
             elif isinstance(val, pythoncom.com_error):
+                # recycle if excel is not accessible
                 if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
-                    self._server._pending_function_queue.put(uid)
                     logger.info(f"Call rejected by callee for '{uid}', recycling function...")
+                    self.signal_worker_manager_to_recalculate(uid)
                     return
+                elif VBErrorConverter(val) == 285: # The marshaled interface data packet (OBJREF) has an invalid or unknown format.
+                    logger.info(f"OBJREF invalid '{uid}', recycling function...")
+                    self.signal_worker_manager_to_recalculate(uid)
+                    return
+                elif VBErrorConverter(val) == 30: # A disk error occurred during a read operation.
+                    logger.info(f"disk read failed '{uid}', recycling function...")
+                    self.signal_worker_manager_to_recalculate(uid)
+                    return
+                else:
+                    logger.info(f"Other COM error for '{uid}', recycling function...")
+                    logger.info(f"'{repr(val)}'")
+                    self.signal_worker_manager_to_recalculate(uid)
+                    return
+
+
+            elif isinstance(val, errors.xlproLikelyCOMAccessError):
+                logger.warning(f"Likely COM access error for {uid}, recycling.")
+                self.signal_worker_manager_to_recalculate(uid)
+                return
             
+            elif isinstance(val, UnboundLocalError):
+                logger.warning(f"UnboundLocalError {uid}, recycling... (TODO fix this)")
+                self.signal_worker_manager_to_recalculate(uid)
+                pass
 
             logger.warning(f"Returned value is a generic exception: {uid}, {val}")
             # ret = repr(val) # convert exception to string for it to show in excel.
@@ -972,9 +1003,16 @@ class ResultsManager:
         self._set_results_value(uid, ret)
         # signal that it is complete
         with self._server._uid_result_iscomplete_map_lock:
+            logger.debug(f"calculation marked complete {uid}")
+            try:
+                if "promise" in ret.lower():
+                    pass
+            except:
+                pass
             self._server._uid_result_iscomplete_map[uid] = True
         # remove from the pending function map once successfully completed.
         with self._server._uid_pending_function_map_lock:
+            logger.debug(f"calculation removed as pending function {uid}")
             del self._server._uid_pending_function_map[uid]
 
         # signal to the client manager to update the client
@@ -988,7 +1026,7 @@ class ResultsManager:
         Unlike the ClientManager
         """
         while not self._stop_event.is_set():
-            logger.info("ResultsManager thread is waiting for events or timeout...")
+            # logger.info("ResultsManager thread is waiting for events or timeout...")
             self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
@@ -1141,13 +1179,13 @@ class ClientManager:
         # XXX - Warning that qsize() is not thread safe
         # this prevents inplace recycling and potentially infinite loop
         queue_length = self._server._client_recalculate_queue.qsize()
-        logger.debug(f"Client manager queue length estimate is {queue_length}")
+        # logger.debug(f"Client manager queue length estimate is {queue_length}")
         for _ in range(queue_length):
             try:
                 uid = self._server._client_recalculate_queue.get()
-                logger.debug(f"Client manager fetched uid '{uid}'")
+                # logger.debug(f"Client manager fetched uid '{uid}'")
             except queue.Empty:
-                logger.debug("Client manager queue is empty")
+                # logger.debug("Client manager queue is empty")
                 return
             
             with self._server._uid_result_iscomplete_map_lock:

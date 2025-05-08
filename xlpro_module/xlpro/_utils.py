@@ -3,7 +3,7 @@ from PIL import Image
 
 
 from pywintypes import IID
-from win32com.client import Dispatch
+from win32com.client.dynamic import Dispatch
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -39,15 +39,35 @@ from xlpro import errors
 import json
 from xlpro._types import list1d, list2d, ndarray1d, ndarray2d
 
-
-
 logger = logging.getLogger(__name__)
 
-VB_DYNAMIC_MODULE_NAME = "xlpro_async"
+# VB_DYNAMIC_MODULE_NAME = "xlpro_async"
+
+def get_function_types_with_fallback(func:Callable):
+    try:
+        hints = typing.get_type_hints(func, globalns={}, localns={})
+    except NameError as e:
+        # Fallback: manually replace forward references with Any
+        annotations = func.__annotations__
+        resolved = {}
+        for k, v in annotations.items():
+            if isinstance(v, str):
+                try:
+                    # Attempt to resolve the type
+                    resolved_type = eval(v, {}, {})
+                except Exception:
+                    resolved_type = Any
+            else:
+                resolved_type = v
+            resolved[k] = resolved_type
+        hints = resolved
+
+    return hints
 
 def get_function_signature(func):
     # Get the type hints from the function
-    type_hints = typing.get_type_hints(func)
+    # type_hints = typing.get_type_hints(func)
+    type_hints = get_function_types_with_fallback(func)
     
     # Get the parameter information using inspect
     signature = inspect.signature(func)
@@ -69,27 +89,7 @@ def get_function_signature(func):
     # return func.__qualname__, result, type_hints.get('return', Any), default_value_map
     return func.__name__, result, type_hints.get('return', Any), default_value_map
 
-# Converts python type to vb type
-vb_type_conversion_strings = {
-    int: "Cint({})",
-    float: "Cdbl({})",
-    bool: "Cbool({})",
-    str: "{}",
-    Any: "{}"
-}
 
-# Use in function definitions
-vb_type_declaration_strings = {
-    int: "{} As Integer",
-    float: "{} As Double",
-    bool: "{} As Boolean",
-    str: "{} As String",
-    Any: "{} As Variant",
-}
-
-vb_range_conversion_check_string = """If TypeName({arg}) = \"Range\" Then
-    {arg} = {arg}.Value
-EndIf"""
 
 from xlpro._enums import FunctionTypes
 import pandas as pd
@@ -115,6 +115,35 @@ def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
     return FunctionTypes.array_or_value
 
 
+# Converts python type to vb type
+VB_TYPE_CONVERSION_STRINGS = {
+    int: "Cint({})",
+    float: "Cdbl({})",
+    bool: "Cbool({})",
+    str: "{}",
+    Any: "{}"
+}
+
+# Use in function definitions
+VB_TYPE_DECLARATION_STRINGS = {
+    int: "{} As Integer",
+    float: "{} As Double",
+    bool: "{} As Boolean",
+    str: "{} As String",
+    Any: "{} As Variant",
+}
+
+VB_RANGE_CONVERSION_CHECK_STRING = """If TypeName({arg}) = \"Range\" Then
+    {arg} = {arg}.Value
+EndIf"""
+
+
+RESERVED_KW_LOOKUPS = {
+    "caller": "Application.Caller",
+    "thiswb": "ActiveWorkbook",
+}
+RESERVED_ARGS = list(RESERVED_KW_LOOKUPS.keys())
+
 def function_template_with_caller(func:Callable) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
@@ -125,19 +154,35 @@ def function_template_with_caller(func:Callable) -> str:
     arg_conversion_list = []
     arg_range_conversion_check_list = []
 
+    # loop over each arg and type
+    # create the declaration list of strings
+    # create the conversion list of strings.
     for a, t in args_and_types:
-        if vb_type_declaration_strings.get(t, None):
-            arg_declaration_list.append( vb_type_declaration_strings[t].format(a))
+        if a in RESERVED_ARGS:
+            # handle reserved kwargs
+            arg_conversion_list.append(RESERVED_KW_LOOKUPS[a])
+            continue
+
+        # define the function declaration values
+        if VB_TYPE_DECLARATION_STRINGS.get(t, None):
+            arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[t].format(a))
         else:
             arg_declaration_list.append("{} As Variant".format(a))
-        if vb_type_conversion_strings.get(t, None):
-            arg_conversion_list.append(vb_type_conversion_strings[t].format(a))
+
+
+        # define the type conversions/casting to pass to xlpro
+        if VB_TYPE_CONVERSION_STRINGS.get(t, None):
+            # handle any args that can be converted
+            arg_conversion_list.append(VB_TYPE_CONVERSION_STRINGS[t].format(a))
         else:
+            # handle standard args
             arg_conversion_list.append("{}".format(a))
-        if a not in ["caller", "thiswb"]:
+
+        # convert all range inputs to their .value attribute
+        if a not in RESERVED_ARGS:
             if t not in [float, int, bool, str]:
                 arg_range_conversion_check_list.append(
-                    textwrap.indent(vb_range_conversion_check_string.format(arg=a), "    ")
+                    textwrap.indent(VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a), "    ")
             )
 
     # XXX - todo - ensure no reserved vba arguments are parsed!   
@@ -145,14 +190,14 @@ def function_template_with_caller(func:Callable) -> str:
     a_list = [a for a, t in args_and_types]
 
     from xlpro import server 
-
-    return f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
+    ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
     Set xlpro = GetObject("new: " & xlpro_guid)
 {'\n'.join(arg_range_conversion_check_list)}
     {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
 End Function
 """
+    return ret
 
 def sub_template(func:Callable) -> str:
     """Returns function template string to send to VBA module.
@@ -264,16 +309,11 @@ def com_args_release_to_stream_reserved(func, args):
         caller = args[idx]
         caller_stream = comarshal_release_and_get_stream(caller)
         new_args[idx] = caller_stream
-        # Caller type could be many things, likely just a Range.
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
-        pass
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         thiswb = args[idx]
         thiswb_stream = comarshal_release_and_get_stream(thiswb)
         new_args[idx] = thiswb_stream
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
-        pass
     return new_args
 
 def com_args_dispatch_reserved(func, args):
@@ -281,25 +321,26 @@ def com_args_dispatch_reserved(func, args):
     Marshals the caller and thiswb reserved keyword arguments for use
     in another thread. Replaces the args with streams that can be used on another thread.
     """
-    f_name, args_and_types, ret_type, _ = get_function_signature(func)
-    arg_names = [v0 for v0, v1 in args_and_types]
-    new_args = list(args)
-    if "caller" in arg_names:
-        idx = arg_names.index("caller")
-        caller = args[idx]
-        caller_stream = comarshal_dispatch_stream(caller)
-        new_args[idx] = caller_stream
-        # Caller type could be many things, likely just a Range.
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
-        pass
-    if "thiswb" in arg_names:
-        idx = arg_names.index("thiswb")
-        thiswb = args[idx]
-        thiswb_stream = comarshal_dispatch_stream(thiswb)
-        new_args[idx] = thiswb_stream
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
-        pass
-    return new_args
+    try:
+        f_name, args_and_types, ret_type, _ = get_function_signature(func)
+        arg_names = [v0 for v0, v1 in args_and_types]
+        new_args = list(args)
+        if "caller" in arg_names:
+            idx = arg_names.index("caller")
+            caller = args[idx]
+            try:
+                caller_stream = comarshal_dispatch_stream(caller)
+                new_args[idx] = caller_stream
+            except Exception as e:
+                raise e
+        if "thiswb" in arg_names:
+            idx = arg_names.index("thiswb")
+            thiswb = args[idx]
+            thiswb_stream = comarshal_dispatch_stream(thiswb)
+            new_args[idx] = thiswb_stream
+        return new_args
+    except Exception as e:
+        raise e
 
 def get_args_minus_reserved(func, args):
     """Returns the arguments of a function but removes the reserved keywords
@@ -312,11 +353,9 @@ def get_args_minus_reserved(func, args):
     if "caller" in arg_names:
         idx = arg_names.index("caller")
         arg_idxs_to_del.append(idx)
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         arg_idxs_to_del.append(idx)
-        raise NotImplementedError("Support for caller and thiswb dropped until deferred calculation flow reworked")
     arg_idxs_to_del.sort(reverse=True)
     for idx in arg_idxs_to_del:
         new_args.pop(idx)
@@ -445,28 +484,6 @@ def convert_xl_2d_types_kwargs(func, kwargs):
                 break
 
     return ppkwargs
-
-
-def com_init_dispatch_release_wrapper(func):
-    """Wraps com object dispatch and release around a func.
-    Also appropriately configures pythoncom coinitialise"""
-    raise NotImplementedError
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        pythoncom.CoInitialize()
-        # dispatch the args on this thread
-        # only relevant if the reserved dispatch arguments are being used.
-        args_dispatched = com_args_dispatch_reserved(func, args)
-
-        ret = func(*args_dispatched, **kwargs)
-
-        # must release after!
-        com_args_release_to_stream_reserved(func, args_dispatched)
-        pythoncom.CoUninitialize()
-        
-        return ret
-    
-    return wrapper
 
 
 def show_warning(title, message):
@@ -762,6 +779,11 @@ def typ(val):
 #     for args in args_list
 #         ret.append()
 
+def int2rgb(color:int): # -> tuple[int, int, int]:
+    r = color & 0xFF
+    g = (color >> 8) & 0xFF
+    b = (color >> 16) & 0xFF
+    return (r, g, b)
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)

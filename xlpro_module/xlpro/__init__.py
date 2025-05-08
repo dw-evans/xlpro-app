@@ -10,6 +10,7 @@ from xlpro._utils import (
     typ,
     cpy,
     deepcpy,
+    int2rgb
 )
 
 from xlpro._wrappers import (

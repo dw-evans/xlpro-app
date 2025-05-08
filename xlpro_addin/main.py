@@ -4,7 +4,7 @@ import shutil
 import olefile
 from oletools.olevba import VBA_Parser
 import os
-from win32com.client import Dispatch
+from win32com.client.dynamic import Dispatch
 import regex as re
 root_dir = Path(__file__).parent
 

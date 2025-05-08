@@ -1454,7 +1454,7 @@ if __name__ == "__main__":
     # main_but_reinitializing()
     # test_configure_workbook_with_existing_venv()
 
-    from win32com.client import Dispatch
+    from win32com.client.dynamic import Dispatch
 
     xlapp:"xl._Application" = Dispatch("Excel.Application")
     xlapp.Visible=False

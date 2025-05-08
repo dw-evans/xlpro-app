@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.figure
 
-# from win32typelibs import excel as xl
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from win32typelibs import excel as xl
 
 import numpy as np
 
@@ -20,7 +23,8 @@ xlpro.register()(xlpro.show_image)
 xlpro.register()(xlpro.typ)
 xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
-xlpro.register()(xlpro.conditional_formatter_example)
+xlpro.register()(xlpro.int2rgb)
+# xlpro.register()(xlpro.conditional_formatter_example)
 
 def pd_function_create(x) -> pd.DataFrame:
     ret = pd.DataFrame(x[1:], columns=x[0])
@@ -42,3 +46,11 @@ def add_line(fig, x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
     ax.plot(x, y, "g--")
 
     return fig
+
+def get_self_color_value(caller:'xl.Range') -> int:
+    try:
+        print(caller.Value)
+        ret = caller.Interior.Color
+    except Exception as e:
+        raise e
+    return ret
