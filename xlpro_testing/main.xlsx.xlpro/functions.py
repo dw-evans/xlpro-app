@@ -47,8 +47,12 @@ def add_line(fig, x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
 
     return fig
 
+import random
+import time
+
 def get_self_color_value(caller:'xl.Range') -> int:
     try:
+        # time.sleep(random.random() * 10.0)
         print(caller.Value)
         ret = caller.Interior.Color
     except Exception as e:

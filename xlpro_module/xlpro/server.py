@@ -584,6 +584,8 @@ class xlproWorkspace:
                     if re.match(r"^<unknown>\..*$", str(e)):
                         logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
                         e = errors.xlproLikelyCOMAccessError(str(e))
+                elif isinstance(e, pythoncom.com_error):
+                    pass
                 self._result_queue.put((uid, e))
                 logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
             logger.debug("Waking results manager from worker thread...")
@@ -787,7 +789,8 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        return cfg.max_worker_threads
+        return 24
+        # return cfg.max_worker_threads
 
     def start(self):
         self._thread.start()
@@ -801,6 +804,14 @@ class WorkerManager:
 
     def wake(self):
         self._wake_event.set()
+
+    @staticmethod
+    def sleep_wrapper(func):
+        import random
+        def wrapper(*args, **kwargs):
+            time.sleep(random.random() * 3.0)
+            return func(*args, **kwargs)
+        return wrapper
 
     def _process_function_queue(self):
         with self._threadpool_dict_lock:
@@ -820,7 +831,8 @@ class WorkerManager:
                     logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
                     return
 
-                t = threading.Thread(target=func, daemon=True)
+                # t = threading.Thread(target=func, daemon=True)
+                t = threading.Thread(target=self.sleep_wrapper(func), daemon=True)
                 self._threadpool_dict[uid] = t
             # XXX - todo - limit the number of attempts for a given function in some way
             # XXX - todo - support sending terminate command to lingering worker threads
@@ -1255,9 +1267,14 @@ class ClientManager:
             finally:
                 # XXX - Marshalling the caller back to the pool in case
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")
+                try:
+                    self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+                except Exception as e:
+                    pass
 
             # if we failed to update, recycle the queue as necessary
-
+            if not replace_in_queue:
+                pass
             if replace_in_queue:
                 self._server._client_recalculate_queue.put(uid)
 

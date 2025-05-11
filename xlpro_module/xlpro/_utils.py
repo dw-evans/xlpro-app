@@ -138,11 +138,17 @@ VB_RANGE_CONVERSION_CHECK_STRING = """If TypeName({arg}) = \"Range\" Then
 EndIf"""
 
 
-RESERVED_KW_LOOKUPS = {
+RESERVED_XLPRO_KW_LOOKUPS = {
     "caller": "Application.Caller",
     "thiswb": "ActiveWorkbook",
 }
-RESERVED_ARGS = list(RESERVED_KW_LOOKUPS.keys())
+RESERVED_ARGS = list(RESERVED_XLPRO_KW_LOOKUPS.keys())
+
+# from vba_reserved_names import RESERVED_VBA_NAMES
+
+if TYPE_CHECKING:
+    from win32typelibs import excel as xl
+
 
 def function_template_with_caller(func:Callable) -> str:
     """Returns function template string to send to VBA module.
@@ -160,7 +166,7 @@ def function_template_with_caller(func:Callable) -> str:
     for a, t in args_and_types:
         if a in RESERVED_ARGS:
             # handle reserved kwargs
-            arg_conversion_list.append(RESERVED_KW_LOOKUPS[a])
+            arg_conversion_list.append(RESERVED_XLPRO_KW_LOOKUPS[a])
             continue
 
         # define the function declaration values

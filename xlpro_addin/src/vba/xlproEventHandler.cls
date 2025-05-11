@@ -46,6 +46,12 @@ Private Sub app_Workbook_BeforeClose(Cancel As Boolean)
     End If
 End Sub
 
+' Private Sub app_WorkbookBeforeSave(Wb as Workbook, SaveAsUI As Boolean, Cancel As Boolean)
+' ' Was going to implement a method here to clear the macros of a workbook, but risk of inter-
+' ' -ference with other workbooks is not worth the risk.
+' End Sub
+
+
 ' TODO - xxx - prevent any overwrites of an existing workbookbeforeclose
 ' function for example.
 
