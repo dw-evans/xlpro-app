@@ -47,6 +47,9 @@ def add_line(fig, x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
 
     return fig
 
+def set_fig_size_mm(fig:matplotlib.figure.Figure, size:ndarray1d[np.float64]):
+    fig.set_size_inches(size / 25.4)
+
 import random
 import time
 

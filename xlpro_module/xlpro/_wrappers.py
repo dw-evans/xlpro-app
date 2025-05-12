@@ -183,6 +183,14 @@ def register(_type:None|int=None, isactive=True):
         return func
     return wrapper
 
+
+def expand(val):
+    mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
+    ...
+
+
+
+
 # XXX - todo - register 'register' and 'ignore' as class based methods to give the option of
 # calling with parentheses or not.
 # Actually don't know if this is a horrendous idea.
@@ -215,11 +223,6 @@ def import_module_subs_with_registration(mname, fpath):
     valid_functions = _utils.get_sub_valid_functions_from_module(mname)
     for f in valid_functions:
         _register_sub(f, mname, _isactive=True)
-
-
-    
-
-
 
 
 def _pyobj_func_wrapper(func):
@@ -347,8 +350,12 @@ def generate_wrapped_function(mname, fname):
     raise NotImplementedError("Function type is not supported")
 
 
-def generate_wrapped_function_sub(mname, fname):
-    """primary interface for generating wrapped functions which pre-parse excel arguments."""
-    # func = sys.modules[mname][fname]
-    func = _module_fname_func_register[mname][fname]
-    return func
+def expand(func):
+    ...
+
+
+# def generate_wrapped_function_sub(mname, fname):
+#     """primary interface for generating wrapped functions which pre-parse excel arguments."""
+#     # func = sys.modules[mname][fname]
+#     func = _module_fname_func_register[mname][fname]
+#     return func

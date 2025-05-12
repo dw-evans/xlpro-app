@@ -254,9 +254,15 @@ class xlproWorkspace:
 
         self._uid_results_map_lock = threading.Lock()
         self._uid_results_map:dict=None
+        
+        self._uid_subresults_map_lock = threading.Lock()
+        self._uid_subresults_map:dict[str, tuple]=None
+        
+        self._uid_subresults_display_map_lock = threading.Lock()
+        self._uid_subresults_display_map:dict[str, tuple]=None
 
         self._uid_result_iscomplete_map_lock = threading.Lock()
-        self._uid_result_iscomplete_map:dict=None
+        self._uid_result_iscomplete_map:dict=None # {uid: [subres0, subres1, ..., subresN]}
 
         self._uid_result_type_map_lock = threading.Lock()
         self._uid_result_type_map:dict=None
@@ -381,14 +387,27 @@ class xlproWorkspace:
 
     def reset_workspace_cache(self):
         logger.debug("Initializing hashmaps")
-        self._uid_result_display_map = {} # the result to be displayed
-        self._uid_results_map = {} # the actual results
-        self._uid_result_iscomplete_map = {}
-        self._uid_result_type_map = {}
-        self._uid_to_caller_map = {}
-        self._uid_pending_function_map = {} # uid: func
-        self._caller_address_uid_map = {} # uid: address
-        self._uid_args_cache = {}
+        with self._uid_result_display_map_lock:
+            self._uid_result_display_map = {} # the result to be displayed
+        with self._uid_results_map_lock:
+            self._uid_results_map = {} # the actual results
+        with self._uid_result_iscomplete_map_lock:
+            self._uid_result_iscomplete_map = {}
+        with self._uid_result_type_map_lock:
+            self._uid_result_type_map = {}
+        with self._uid_to_caller_map_lock:
+            self._uid_to_caller_map = {}
+        with self._uid_pending_function_map_lock:
+            self._uid_pending_function_map = {} # uid: func
+        with self._caller_address_uid_map_lock:
+            self._caller_address_uid_map = {} # uid: address
+        with self._uid_args_cache_lock:
+            self._uid_args_cache = {}
+
+        with self._uid_subresults_map_lock:
+            self._uid_subresults_map ={}
+        with self._uid_subresults_display_map_lock:
+            self._uid_subresults_display_map ={}
 
 
     def clear_uid(self, uid):
@@ -436,6 +455,20 @@ class xlproWorkspace:
         except:
             pass
         pass
+
+
+
+        try:
+            with self._uid_subresults_map_lock:
+                del self._uid_subresults_map[uid]
+        except:
+            pass
+        try:
+            with self._uid_subresults_display_map_lock:
+                del self._uid_subresults_display_map[uid]
+        except:
+            pass
+
 
     @staticmethod
     def hash_excel_function_call(*args:typing.Iterable[str]):
@@ -500,7 +533,10 @@ class xlproWorkspace:
             with self._uid_result_display_map_lock:
                 with self._uid_result_iscomplete_map_lock:
                     if self._uid_result_iscomplete_map.get(uid, False):
-                        ret = self._uid_result_display_map[uid]
+                        if f"{uid}_expanded" in self._uid_result_display_map:
+                            ret = self._uid_result_display_map[f"{uid}_expanded"]
+                        else:
+                            ret = self._uid_result_display_map[uid]
                         logger.debug(f"result marked complete, fetched cached result {ret}")
                         return ret
                 
@@ -559,10 +595,24 @@ class xlproWorkspace:
         args = list(args)
         for i, arg in enumerate(args):
             if isinstance(arg, str):
-                if m:=re.match(r"PyObj<(.*)>", arg):
+                # handle the basic pyobject case
+                if m:=re.match(r"^PyObj<(.*)>$", arg):
                     with self._uid_results_map_lock:
                         temp_uid = m.group(1)
                         args[i] = self._uid_results_map[temp_uid]
+
+                # handle the case for an address request for expanded values
+                elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
+                    with self._uid_results_map_lock:
+                        temp_uid = m.group(1)
+                        temp_addr = int(m.group(2))
+                        # try and look it up, pass the error through to the function if we encounter one.
+                        try:
+                            args[i] = self._uid_results_map[temp_uid][temp_addr]
+                        except IndexError as e:
+                            args[i] = e
+                        except Exception as e:
+                            raise errors.xlproUnhandledException
         def worker():
             f = _wrappers.generate_wrapped_function(self._temp_module_name, func.__name__)
             try:
@@ -775,6 +825,8 @@ class FigureGeneratingThread:
         self._return_event.set()
 
 
+# from concurrent.futures import ThreadPoolExecutor
+# x = ThreadPoolExecutor(max_workers=)
 
 class WorkerManager:
     """Manages function execution for a workspace. Sends results to the results manager"""
@@ -831,8 +883,8 @@ class WorkerManager:
                     logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
                     return
 
-                # t = threading.Thread(target=func, daemon=True)
-                t = threading.Thread(target=self.sleep_wrapper(func), daemon=True)
+                t = threading.Thread(target=func, daemon=True)
+                # t = threading.Thread(target=self.sleep_wrapper(func), daemon=True)
                 self._threadpool_dict[uid] = t
             # XXX - todo - limit the number of attempts for a given function in some way
             # XXX - todo - support sending terminate command to lingering worker threads
@@ -888,55 +940,11 @@ class ResultsManager:
         with self._server._uid_results_map_lock:
             self._server._uid_results_map[uid] = val
 
+    def _set_subresults_values(self, uid, val):
+        with self._server._uid_results_map_lock:
+            for i, subval in enumerate(val):
+                self._server._uid_results_map[f"{uid}_{i}"] = subval
 
-    def _recalculate_precedents(self, uid):
-        pythoncom.CoInitialize()
-        caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
-        precedents_stream = _utils.get_precedents_chain(caller_dispatch)
-        
-        precedents_recalculate = []
-        active_formulas = self._server.get_active_registered_functon_names()
-
-        u = [x.AddressLocal for x in precedents_stream]
-
-        for ps_disp in precedents_stream:
-            try:
-                ps_disp:"xl.Range"
-                formula = ps_disp.Formula2
-                ps_disp.Formula2 = ps_disp.Formula2
-                if "pd_function_create" in formula:
-                    pass
-                if _utils.formula_is_for_xlpro(formula, active_formulas):
-                    precedents_recalculate.append(ps_disp)
-                else:
-                    _utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - obj created in this thread
-            except Exception as e:
-                logger.warning(f"Error during recalculate: {e}")
-                continue
-        v = [x.AddressLocal for x in precedents_recalculate]
-        logger.debug(f"Precedents, '{len(v)}' {v[:min(12, len(v))]}")
-        for ps_disp in precedents_recalculate:
-            try:
-                ps_disp.Formula2 = ps_disp.Formula2
-            except Exception as e:
-                logger.warning(f"Error during recalculate2: {e}")
-                continue
-
-            _utils.comarshal_release_and_get_stream(ps_disp) # marshal release only afaik - XXX - todo - check
-        self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
-        pythoncom.CoUninitialize()
-
-    def _emergency_recalculate(self, uid) -> None:
-        """force a recalculate"""
-        raise NotImplementedError("please god dont use this looks dodgy")
-        pythoncom.CoInitialize()
-        try:
-            caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
-            caller_dispatch.Formula2 = caller_dispatch.Formula2
-            self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
-        except KeyError as e:
-            logger.error(f"Error during forced client update: '{uid}', {e}")
-        pythoncom.CoUninitialize()
 
     def signal_worker_manager_to_recalculate(self, uid):
         logger.debug(f"ResultsManager is waking the worker manager to recycle '{uid}'")
@@ -1011,16 +1019,17 @@ class ResultsManager:
             logger.warning(f"Returned value is a generic exception: {uid}, {val}")
             # ret = repr(val) # convert exception to string for it to show in excel.
 
+
         # if it is a valid return, write the result to the cache
         self._set_results_value(uid, ret)
+        # xxx - todo - only should expand the subresults if requested instead of every time an iterable is returned.
+        # if isinstance(val, typing.Iterable):
+        # if isinstance(val, list):
+        #     self._set_subresults_values(uid, val)
+
         # signal that it is complete
         with self._server._uid_result_iscomplete_map_lock:
             logger.debug(f"calculation marked complete {uid}")
-            try:
-                if "promise" in ret.lower():
-                    pass
-            except:
-                pass
             self._server._uid_result_iscomplete_map[uid] = True
         # remove from the pending function map once successfully completed.
         with self._server._uid_pending_function_map_lock:
@@ -1088,12 +1097,50 @@ class ClientManager:
             return self._server._uid_results_map[uid]
         
     def _get_value(self, uid):
-        # XXX - todo - move logic to server
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
         
+    def _get_subresult_display(self, uid):
+        with self._server._uid_subresults_map_lock:
+            return self._server._uid_subresults_map[uid]
+
+    def _update_client_iterable_result(self, uid) -> None:
+        """Update the data for the case where """
+        try:
+            caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
+            iterable_val = self._get_value(uid)
+
+            if isinstance(iterable_val, Exception):
+                logger.warning(f"Value is an exception: '{iterable_val}', '{uid}'")
+                self._set_result_display(uid, repr(iterable_val))
+
+            # construct a list off the iterable value
+            elif isinstance(iterable_val, typing.Iterable):
+                val_modified = []
+                for i, subval in enumerate(iterable_val):
+                    if isinstance(subval, (int, float, str, bool)):
+                        val_modified.append(subval)
+                    else:
+                        val_modified.append(f"PyObj<{uid}>_{i}")
+
+                # create a *_expanded variant of the uid result display
+                self._set_result_display(f"{uid}_expanded", np.array(val_modified).T)
+
+                pass
+
+            # update by resetting the formula
+            caller_dispatch.Formula2 = caller_dispatch.Formula2
+        except KeyError as e:
+            # XXX - todo - there is a risk of a keyerror here for some reason
+            logger.error(f"Error during client update: '{uid}', {e}")
+        finally:
+            try:
+                self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+            except:
+                pass
+    
     def _update_client_pyobject_result(self, uid) -> None:
-        """Update the data for the py_object case case (row-major arrays, strings, values)"""
+        """Update the data for the py_object case (row-major arrays, strings, values)"""
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val = self._get_value(uid)
@@ -1163,6 +1210,7 @@ class ClientManager:
             # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
             # look for an existing shape with the same name
+            ws:'xl._Worksheet'
             try:
                 shape = ws.Shapes(xl_name)
                 xpos, ypos = shape.Left, shape.Top
@@ -1232,8 +1280,12 @@ class ClientManager:
                 value = self._get_value(uid)
                 if type(value) == xlproImage:
                     self._update_client_image_result(uid)
-                elif isinstance(value, matplotlib.figure.Figure):
-                    self._update_client_pyobject_result(uid)
+                # elif isinstance(value, matplotlib.figure.Figure):
+                    # self._update_client_pyobject_result(uid)
+
+                elif type(value) == list:
+                    self._update_client_iterable_result(uid)
+                    
 
                 elif result_type == FunctionTypes.array_or_value:
                     self._update_client_default_result(uid)

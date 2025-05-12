@@ -162,9 +162,12 @@ class ExcelArrayConverter:
         if compare_generic_aliases(tdst, list1d):
             pass
 
+            
+        # map the input value to list1d or array1d
         if any([compare_generic_aliases(tdst, x) for x in [list1d, ndarray1d]]):
             intermediate = np.array(val)
             shape = intermediate.shape
+            # implicitly the shape is 2d, convert it to the user chosen list or ndarray
             if all([x > 1 for x in shape]):
                 raise TypeError("Provided value is not compatible with list1d")
             if compare_generic_aliases(tdst, list1d):
@@ -172,12 +175,14 @@ class ExcelArrayConverter:
             elif compare_generic_aliases(tdst, ndarray1d):
                 return intermediate.flatten()
         
+        # as above
         elif any([compare_generic_aliases(tdst, x) for x in [list2d, ndarray2d]]):
             intermediate = np.array(val)
             if compare_generic_aliases(tdst, list2d):
                 return intermediate.tolist()
             return intermediate
 
+        # handle generic lists and arrays
         elif tdst in [list, np.ndarray]:
             intermediate = np.array(val)
             if tdst == list:
@@ -189,10 +194,10 @@ class ExcelArrayConverter:
             # Needs to be a numpy array. maybe because it needs to be contigious memory?
             return np.array(val)
 
-
+        # handle things such as list[float], i.e. <origin>[<dtype>]
         else:
-            # handle things such as list[float]
             intermediate = np.array(val)
+
             if origin == list:
                 intermediate = np.array(val, dtype=dtype)
                 return intermediate.tolist()
@@ -208,6 +213,8 @@ class ExcelArrayConverter:
 
     @classmethod
     def _convert_alias_args_to_np_dtype(cls, args:tuple[type]):
+        """Converts the args of a generic alias into a single dtype for numpy conversion
+        A return of None will implicitly resort to numpy's conversion handling."""
 
         # XXX - todo - we may want to support strings in a fancy way...
         # For string arrays we probably want to fetch the .Text property of 
@@ -217,33 +224,47 @@ class ExcelArrayConverter:
 
         if len(args) == 0:
             return None
+        
         a0 = args[0]
+
+        # list[float, int, ...] using different types is not supported
         if not all([x == a0 for x in args]):
             raise TypeError(f"Type arguments {a0} are too complicated to convert")
+        
+        
+        # if the type has not been given for the list1d or list2d case return no type
         if a0 in [T, list[T]]:
-            # if the type has not been given for the list1d or list2d case return no type
             return None
+        
+        # recursively handle generic alias
         if isinstance(a0, typing.GenericAlias):
             if not typing.get_origin(a0) == list:
                 raise TypeError(f"Type {a0} cannot be processed, origin must be list")
             return cls._convert_alias_args_to_np_dtype(typing.get_args(a0))
         
+        # convert python types to numpy types for convenience.
         elif a0 == float:
             return np.float64
         elif a0 == int:
             return np.int64
         elif a0 == bool:
             return np.bool
+        
+        # unsure what this is for.
         elif isinstance(a0, TypeVar):
             return None
+        
+        # if the user specifies a specific dtype, resort to that
+        # numpy should catch any conversion errors when attempting to convert
         elif any([np.issubdtype(a0, x) for x in (np.floating, np.integer, np.bool)]):
-            # if the user specifies a specific dtype, resort to that
-            # numpy should catch any conversion errors when attempting to convert
             return a0
+        
+        
         else:
             # Let the numpy default behaviour run
             # XXX - todo - check how this behaves
             return None 
+
 
     @classmethod
     def _convert_back_to_range_format(cls, val):
@@ -259,6 +280,9 @@ class ExcelArrayConverter:
                 return [val]
 
         return val
+    
+
+
 
 
 if __name__ == "__main__":

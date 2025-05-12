@@ -200,7 +200,7 @@ def function_template_with_caller(func:Callable) -> str:
     Dim xlpro As Object
     Set xlpro = GetObject("new: " & xlpro_guid)
 {'\n'.join(arg_range_conversion_check_list)}
-    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}", {', '.join(arg_conversion_list)})
+    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}"{', ' if arg_conversion_list else ''}{', '.join(arg_conversion_list)})
 End Function
 """
     return ret
@@ -543,7 +543,7 @@ def is_arg_promise(arg):
 def is_arg_stringified_exception(arg):
     if not isinstance(arg, str):
         return False
-    return bool(re.match(r"^\w*((?:error)?(?:exception)?)\(.*\)$", arg, flags=re.IGNORECASE))
+    return bool(re.match(r"^\w*((?:error)|(?:exception))\(.*\)$", arg, flags=re.IGNORECASE))
 
 def pre_validate_args(args:tuple|list, kwargs:dict):
     for arg in list(args) + [v for v in kwargs.values()]:
@@ -790,6 +790,10 @@ def int2rgb(color:int): # -> tuple[int, int, int]:
     g = (color >> 8) & 0xFF
     b = (color >> 16) & 0xFF
     return (r, g, b)
+
+def rgb2int(color:tuple[int, int, int]):
+    r, g, b = color
+    return (b << 16) + (g << 8) + r
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)
