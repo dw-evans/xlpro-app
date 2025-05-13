@@ -106,13 +106,17 @@ class FunctionSignature:
 def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
     # XXX - todo - link this up with the enum in the server at some point
     f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
-    if ret_type == matplotlib.figure.Figure:
-        return FunctionTypes.py_object
-    elif ret_type == pd.DataFrame:
-        return FunctionTypes.py_object
-    elif ret_type == pd.Series:
-        return FunctionTypes.py_object
-    return FunctionTypes.array_or_value
+    # if ret_type == matplotlib.figure.Figure:
+    #     return FunctionTypes.py_object
+    # elif ret_type == pd.DataFrame:
+    #     return FunctionTypes.py_object
+    # elif ret_type == pd.Series:
+    #     return FunctionTypes.py_object
+    if isinstance(ret_type, (str, float, int, bool)):
+        return FunctionTypes.array_or_value
+    # elif any([ret_type == x for x in (list1d, list2d, ndarray1d, ndarray2d)]):
+    #     return FunctionTypes.array_or_value
+    return FunctionTypes.py_object
 
 
 # Converts python type to vb type
@@ -685,7 +689,11 @@ def show(val):
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         return ret
 
-    elif tval in [tuple, list1d, list2d, ndarray1d, ndarray2d]:
+    elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
+        # XXX - todo - fix tuple hack in excelarrayconverter class!
+        if tval == tuple:
+            val_adj = list(val)
+            tval = list
         tdst = tval
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         return ret

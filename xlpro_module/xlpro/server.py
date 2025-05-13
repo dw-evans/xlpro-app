@@ -1124,7 +1124,7 @@ class ClientManager:
                         val_modified.append(f"PyObj<{uid}>_{i}")
 
                 # create a *_expanded variant of the uid result display
-                self._set_result_display(f"{uid}_expanded", np.array(val_modified).T)
+                self._set_result_display(f"{uid}_expanded", np.array(val_modified, dtype=object))
 
                 pass
 
@@ -1278,19 +1278,26 @@ class ClientManager:
             try:
 
                 value = self._get_value(uid)
+
+                # handle images every time
                 if type(value) == xlproImage:
                     self._update_client_image_result(uid)
-                # elif isinstance(value, matplotlib.figure.Figure):
-                    # self._update_client_pyobject_result(uid)
 
-                elif type(value) == list:
-                    self._update_client_iterable_result(uid)
+                if any([type(value) == x for x in (str, bool, int, float)]):
+                    self._update_client_default_result(uid)
                     
-
+                # an array or value type will send the values directly to excel via COM
                 elif result_type == FunctionTypes.array_or_value:
                     self._update_client_default_result(uid)
+
+                # sends a string to excel which effectively points to a stored result
                 elif result_type == FunctionTypes.py_object:
-                    self._update_client_pyobject_result(uid)
+                    # a py_object list must be parsed before sending to excel to ensure the contents are compliant 
+                    if any([type(value) == x for x in (list, tuple)]):
+                        self._update_client_iterable_result(uid)
+                    else:
+                        self._update_client_pyobject_result(uid)
+
                 else:
                     raise Exception("Result type invalid")
                 # if successful we don't need to replace#

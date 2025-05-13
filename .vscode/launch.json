@@ -73,7 +73,7 @@
             "subProcess": true,
             "connect":{
                 "host":"localhost",
-                "port":52099
+                "port":52983
             },
             "pathMappings":[
                 {
