@@ -332,13 +332,14 @@ class xlproWorkspace:
         self.update_module_sub_map_wrapper()
         logger.info(f"Registration complete.")
 
-    def get_active_registered_functon_names(self):
-        return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
+    def get_active_registered_functon_map(self):
+        return {k: v for k, v in self._module_function_maps_wrapper.fname_func_register.items() if self._module_function_maps_wrapper.fname_isactive_register[k]}
+        # return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
     def get_active_registered_sub_names(self):
         return [k for k, isactive in self._module_sub_maps_wrapper.subname_isactive_register.items() if isactive]
     
     def get_active_registered_functions(self):
-        keys = self.get_active_registered_functon_names()
+        keys = self.get_active_registered_functon_map()
         return [self._module_function_maps_wrapper.fname_func_register[key] for key in keys]
     def get_active_registered_subs(self):
         keys = self.get_active_registered_sub_names()
@@ -381,9 +382,16 @@ class xlproWorkspace:
         self.reset_workspace_cache()
 
     def _get_function_by_name(self, fname):
-        return self._module_function_maps_wrapper.fname_func_register[fname]
+        try:
+            return self._module_function_maps_wrapper.fname_func_register[fname]
+        except:
+            raise KeyError
+
     def _get_sub_by_name(self, fname):
-        return self._module_sub_maps_wrapper.subname_func_register[fname]
+        try:
+            return self._module_sub_maps_wrapper.subname_func_register[fname]
+        except:
+            raise KeyError
 
     def reset_workspace_cache(self):
         logger.debug("Initializing hashmaps")
@@ -614,7 +622,12 @@ class xlproWorkspace:
                         except Exception as e:
                             raise errors.xlproUnhandledException
         def worker():
-            f = _wrappers.generate_wrapped_function(self._temp_module_name, func.__name__)
+            fname = _wrappers.get_registered_func_name(func, self._temp_module_name)
+            if func.__name__ == "xlpro_getitem":
+                pass
+            if func.__name__ == "getitem":
+                pass
+            f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
                 ret = f(*args, **kwargs)
                 self._result_queue.put((uid, ret))
@@ -669,8 +682,8 @@ class xlproWorkspace:
         #     p.stop()
 
     def get_vba_sync_text(self) -> str:
-        funcs = self.get_active_registered_functions()
-        return _utils.get_xlpro_vb_dynamic_component_contents(funcs)
+        # funcs = self.get_active_registered_functions()
+        return _utils.get_xlpro_vb_dynamic_component_contents(self.get_active_registered_functon_map())
     def get_vba_sync_text_subs(self) -> str:
         subs = self.get_active_registered_subs()
         return _utils.get_xlpro_vb_dynamic_component_contents_subs(subs)

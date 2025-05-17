@@ -154,11 +154,14 @@ if TYPE_CHECKING:
     from win32typelibs import excel as xl
 
 
-def function_template_with_caller(func:Callable) -> str:
+def function_template_with_caller(func:Callable, fname:str=None) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
     func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    if fname is not None:
+        func_name = fname
+
     docstring = func.__doc__
     arg_declaration_list = []
     arg_conversion_list = []
@@ -261,16 +264,17 @@ def init_xlpro_vb_dynamic_component(wb:"xl._Workbook", func_register:list[Callab
     # vb_dynamic_comdemod = None
     # pythoncom.CoUninitialize()
 
-def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str:
+# def get_xlpro_vb_dynamic_component_contents(func_register:list[Callable]) -> str:
+def get_xlpro_vb_dynamic_component_contents(func_register:dict[str: Callable]) -> str:
     s_list = []
 
     from xlpro import server 
     s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
 
-    for f in func_register:
+    for fname, f in func_register.items():
         if not isinstance(f, Callable):
             raise TypeError(f"Item must be a function, {type(f)}, {f}")
-        s_list.append(function_template_with_caller(f))
+        s_list.append(function_template_with_caller(func=f, fname=fname))
     return "\n".join(s_list)
 
 def get_xlpro_vb_dynamic_component_contents_subs(func_register:list[Callable]) -> str:
@@ -802,6 +806,22 @@ def int2rgb(color:int): # -> tuple[int, int, int]:
 def rgb2int(color:tuple[int, int, int]):
     r, g, b = color
     return (b << 16) + (g << 8) + r
+
+
+class ExpandedIterable(list):
+    def __init__(self, val):
+        if not isinstance(val, typing.Iterable):
+            raise TypeError(f"Type: {type(val)} cannot be expanded")
+
+def expand(val):
+    return ExpandedIterable(val)
+
+import operator
+def xlpro_getitem(obj, val:int):
+    return operator.getitem(obj, val)
+    
+    
+
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)

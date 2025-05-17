@@ -62,11 +62,13 @@ def _add_sub_module(mname):
 
 def _sub_set_active(func, mname, state:bool):
     _add_sub_module(mname)
+    # fname = get_registered_func_name(func, mname)
     fname = func.__name__
     _module_subname_isactive_register[mname][fname] = state
 
 def _register_sub(func, _mname, _isactive):
     _add_sub_module(_mname)
+    # fname = get_registered_func_name(func, _mname)
     fname = func.__name__
     _module_subname_func_register[_mname][fname] = func
     _module_func_subname_register[_mname][func] = fname
@@ -77,6 +79,7 @@ def register_sub(isactive=True):
     """Primary interface for registration"""
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
+        # fname = get_registered_func_name(func, mname)
         fname = func.__name__
         if not mname in _module_subname_func_register:
             _add_sub_module(mname)
@@ -132,23 +135,20 @@ def _add_func_module(mname):
 def _func_set_active(func, mname, state:bool): 
     if not isinstance(state, bool):
         raise TypeError
-    _add_func_module(mname)
-    fname = func.__name__
+    fname = get_registered_func_name(func, mname)
     _module_fname_isactive_register[mname][fname] = state
 
 def _func_set_jsonified(func, mname, isjsonified:bool): 
     if not isinstance(isjsonified, bool):
         raise TypeError
-    _add_func_module(mname)
-    fname = func.__name__
+    fname = get_registered_func_name(func, mname)
     if isjsonified:
         pass
     _module_fname_isjsonified_register[mname][fname] = isjsonified
 
 
 def _register_func(func, mname):
-    _add_func_module(mname)
-    fname = func.__name__
+    fname = get_registered_func_name(func, mname)
     _module_fname_func_register[mname][fname] = func
     _module_func_fname_register[mname][func] = fname
 
@@ -159,34 +159,47 @@ def _validate_func_type(_type):
 
 def _register_func_type(func, mname, _type):
     _validate_func_type(_type)
-    fname = func.__name__
+    fname = get_registered_func_name(func, mname)
     _module_fname_type_register[mname][fname] = _type
 
+def _register_fname(func, mname, fname):
+    if func in _module_func_fname_register[mname]:
+        raise Exception("Attempted to register function object again")
+    if fname in _module_fname_func_register[mname]:
+        raise Exception("Attempted to register function name again")
+    _module_func_fname_register[mname][func] = fname
+    _module_fname_func_register[mname][fname] = func
 
-def _register(func, _mname, _type, _isactive):
+def get_registered_func_name(func, mname):
+    return _module_func_fname_register[mname][func]
+
+def _register(func, _mname, _type, _isactive, fname:str=None):
+    _register_fname(func, _mname, fname if fname is not None else func.__name__)
     _register_func(func, _mname)
     _func_set_active(func, _mname, _isactive)
     if _type is None:
         _type = _utils.infer_func_result_type_from_type_hints(func)
     _register_func_type(func, _mname, _type)
 
-def register(_type:None|int=None, isactive=True):
+def register(_type:None|int=None, isactive=True, fname:str=None):
     """Registers the function for xlpro. User can set function type or rely on PEP-484 type hints
     per the documentation"""
+    if fname == "getitem":
+        pass
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
-        fname = func.__name__
-        if not mname in _module_fname_func_register:
-            _add_func_module(mname)
-        if not fname in _module_fname_func_register[mname]:
-            _register(func, mname, _type, isactive)
+        _add_func_module(mname)
+        _register(func=func, _mname=mname, _type=_type, _isactive=isactive, fname=fname)
         return func
     return wrapper
 
 
-def expand(val):
-    mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
-    ...
+# def expand(func):
+#     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
+#     def inner(*args, **kwargs):
+#         return _utils.expand(func(*args, **kwargs))
+#     return inner
+
 
 
 
@@ -284,7 +297,7 @@ def wrap_jsonify():
             return func(*args, **kwargs)
         
         # register()(func)
-        wrapper.__name__ = f"{func.__name__}_json"
+        wrapper.__name__ = f"{get_registered_func_name(func, mname)}_json"
         wrapper.__qualname__ = wrapper.__name__
 
         _register(wrapper, mname, None, True)
@@ -349,9 +362,6 @@ def generate_wrapped_function(mname, fname):
     
     raise NotImplementedError("Function type is not supported")
 
-
-def expand(func):
-    ...
 
 
 # def generate_wrapped_function_sub(mname, fname):
