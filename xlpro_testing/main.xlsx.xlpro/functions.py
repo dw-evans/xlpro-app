@@ -20,7 +20,7 @@ import pandas as pd
 xlpro.register()(xlpro.jsonify)
 xlpro.register()(xlpro.show)
 xlpro.register()(xlpro.show_image)
-xlpro.register()(xlpro.typ)
+xlpro.register()(xlpro.pytype)
 xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
 xlpro.register()(xlpro.int2rgb)

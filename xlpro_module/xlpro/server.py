@@ -37,7 +37,8 @@ from xlpro import _wrappers
 import regex as re
 from copy import deepcopy
 
-from xlpro._types import xlproImage
+from xlpro._types import xlproImage, xlproExpandedType
+from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
 
@@ -627,6 +628,8 @@ class xlproWorkspace:
                 pass
             if func.__name__ == "getitem":
                 pass
+            if func.__name__ == "add_line":
+                pass
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
                 ret = f(*args, **kwargs)
@@ -648,6 +651,8 @@ class xlproWorkspace:
                         logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
                         e = errors.xlproLikelyCOMAccessError(str(e))
                 elif isinstance(e, pythoncom.com_error):
+                    pass
+                elif isinstance(e, Exception):
                     pass
                 self._result_queue.put((uid, e))
                 logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
@@ -1118,7 +1123,7 @@ class ClientManager:
             return self._server._uid_subresults_map[uid]
 
     def _update_client_iterable_result(self, uid) -> None:
-        """Update the data for the case where """
+        """Update the data for the case where the result is a list"""
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             iterable_val = self._get_value(uid)
@@ -1179,7 +1184,12 @@ class ClientManager:
         """Update the data for the default case (row-major arrays, strings, values)"""
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
-            val = self._get_value(uid)
+            # handle the case where the return may be an array expand request or a basic value
+            val0 = self._get_value(uid)
+            if type(val0) == xlproExpandedType:
+                val = val0.data
+            else:
+                val = val0
             if isinstance(val, Exception):
                 logger.warning(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
@@ -1308,6 +1318,8 @@ class ClientManager:
                     # a py_object list must be parsed before sending to excel to ensure the contents are compliant 
                     if any([type(value) == x for x in (list, tuple)]):
                         self._update_client_iterable_result(uid)
+                    elif type(value) == xlproExpandedType:
+                        self._update_client_default_result(uid)
                     else:
                         self._update_client_pyobject_result(uid)
 

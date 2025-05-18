@@ -7,10 +7,13 @@ from xlpro._utils import (
     jsonify,
     show,
     show_image,
-    typ,
+    pytype,
     cpy,
     deepcpy,
-    int2rgb
+    int2rgb,
+    xlpro_getattr,
+    xlpro_getitem,
+    pynone
 )
 
 from xlpro._wrappers import (
@@ -20,21 +23,25 @@ from xlpro._wrappers import (
     register_sub
 )
 
-from xlpro._enums import (
-    FunctionTypes
-)
+# from xlpro._enums import (
+#     FunctionTypes
+# )
 
 from xlpro._types import (
     list1d,
     list2d,
     ndarray1d,
-    ndarray2d
+    ndarray2d,
+    xlproExpandedType,
+    xlproImage
+)
+from xlpro._types import (
+    xlproExpandedType,
+    xlproImage
 )
 
-from xlpro.formatter import (
-    conditional_formatter_example
-)
 
-
-
+# from xlpro.formatter import (
+#     conditional_formatter_example
+# )
 

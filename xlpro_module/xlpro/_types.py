@@ -161,7 +161,6 @@ class ExcelArrayConverter:
 
         if compare_generic_aliases(tdst, list1d):
             pass
-
             
         # map the input value to list1d or array1d
         if any([compare_generic_aliases(tdst, x) for x in [list1d, ndarray1d]]):
@@ -282,6 +281,16 @@ class ExcelArrayConverter:
         return val
     
 
+
+class xlproExpandedType:
+    """Class to signal that an array is to be expanded."""
+    def __init__(self, arraydata):
+        oned_direction_rowwise = False
+        if oned_direction_rowwise:
+            if len((npdata:=np.array(arraydata)).shape) == 1:
+                self.data = npdata.reshape(-1, 1)
+        else:
+            self.data = arraydata
 
 
 

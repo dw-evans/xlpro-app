@@ -671,7 +671,7 @@ def deepcpy(val):
     """returns a deep copy of the object"""
     return _copy.deepcopy(val)
 
-from xlpro._types import xlproImage
+from xlpro._types import xlproImage, xlproExpandedType
 
 def show(val):
     """converts a value to excel-ready representation"""
@@ -680,18 +680,19 @@ def show(val):
     tval = type(val)
     val_adj = val
     tdst:type=None
+    ret = None
+    calc_success = False
 
     if tval == pd.DataFrame:
         tdst = ndarray2d
         val_adj = val.to_numpy()
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
-        return ret
+        calc_success = True
 
     elif tval == pd.Series:
         tdst = ndarray2d
         val_adj = val.to_numpy()
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
-        return ret
 
     elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
         # XXX - todo - fix tuple hack in excelarrayconverter class!
@@ -700,16 +701,27 @@ def show(val):
             tval = list
         tdst = tval
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
-        return ret
+        calc_success = True
+    
+    elif tval == np.ndarray:
+        tdst = ndarray2d
+        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+        calc_success = True
 
     elif isinstance(val, Exception):
         raise val
     
     elif tval == str:
-        return val
+        ret = val
+        calc_success = True
+    
+    if calc_success:
+        return xlproExpandedType(ret)
+
 
     # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")
+
 
 
 def px_to_pt(px, dpi):
@@ -784,7 +796,7 @@ def show_image(val, name:str,
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
-def typ(val):
+def pytype(val):
     if val is None:
         return None
     ret = str(type(val))
@@ -808,19 +820,27 @@ def rgb2int(color:tuple[int, int, int]):
     return (b << 16) + (g << 8) + r
 
 
-class ExpandedIterable(list):
-    def __init__(self, val):
-        if not isinstance(val, typing.Iterable):
-            raise TypeError(f"Type: {type(val)} cannot be expanded")
+# class ExpandedIterable(list):
+#     def __init__(self, val):
+#         if not isinstance(val, typing.Iterable):
+#             raise TypeError(f"Type: {type(val)} cannot be expanded")
 
-def expand(val):
-    return ExpandedIterable(val)
+# def expand(val):
+#     return ExpandedIterable(val)
 
 import operator
 def xlpro_getitem(obj, val:int):
+    """Typed wrapper for getitem"""
     return operator.getitem(obj, val)
     
+def xlpro_getattr(obj, attrname:str, default:Any):
+    """Typed wrapper for getattr"""
+    return getattr(obj, attrname, default)
     
+def pynone():
+    """Returns Python None"""
+    return None    
+
 
 
 if __name__ == "__main__":
