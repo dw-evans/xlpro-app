@@ -1,5 +1,89 @@
 Attribute VB_Name = "xlpro_static"
 
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:24:59
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:23:38
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:22:54
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:22:11
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:21:42
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:21:27
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:20:44
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:12:50
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:03:58
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 23:00:58
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 22:59:23
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-05-19, 22:54:01
+' ### END METADATA ###
+
+
 Option Explicit
 
 Public Const XLPRO_GUID As String = ""
@@ -140,6 +224,11 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     Debug.Print command
     taskID = shell(command, vbNormalFocus)
 End Sub
+
+
+sub dummy(ByRef control as Office.IRibbonControl)
+    MsgBox "placeholder sub"
+end sub
 
 '------------------------------------------------------------------------
 'Items below here are helper subroutines for the addin.
@@ -380,22 +469,6 @@ Public Function ptr(rng As Range)
     ptr = "*<" & wb.FullName & "::" & ws.Name & "::" & rng.Address & ">"
 End Function
 
-
-Sub test(val As Long, val2 As Long)
-    ActiveSheet.Range("A1").Value = val + val2
-End Sub
-
-Sub test2(val As Variant)
-    Dim i0 As Long
-    i0 = LBound(val)
-    ActiveSheet.Range("A1").Value = val(i0) + val(i0 + 1)
-End Sub
-
-Sub test3(val As Variant)
-    Dim i0 As Long
-    i0 = LBound(val)
-    ActiveSheet.Range("A1").Value = val(i0) & val(i0 + 1)
-End Sub
 
 Sub conditional_format_handler(workbook_name As String, sheet_name As String, range_names As Variant, colors As Variant, return_uid As String)
     'pass the areas and conditional formatting colours for each area

@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/archive-24.png" Id="archive-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/cpu-24.png" Id="cpu-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-code-24.png" Id="file-code-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/flame-24.png" Id="flame-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/gear-16.png" Id="gear-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/gear-24.png" Id="gear-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/info-24.png" Id="info-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/play-24.png" Id="play-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/question-16.png" Id="question-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/question-24.png" Id="question-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/server-24.png" Id="server-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/squirrel-24.png" Id="squirrel-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/sync-24.png" Id="sync-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/tools-24.png" Id="tools-24" />
+</Relationships>

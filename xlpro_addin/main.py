@@ -20,6 +20,7 @@ xlam_dist_file_name = xlpro_xlam_fp.stem + xlpro_xlam_fp.suffix
 custom_ui_folder_name = "customUI"
 rels_folder_name = "_rels"
 xlstart_archive_dirname = "archive"
+contenttypes_xml_name = "[Content_Types].xml"
 
 
 import typing
@@ -96,12 +97,14 @@ def extract():
     custom_ui_fp = archive_fp / custom_ui_folder_name
     shutil.copytree(custom_ui_fp, src_dir / custom_ui_fp.name)
 
+
+
     print(f"fetching the rels folder from archive")
     rels_fp = archive_fp / "_rels"
     shutil.copytree(rels_fp, src_dir / rels_fp.name)
 
     # cleanup
-    print("deleting temprary directory")
+    print("deleting temporary directory")
     shutil.rmtree(temp_dir)
 
     print("done")
@@ -124,8 +127,6 @@ def unzip_folder(src, dst):
 def build():
     regen_temp_dir()
     dst_dir.mkdir(exist_ok=True)
-
-
 
     xlapp:'xl._Application' = Dispatch("excel.application")
     xlapp.Visible = True
@@ -197,18 +198,16 @@ def build():
     archive_custom_ui_dir = archive_fp / custom_ui_folder_name
     replace_folder(src_dir / custom_ui_folder_name, archive_custom_ui_dir)
 
+    # copy the content types into the archive
+    os.remove(archive_fp / contenttypes_xml_name)
+    shutil.copy2(src_dir / contenttypes_xml_name, archive_fp / contenttypes_xml_name)
 
-    # and copy the source customUI directory into the zip file.
-    archive_custom_ui_dir = archive_fp / rels_folder_name
-    replace_folder(src_dir / rels_folder_name, archive_custom_ui_dir)
+    # replace top level rels
+    rels_dir = archive_fp / rels_folder_name
+    replace_folder(src_dir / rels_folder_name, rels_dir)
 
 
     pass
-    # def modify_custom_ui():
-    #     s = '<Relationship Id="Re5c5f97222814fd1" Type="http://schemas.microsoft.com/office/2007/relationships/ui/extensibility" Target="customUI/customUI14.xml"/>'
-        
-
-
     # remove the temporary zipped file
     os.remove(tmp_xlam_fp)
     # zip the archive and conver to xlam extension
@@ -218,7 +217,7 @@ def build():
     shutil.copy2(tmp_xlam_fp, dst_dir / xlam_dist_file_name)
 
     # cleanup
-    print("deleting temprary directory")
+    print("deleting temporary directory")
     shutil.rmtree(temp_dir)
     print("done")
 
@@ -269,7 +268,10 @@ def main():
         print("No action provided. Use --build or --extract.")
 
 
+import sys
+
 if __name__ == "__main__":
+    sys.argv = [__file__, "--build", "--push"]
     main()
     # build()
     # reload_to_xlstart()

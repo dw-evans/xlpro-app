@@ -2,21 +2,35 @@
   <ribbon startFromScratch="false"> 
     <tabs> 
       <tab id="CustomTab" label="xlpro"> 
-        <group id="SimpleControls" label="My Group"> 
-          <button id="Button1" imageMso="HappyFace" size="large" 
-                  label="init workbook" 
-                  screentip="init workbook" 
+        <group id="group1" label=" "> 
+          <button id="Button1" image="cpu-24" size="large" 
+                  label="Init" 
+                  screentip="Initialize" 
                   onAction="xlproInit"/> 
-          <button id="Button2" imageMso="HappyFace" size="large" 
-                  label="start py server" 
-                  screentip="start py server" 
+        </group> 
+        <group id="group2" label=" "> 
+          <button id="Button2" image="play-24" size="large" 
+                  label="Serve" 
+                  screentip="Start Server" 
                   onAction="xlproStart"/> 
-          <button id="Button3" imageMso="HappyFace" size="large" 
-                  label="refresh py server" 
-                  screentip="refresh py server" 
+          <button id="Button3" image="sync-24" size="large" 
+                  label="Sync" 
+                  screentip="Sync" 
                   onAction="xlproRegister"/> 
-          <button id="Button4" imageMso="HappyFace" size="large" 
-                  label="start vscode" 
+        </group> 
+        <group id="group3" label=" "> 
+          <button id="Button4" image="file-code-24" size="large" 
+                  label="Edit" 
+                  screentip="start vs code" 
+                  onAction="xlproStartIDE"/> 
+        </group> 
+        <group id="group4" label=" "> 
+          <button id="Button5" image="gear-16" 
+                  label="Configure" 
+                  screentip="something" 
+                  onAction="xlproStartIDE"/> 
+          <button id="Button6" image="question-16" 
+                  label="Documentation" 
                   screentip="start vs code" 
                   onAction="xlproStartIDE"/> 
         </group> 
