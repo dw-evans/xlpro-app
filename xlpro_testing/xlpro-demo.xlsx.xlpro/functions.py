@@ -75,6 +75,67 @@ def add_line_unique(ax:matplotlib.axes.Axes, x:ndarray1d, y:ndarray2d, tag:str):
         return ln
     raise Exception(f"Duplicate line tag {tag}")
 
+# @xlpro.ignore()
+def get_all_artists(ax:matplotlib.axes.Axes):
+    lines = ax.lines                          # List of Line2D objects
+    collections = ax.collections              # For things like scatter plots, contour fills
+    patches = ax.patches                      # Rectangles, Circles, Polygons, etc.
+    texts = ax.texts                          # All Text objects including annotations
+    images = ax.images                        # Any image (imshow, etc.)
+    artists = ax.artists                      # Miscellaneous Artist objects
+    tables = ax.tables                        # Tables
+    containers = ax.containers                # Bar containers, etc.
+
+    all_artists = (
+        ax.lines +
+        ax.collections +
+        ax.patches +
+        ax.texts +
+        ax.images +
+        ax.artists +
+        ax.containers +
+        list(ax.tables.values())  # tables is a dict
+    )
+
+    return all_artists
+
+
+def add_line_point_unique(ax:matplotlib.axes.Axes, ln:matplotlib.lines.Line2D, xpos:float, tag):
+    for t in ax.texts:
+        if tag == getattr(t, "_tag", None):
+            t.remove()
+    
+    xdata = list(ln.get_xdata())
+    ydata = list(ln.get_ydata())
+
+    # Interpolate or extrapolate y value at xpos
+    if len(xdata) >= 2:
+        # Sort xdata and ydata together by x
+        sorted_points = sorted(zip(xdata, ydata))
+        xs, ys = zip(*sorted_points)
+        yval = np.interp(xpos, xs, ys)
+    else:
+        # Not enough points to interpolate
+        yval = 0.0
+
+    # Redraw the line (only necessary outside interactive mode)
+    ax.draw_artist(ln)
+
+    # Annotate the new point
+    label = str((float(xpos), float(yval)))
+
+    annot = ax.annotate(label,
+                xy=(xpos, yval),
+                xytext=(5, 5),
+                textcoords='offset points',
+                color='white',
+                fontsize=8.0)
+    annot._tag = tag
+
+    return annot
+
+
+
 def show_image_with_seed(val, name:str, seed):
     return xlpro.show_image(val, name)
 
@@ -175,6 +236,7 @@ def np_create_random_typed(n:int, m:int) -> ndarray2d:
 
 def get_address(caller:'xl.Range'):
     return caller.Address
+
 
 # import random
 # import time
