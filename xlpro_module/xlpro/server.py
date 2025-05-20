@@ -599,29 +599,57 @@ class xlproWorkspace:
         if kwargs:
             raise Exception("kwargs should not be here!")
         pass
+
+        def modify_args_list(args:list):
+            for i, arg in enumerate(args):
+                if isinstance(arg, str):
+                    if not arg.startswith("PyObj"):
+                        continue
+                    # handle the basic pyobject case
+                    if m:=re.match(r"^PyObj<(.*)>$", arg):
+                        with self._uid_results_map_lock:
+                            temp_uid = m.group(1)
+                            args[i] = self._uid_results_map[temp_uid]
+
+                    # handle the case for an address request for expanded values
+                    elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
+                        with self._uid_results_map_lock:
+                            temp_uid = m.group(1)
+                            temp_addr = int(m.group(2))
+                            # try and look it up, pass the error through to the function if we encounter one.
+                            try:
+                                args[i] = self._uid_results_map[temp_uid][temp_addr]
+                            except IndexError as e:
+                                args[i] = e
+                            except Exception as e:
+                                raise errors.xlproUnhandledException
+            return args
+            
         # check for py object request
         # args0 = deepcopy(args)
+        import copy
+        args_original = copy.deepcopy(args)
         args = list(args)
-        for i, arg in enumerate(args):
-            if isinstance(arg, str):
-                # handle the basic pyobject case
-                if m:=re.match(r"^PyObj<(.*)>$", arg):
-                    with self._uid_results_map_lock:
-                        temp_uid = m.group(1)
-                        args[i] = self._uid_results_map[temp_uid]
+        # modify level 0 of the args
+        modify_args_list(args)
+        # check if level 1 needs to be modified
+        try:
+            for i, arg in enumerate(args):
+                # a tuple nested arg may contain pyobject strings
+                if isinstance(arg, (tuple, list)):
+                    args[i] = modify_args_list(list(arg))
+                    for i0, arg0 in enumerate(args[i]):
+                        if isinstance(arg0, (list, tuple)):
+                            args[i][i0] = modify_args_list(list(arg0))
+            pass
+        except Exception as e:
+            raise e
+                
 
-                # handle the case for an address request for expanded values
-                elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
-                    with self._uid_results_map_lock:
-                        temp_uid = m.group(1)
-                        temp_addr = int(m.group(2))
-                        # try and look it up, pass the error through to the function if we encounter one.
-                        try:
-                            args[i] = self._uid_results_map[temp_uid][temp_addr]
-                        except IndexError as e:
-                            args[i] = e
-                        except Exception as e:
-                            raise errors.xlproUnhandledException
+        if func.__name__ == "add_legend":
+            pass
+                    
+                
         def worker():
             fname = _wrappers.get_registered_func_name(func, self._temp_module_name)
             if func.__name__ == "xlpro_getitem":

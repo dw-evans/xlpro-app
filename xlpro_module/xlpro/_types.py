@@ -147,8 +147,11 @@ class ExcelArrayConverter:
         # excel will provide a range as tuple[tuple]
         # or a 1x1 range as a value.
 
+        if tdst == list1d[str]:
+            pass
+
         # return the incoming value if not a 2d array needing conversion
-        if not isinstance(val, tuple):
+        if not isinstance(val, (tuple, list)):
             return val
 
         # dissect the destination type
@@ -188,10 +191,10 @@ class ExcelArrayConverter:
                 return intermediate.tolist()
             return intermediate
         
-        elif tdst in [tuple,]:
-            # XXX - todo - for some reason Excel doesn't accept a tuple of tuples as a return type. 
-            # Needs to be a numpy array. maybe because it needs to be contigious memory?
-            return np.array(val)
+        # elif tdst in [tuple,]:
+        #     # XXX - todo - for some reason Excel doesn't accept a tuple of tuples as a return type. 
+        #     # Needs to be a numpy array. maybe because it needs to be contigious memory?
+        #     return np.array(val)
 
         # handle things such as list[float], i.e. <origin>[<dtype>]
         else:
@@ -248,6 +251,8 @@ class ExcelArrayConverter:
             return np.int64
         elif a0 == bool:
             return np.bool
+        elif a0 == str:
+            return str
         
         # unsure what this is for.
         elif isinstance(a0, TypeVar):
