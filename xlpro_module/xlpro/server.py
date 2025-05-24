@@ -37,7 +37,7 @@ from xlpro import _wrappers
 import regex as re
 from copy import deepcopy
 
-from xlpro._types import xlproImage, xlproExpandedType
+from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
@@ -557,6 +557,11 @@ class xlproWorkspace:
             with self._caller_address_uid_map_lock:
                 # the hash will be constant for a function/args/caller combination so this is valid
                 if caller_addr in self._caller_address_uid_map.keys():
+                    # XXX - todo - this chain will wipe nested calculations within the same cell
+                    # Even if we check which function is being executed we would still fail if the same
+                    # nested function call occurs from the same cell.
+                    # The function hash might pay to be generated from vba using cell range addrs
+                    # Then we can check if ...
                     self.clear_uid(self._caller_address_uid_map[caller_addr])
                 self._caller_address_uid_map[caller_addr] = uid
 
@@ -610,6 +615,8 @@ class xlproWorkspace:
                         with self._uid_results_map_lock:
                             temp_uid = m.group(1)
                             args[i] = self._uid_results_map[temp_uid]
+                            if isinstance(args[i], xlproCollapsedType):
+                                args[i] = args[i].data 
 
                     # handle the case for an address request for expanded values
                     elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
@@ -619,6 +626,8 @@ class xlproWorkspace:
                             # try and look it up, pass the error through to the function if we encounter one.
                             try:
                                 args[i] = self._uid_results_map[temp_uid][temp_addr]
+                                if isinstance(args[i], xlproCollapsedType):
+                                    args[i] = args[i].data 
                             except IndexError as e:
                                 args[i] = e
                             except Exception as e:
@@ -1146,10 +1155,6 @@ class ClientManager:
         with self._server._uid_results_map_lock:
             return self._server._uid_results_map[uid]
         
-    def _get_subresult_display(self, uid):
-        with self._server._uid_subresults_map_lock:
-            return self._server._uid_subresults_map[uid]
-
     def _update_client_iterable_result(self, uid) -> None:
         """Update the data for the case where the result is a list"""
         try:
@@ -1189,7 +1194,11 @@ class ClientManager:
         """Update the data for the py_object case (row-major arrays, strings, values)"""
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
-            val = self._get_value(uid)
+            val0 = self._get_value(uid)
+            if isinstance(val0, xlproCollapsedType):
+                val = val0.data
+            else:
+                val = val0
             if isinstance(val, Exception):
                 logger.warning(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
@@ -1327,8 +1336,10 @@ class ClientManager:
 
             # Decide whether to recycle
             try:
-
                 value = self._get_value(uid)
+
+                if uid.lower().startswith("$f$36"):
+                    pass
 
                 # handle images every time
                 if type(value) == xlproImage:
@@ -1339,7 +1350,10 @@ class ClientManager:
                     
                 # an array or value type will send the values directly to excel via COM
                 elif result_type == FunctionTypes.array_or_value:
-                    self._update_client_default_result(uid)
+                    if type(value) == xlproCollapsedType:
+                        self._update_client_pyobject_result(uid)
+                    else:
+                        self._update_client_default_result(uid)
 
                 # sends a string to excel which effectively points to a stored result
                 elif result_type == FunctionTypes.py_object:
@@ -1353,6 +1367,8 @@ class ClientManager:
 
                 else:
                     raise Exception("Result type invalid")
+                
+                
                 # if successful we don't need to replace#
                 logger.debug(f"Client manager successfully processed uid '{uid}'. Not replacing")
                 replace_in_queue = False

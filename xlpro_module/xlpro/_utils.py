@@ -671,7 +671,7 @@ def deepcpy(val):
     """returns a deep copy of the object"""
     return _copy.deepcopy(val)
 
-from xlpro._types import xlproImage, xlproExpandedType
+from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 
 def show(val):
     """converts a value to excel-ready representation"""
@@ -799,8 +799,16 @@ def show_image(val, name:str,
 def pytype(val):
     if val is None:
         return None
+    if isinstance(val, xlproCollapsedType):
+        return f"xlproCollapsedType[{str(type(val.data))}]"
     ret = str(type(val))
     return ret
+
+def pyrepr(val):
+    if val is None:
+        return None
+    return repr(val)
+        
 
 # def vectorize(func_name:str, args_list) -> list1d:
 #     ret = []

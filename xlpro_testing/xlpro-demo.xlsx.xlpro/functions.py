@@ -30,6 +30,8 @@ xlpro.register()(xlpro.pytype)
 xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
 xlpro.register()(xlpro.int2rgb)
+xlpro.register()(xlpro.pyrepr)
+
 # xlpro.register()(xlpro.conditional_formatter_example)
 
 
@@ -69,11 +71,42 @@ def add_line(ax:matplotlib.axes.Axes, x:ndarray1d, y:ndarray2d):
 def add_line_unique(ax:matplotlib.axes.Axes, x:ndarray1d, y:ndarray2d, tag:str):
     if tag is None:
         raise Exception(f"InvalidTag")
-    if not tag in [getattr(x, "_tag", None) for x in ax.get_lines()]:
-        ln, = ax.plot(x, y)
-        ln._tag = tag
-        return ln
-    raise Exception(f"Duplicate line tag {tag}")
+    for line in ax.get_lines():
+        if tag == getattr(x, "_tag", None):
+            line.remove()
+    ln, = ax.plot(x, y, color=None)
+    ln._tag = tag
+    return ln
+
+def add_point_marker_unique(ax:matplotlib.axes.Axes, x:ndarray1d, y:ndarray2d, tag:str):
+    if tag is None:
+        raise Exception(f"InvalidTag")
+    for line in ax.get_lines():
+        if tag == getattr(line, "_tag", None):
+            line.remove()
+    ln, = ax.plot(x, y, marker="o", markersize=5)
+    ln._tag = tag
+    return ln
+
+def hex_to_rgb_tuple(hex_str:str):
+    """Convert a hex color string (#RRGGBB or #RRGGBBAA) to a tuple of integers (R, G, B) or (R, G, B, A)."""
+    hex_str = hex_str.strip().lstrip('#')
+    
+    if len(hex_str) not in (6, 8):
+        raise ValueError("Hex color must be in the format #RRGGBB or #RRGGBBAA")
+
+    r = int(hex_str[0:2], 16)
+    g = int(hex_str[2:4], 16)
+    b = int(hex_str[4:6], 16)
+
+    if len(hex_str) == 8:
+        a = int(hex_str[6:8], 16)
+        return (r, g, b, a)
+    else:
+        return (r, g, b)
+
+def condense(iterable_val):
+    return xlpro.xlproCollapsedType(iterable_val)
 
 # @xlpro.ignore()
 def get_all_artists(ax:matplotlib.axes.Axes):
@@ -100,13 +133,15 @@ def get_all_artists(ax:matplotlib.axes.Axes):
     return all_artists
 
 
-def add_line_point_unique(ax:matplotlib.axes.Axes, ln:matplotlib.lines.Line2D, xpos:float, tag):
+def add_line_point_unique(ax:matplotlib.axes.Axes, ln:matplotlib.lines.Line2D, xpos:float, tag:str):
     for t in ax.texts:
         if tag == getattr(t, "_tag", None):
             t.remove()
     
     xdata = list(ln.get_xdata())
     ydata = list(ln.get_ydata())
+
+    ln_color = ln.get_color()
 
     # Interpolate or extrapolate y value at xpos
     if len(xdata) >= 2:
@@ -121,6 +156,8 @@ def add_line_point_unique(ax:matplotlib.axes.Axes, ln:matplotlib.lines.Line2D, x
     # Redraw the line (only necessary outside interactive mode)
     ax.draw_artist(ln)
 
+
+
     # Annotate the new point
     label = str((float(xpos), float(yval)))
 
@@ -131,6 +168,8 @@ def add_line_point_unique(ax:matplotlib.axes.Axes, ln:matplotlib.lines.Line2D, x
                 color='white',
                 fontsize=8.0)
     annot._tag = tag
+
+    pt = add_point_marker_unique(ax, xpos, yval, f"{tag}_0")
 
     return annot
 

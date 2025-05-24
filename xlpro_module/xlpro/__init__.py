@@ -13,7 +13,8 @@ from xlpro._utils import (
     int2rgb,
     xlpro_getattr,
     xlpro_getitem,
-    pynone
+    pynone,
+    pyrepr,
 )
 
 from xlpro._wrappers import (
@@ -32,12 +33,11 @@ from xlpro._types import (
     list2d,
     ndarray1d,
     ndarray2d,
-    xlproExpandedType,
-    xlproImage
 )
 from xlpro._types import (
     xlproExpandedType,
-    xlproImage
+    xlproCollapsedType,
+    xlproImage,
 )
 
 
