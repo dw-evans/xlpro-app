@@ -107,6 +107,7 @@ XLPRO_ASSETS_DIR = XLPRO_INSTALL_DIR / "assets"
 
 XLPRO_INSTALLER_ASSETS_DIR = BASE_PATH / "assets"
 
+
 def get_preinstalled_uv_path():
     return Path() / r"C:\Users\Daniel Evans\.local\bin\uv.exe"
 
@@ -256,7 +257,7 @@ def install():
     shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)    
 
     logger.info("Copying examples")
-    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "examples"), XLPRO_ASSETS_DIR / x.name)       
+    shutil.copytree(XLPRO_INSTALLER_ASSETS_DIR / "xlpro_examples", XLPRO_ASSETS_DIR / "examples")       
 
     logger.info("Copying wheel")
     shutil.copy2(x:=(list(XLPRO_INSTALLER_ASSETS_DIR.glob("*.whl"))[0]), XLPRO_ASSETS_DIR / x.name)       

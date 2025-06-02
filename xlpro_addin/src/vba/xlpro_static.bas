@@ -3,85 +3,44 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:24:59
+' At 2025-06-02, 23:51:42
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:23:38
+' At 2025-06-02, 23:43:42
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:22:54
+' At 2025-06-02, 23:39:53
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:22:11
+' At 2025-06-02, 23:37:44
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:21:42
+' At 2025-06-02, 23:36:45
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:21:27
+' At 2025-06-02, 23:30:34
 ' ### END METADATA ###
 
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:20:44
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:12:50
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:03:58
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 23:00:58
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 22:59:23
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-05-19, 22:54:01
-' ### END METADATA ###
 
 
 Option Explicit

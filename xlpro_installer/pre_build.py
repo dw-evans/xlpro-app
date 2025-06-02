@@ -15,12 +15,18 @@ paths = [
     "startfiles",
     f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl",
     f"../xlpro_module/config.toml",
-    f"../xlpro_addin/xlpro.xlam",
+    f"../xlpro_addin/dist/xlpro.xlam",
     f"../xlpro_cli/dist/xlpro-cli.exe",
-    f"../xlpro_module/examples",
+    f"../xlpro_examples",
 ]
 
+import os
+import shutil
+
 out_dir = wd / "assets"
+# os.rmdir(out_dir)
+shutil.rmtree(out_dir)
+
 out_dir.mkdir(exist_ok=True)
 
 # if not list(x for x in out_dir.glob("*")):

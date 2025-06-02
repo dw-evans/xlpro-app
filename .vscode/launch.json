@@ -24,14 +24,8 @@
             "request":"launch",
             "program":"xlpro_cli/main.py",
             "args": [
-                // "init",
-                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
-                // "guid",
-                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/Book1.xlsx"
-                // "init",
-                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
                 "init",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-demo.xlsx"
             ],
         },
         {
@@ -41,7 +35,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "start",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-demo.xlsx"
             ],
         },
         {
@@ -51,21 +45,10 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "guid",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-demo.xlsx"
             ],
         },
-        // {
-        //     "name":"xlpro_module run server on port",
-        //     "type":"debugpy",
-        //     "request":"launch",
-        //     "module":"xlpro.run_server",
-        //     "args": [
-        //         "--workbook_path",
-        //         "C:/Users/Daniel Evans/projects/xlpro/xlpro_testing/main.xlsx",
-        //         "--debugpy_port",
-        //         "5678"
-        //     ]
-        // },
+
         {
             "name":"debugpy: remote port",
             "type":"debugpy",

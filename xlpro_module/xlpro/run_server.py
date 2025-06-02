@@ -32,9 +32,9 @@ import debugpy
 
 wd = Path(__file__).parent
 
-__logging_dir = Path(config.logging_path).parent
-if not __logging_dir.exists():
-    __logging_dir.mkdir(parents=True, exist_ok=True)
+# __logging_dir = Path(config.logging_path).parent
+# if not __logging_dir.exists():
+#     __logging_dir.mkdir(parents=True, exist_ok=True)
 
 
 logging.basicConfig(
@@ -95,17 +95,9 @@ def serve():
 
     logger.debug(f"serve() being run at root directory: {os.getcwd()}")
 
-    if True:
-        debugpy.listen((config.debug_ip, DEBUGPY_PORT),)
-    else:
-        print("warning, manual debugging configured...")
-        debugpy.listen(("localhost", 5679),)
-        print("waiting for client")
-        debugpy.wait_for_client()
+    debugpy.listen(('localhost', DEBUGPY_PORT))
 
     logger.info(f"ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
-    # debugpy.wait_for_client()
-    # logger.info(f"Client connected successfully at {(config.debug_ip, config.debug_port)}")
 
     xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent() / f"{WORKBOOK_NAME}.xlpro.lock"
     if not xlpro_lock_fp.parent.exists():
@@ -243,7 +235,7 @@ def main():
 
         parser.add_argument("--workbook_path", type=str, required=True, help="The workbook")
         # parser.add_argument("--guid", type=str, required=False, help="The CLSID to run the server on", default=default_clsid)
-        parser.add_argument("--debugpy_port", type=int, required=False, help="The port to configure for debugpy debugging")
+        parser.add_argument("--debugpy_port", type=int, required=True, help="The port to configure for debugpy debugging")
         # parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor", default=None)
 
         args = parser.parse_args()
@@ -257,5 +249,9 @@ def main():
         print(e)
         input("Fatal error encountered. Press enter to exit")
 
+    finally:
+        sys.exit()
+
 if __name__ == "__main__":
+    # sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\xlpro-demo.xlsx", "--debugpy_port", "5678"]
     main()

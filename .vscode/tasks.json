@@ -41,6 +41,22 @@
 
         // xlpro_module
         {
+          "label": "xlpro_module sync version",
+          "type": "shell",
+          "command": "${workspaceFolder}/.venv/scripts/python.exe",
+          "args": ["${workspaceFolder}/xlpro_module/sync_version.py"],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "dependsOn": [],
+          "dependsOrder": "sequence",
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_module"
+          }
+        },
+        {
           "label": "xlpro_module build wheel",
           "type": "shell",
           "command": "${workspaceFolder}/.venv/scripts/python.exe",
@@ -49,7 +65,9 @@
             "kind": "build",
             "isDefault": false
           },
-          "dependsOn": [],
+          "dependsOn": [
+            "xlpro_module sync version"
+          ],
           "dependsOrder": "sequence",
           "problemMatcher": [],
           "options": {
@@ -84,6 +102,7 @@
             "isDefault": false
           },
           "dependsOn": [
+            "xlpro_addin compile and push",
             "xlpro_module build wheel",
             "xlpro_cli build",
             "xlpro_installer pre_build",

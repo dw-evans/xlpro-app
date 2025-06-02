@@ -106,6 +106,7 @@ def main():
     args = parser.parse_args()
     args.func(args)
 
+import sys
 
 if __name__ == "__main__":
     main()

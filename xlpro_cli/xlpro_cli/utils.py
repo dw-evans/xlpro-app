@@ -18,7 +18,7 @@ import psutil
 from pathlib import Path
 import sys
 
-DEVELOPMENT_INSTALL = True
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -33,6 +33,7 @@ def is_pyinstaller():
 
 if is_pyinstaller():
     XLPRO_WD = Path(sys.executable).parent.resolve()
+    # XLPRO_WD = Path(os.environ.get("USERPROFILE")) / ".xlpro"
 else:
     XLPRO_WD = Path(os.environ.get("USERPROFILE")) / ".xlpro"
 
@@ -280,7 +281,9 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     startfile_contents = list(startfile_dir.glob("*"))
 
     for p in startfile_contents:
-        shutil.copy2(p, d / p.name)
+        if not  (dst:=d / p.name).exists():
+            shutil.copy2(p, dst)
+        
 
     # funcs_path = d / f"functions.py"
     # subroutines_path = d / f"subroutines.py"
@@ -526,7 +529,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
                 capture_output=True, 
                 shell=True,
                 text=True,
-                check=True,
+                # check=True,
             )
             print_success("Updates complete.")
         elif v == "no":
@@ -606,6 +609,9 @@ def write_json_file(fp:Path, data:dict, indent=2):
     
 
 def read_venv_to_workbooks_map() -> dict[str, list[str]]:
+    if not XLPRO_VENV_WORKBOOKS_MAP_JSON_FP.exists():
+        write_json_file(XLPRO_VENV_WORKBOOKS_MAP_JSON_FP, {})
+
     d = read_json_file(XLPRO_VENV_WORKBOOKS_MAP_JSON_FP)
     # for k, v_list in d.items():
     #     if not Path(k).exists():
