@@ -896,8 +896,8 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        return 24
-        # return cfg.max_worker_threads
+        # return 24
+        return cfg.max_worker_threads
 
     def start(self):
         self._thread.start()
