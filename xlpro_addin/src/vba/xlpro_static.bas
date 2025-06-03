@@ -1,48 +1,5 @@
 Attribute VB_Name = "xlpro_static"
 
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:51:42
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:43:42
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:39:53
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:37:44
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:36:45
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-02, 23:30:34
-' ### END METADATA ###
-
-
-
 Option Explicit
 
 Public Const XLPRO_GUID As String = ""
@@ -468,100 +425,101 @@ Sub conditional_format_handler(workbook_name As String, sheet_name As String, ra
     
 End Sub
 
-
-
-Function conditional_formatter(formula_str As String, rng As Range, root_cell As Range) As Variant
-
-    Dim rng_name_arr As Variant
-    Dim rng_vals As Variant
     
-    ' ReDim rng_name_arr(1 To rng.Count)
-    Dim i As Integer
+
+' Function conditional_formatter(formula_str As String, rng As Range, root_cell As Range) As Variant
+
+'     Dim rng_name_arr As Variant
+'     Dim rng_vals As Variant
     
-    Dim rng_name As String
-    Dim workbook_name As String
-    Dim sheet_name As String
-    Dim root_cell_addr As String
+'     ' ReDim rng_name_arr(1 To rng.Count)
+'     Dim i As Integer
+    
+'     Dim rng_name As String
+'     Dim workbook_name As String
+'     Dim sheet_name As String
+'     Dim root_cell_addr As String
+'     Dim area_names_arr As Object
 
     
-    workbook_name = rng.Parent.Parent.Name
-    sheet_name = rng.Parent.Name
-    area_names_arr = get_range_name_per_area(rng)
-    root_cell_addr = root_cell.Address
+'     workbook_name = rng.Parent.Parent.Name
+'     sheet_name = rng.Parent.Name
+'     area_names_arr = get_range_name_per_area(rng)
+'     root_cell_addr = root_cell.Address
     
-    rng_vals = get_range_values(Join(area_names_arr, ","))
+'     rng_vals = get_range_values(Join(area_names_arr, ","))
     
-    Dim xlpro As Object
-    Set xlpro = GetObject("new: " & XLPRO_GUID)
-    conditional_formatter = xlpro.execute_function_async(ActiveWorkbook, Application.Caller, "conditional_formatter_example", workbook_name, sheet_name, rng_name_arr, formula_str, root_cell_addr)
-End Function
+'     Dim xlpro As Object
+'     Set xlpro = GetObject("new: " & XLPRO_GUID)
+'     conditional_formatter = xlpro.execute_function_async(ActiveWorkbook, Application.Caller, "conditional_formatter_example", workbook_name, sheet_name, rng_name_arr, formula_str, root_cell_addr)
+' End Function
 
-Private Function get_range_name_per_area(rng As Range) As Variant()
+' Private Function get_range_name_per_area(rng As Range) As Variant()
 
-Dim cell As Range
-Dim values() As Variant
-Dim i As Long
-Dim area As Range
+' Dim cell As Range
+' Dim values() As Variant
+' Dim i As Long
+' Dim area As Range
+
+' ' rng.Interior.Color = 16744319
+' ReDim values(1 To rng.Cells.Count)
+
+' i = 1
+' For Each area In rng.areas
+'     values(i) = area.Address
+'     i = i + 1
+' Next area
+
+' get_range_name_per_area = values
+
+' End Function
+
+' Private Function get_range_name_per_cell(rng As Range) As Variant()
+
+' Dim cell As Range
+' Dim values() As Variant
+' Dim i As Long
+' Dim area As Range
+
+' ' rng.Interior.Color = 16744319
+' ReDim values(1 To rng.Cells.Count)
+
+' i = 1
+' For Each area In rng.areas
+'     For Each cell In area.Cells
+'         values(i) = cell.Address
+'         i = i + 1
+'     Next cell
+' Next area
+
+' get_range_name_per_cell = values
+
+' End Function
+
+' Private Function get_range_values(rng_name As String) As Variant()
+
+' Dim rng As Range
+' Dim cell As Range
+' Dim values() As Variant
+' Dim i As Long
+' Dim area As Range
+
+' Set rng = Range(rng_name)
 
 ' rng.Interior.Color = 16744319
-ReDim values(1 To rng.Cells.Count)
+' ReDim values(1 To rng.Cells.Count)
 
-i = 1
-For Each area In rng.areas
-    values(i) = area.Address
-    i = i + 1
-Next area
+' i = 1
+' For Each area In rng.areas
+'     For Each cell In area.Cells
+'         values(i) = cell.Value
+'         i = i + 1
+'     Next cell
+' Next area
 
-get_range_name_per_area = values
+' get_range_values = values
 
-End Function
-
-Private Function get_range_name_per_cell(rng As Range) As Variant()
-
-Dim cell As Range
-Dim values() As Variant
-Dim i As Long
-Dim area As Range
-
-' rng.Interior.Color = 16744319
-ReDim values(1 To rng.Cells.Count)
-
-i = 1
-For Each area In rng.areas
-    For Each cell In area.Cells
-        values(i) = cell.Address
-        i = i + 1
-    Next cell
-Next area
-
-get_range_name_per_cell = values
-
-End Function
-
-Private Function get_range_values(rng_name As String) As Variant()
-
-Dim rng As Range
-Dim cell As Range
-Dim values() As Variant
-Dim i As Long
-Dim area As Range
-
-Set rng = Range(rng_name)
-
-rng.Interior.Color = 16744319
-ReDim values(1 To rng.Cells.Count)
-
-i = 1
-For Each area In rng.areas
-    For Each cell In area.Cells
-        values(i) = cell.Value
-        i = i + 1
-    Next cell
-Next area
-
-get_range_values = values
-
-End Function
+' End Function
 
 
 
