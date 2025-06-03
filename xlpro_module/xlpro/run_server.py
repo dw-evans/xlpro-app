@@ -169,11 +169,6 @@ def serve():
     SERVER = xlproServer()
 
     print("XLPROSTART_TRIGGER_OK")
-    print("XLPROSTART_TRIGGER_OK")
-    print("XLPROSTART_TRIGGER_OK")
-    print("XLPROSTART_TRIGGER_OK")
-    print("XLPROSTART_TRIGGER_OK")
-    print("XLPROSTART_TRIGGER_OK")
 
     def tidy_up_lock_file():
         logger.info(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")

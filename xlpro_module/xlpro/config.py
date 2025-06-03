@@ -6,7 +6,16 @@ import sys
 import os
 
 
-XLPRO_WD = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
+def is_pyinstaller():
+    return hasattr(sys, '_MEIPASS')
+
+if is_pyinstaller():
+    XLPRO_WD = Path(sys.executable).parent.resolve()
+    # XLPRO_WD = Path(os.environ.get("USERPROFILE")) / ".xlpro"
+else:
+    # development path manually set to the installation directory
+    XLPRO_WD = Path(os.environ.get("USERPROFILE")) / ".xlpro"
+
 config_path = XLPRO_WD / "config.toml"
 
 def load() -> Configuration:
@@ -22,6 +31,20 @@ class Configuration:
     xlpro_subroutines_stem:str
     max_worker_threads:int
     logging_level:str
+    vscode_path:str
+    xlpro_cli_path:str
+
+    def to_dict(self):
+        attrs = (
+            "xlpro_functions_stem",
+            "xlpro_subroutines_stem",
+            "max_worker_threads",
+            "logging_level",
+            "vscode_path",
+            "xlpro_cli_path",
+        )
+        ret = {attr: getattr(self, attr) for attr in attrs}
+        return ret
 
 
 if __name__ == "__main__":

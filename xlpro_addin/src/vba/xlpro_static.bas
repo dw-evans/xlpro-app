@@ -1,10 +1,38 @@
 Attribute VB_Name = "xlpro_static"
 
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-04, 00:04:46
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-04, 00:04:35
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-03, 23:45:49
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-03, 23:45:34
+' ### END METADATA ###
+
+
 Option Explicit
 
-Public Const XLPRO_GUID As String = ""
-Public Const XLPRO_CLI_PATH As String = "xlpro-cli.exe"
-Public Const VSCODE_PATH As String = "code.exe"
+Public XLPRO_CLI_PATH As String
+Public VSCODE_PATH As String
+
 
 Public WORKBOOK_GUID_MAP As Object
 Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
@@ -18,6 +46,69 @@ Public WSCRIPT_SHELL_INITIALIZED As Boolean
 #Else
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
+
+
+Sub LoadConfigTOML()
+    Dim fso As Object
+    Dim file As Object
+    Dim fileText As String
+    Dim userProfilePath As String
+    Dim configPath As String
+
+    ' Get the USERPROFILE environment variable
+    userProfilePath = Environ("USERPROFILE")
+
+    ' Construct the full path to config.toml (adjust the relative part as needed)
+    configPath = userProfilePath & "\.xlpro\config.toml"
+
+    ' Create FileSystemObject (late binding)
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    ' Check if file exists
+    If Not fso.FileExists(configPath) Then
+        MsgBox "Config file not found: " & configPath, vbExclamation
+        Exit Sub
+    End If
+
+    ' Open and read file
+    Set file = fso.OpenTextFile(configPath, 1) ' 1 = ForReading
+    fileText = file.ReadAll
+    file.Close
+    Debug.Print fileText
+
+    ' Use RegExp to extract a and b
+    Dim re As Object
+    Dim matches As Object
+
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True
+    re.IgnoreCase = False
+
+    ' Find a
+    re.Pattern = "(?:^|\n)\s*xlpro_cli_path\s*=\s*""([^""]+)"""
+    Set matches = re.Execute(fileText)
+    If matches.Count > 0 Then
+        XLPRO_CLI_PATH = matches(0).SubMatches(0)
+    Else:
+        GoTo RegistrationErrorHandler
+    End If
+    ' Find b
+    re.Pattern = "(?:^|\n)\s*vscode_path\s*=\s*""([^""]+)"""
+    Set matches = re.Execute(fileText)
+    If matches.Count > 0 Then
+        VSCODE_PATH = matches(0).SubMatches(0)
+    Else:
+        GoTo RegistrationErrorHandler
+    End If
+    Exit Sub
+    
+RegistrationErrorHandler:
+    MsgBox "Error: Error, could not load config.toml xlpro_cli_path or vscode_path", _
+           vbExclamation, "Warning"
+    Err.Clear
+    Exit Sub
+
+End Sub
 
 
 Public Sub initialize_workbook_guid_map()
@@ -66,6 +157,7 @@ Public Function get_workbook_guid_map_value(wb_name As String) As String
 End Function
 
 
+
 '------------------------------------------------------------------------
 ' UI ribbon elements
 '------------------------------------------------------------------------
@@ -77,7 +169,10 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     
     Set wb = ActiveWorkbook
 
+    LoadConfigTOML
+
     ' Use the Shell function to call the program
+    ' Could replace this with a call to the server to start it up instead tbh
     command = """" & XLPRO_CLI_PATH & """" & " start " & """" & wb.Path & "\" & wb.Name & """"
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
@@ -96,6 +191,8 @@ End Sub
 Sub xlproInit(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
     Dim command As String
+
+    LoadConfigTOML
 
     ' Use the Shell function to call the program
     'taskID = Shell("cmd.exe /K xlpro", vbNormalFocus)
@@ -141,10 +238,11 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     taskID = shell(command, vbNormalFocus)
 End Sub
 
-
 sub dummy(ByRef control as Office.IRibbonControl)
     MsgBox "placeholder sub"
 end sub
+
+
 
 '------------------------------------------------------------------------
 'Items below here are helper subroutines for the addin.
@@ -199,7 +297,6 @@ Function get_workbook_guid(wb As Workbook) As String
 
     On Error GoTo ErrHandler
 '    Set shell = CreateObject("WScript.Shell")
-'
     command = """" & XLPRO_CLI_PATH & """" & " guid " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"
     ' command = """" & XLPRO_CLI_PATH & """ guid """ & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"
 
@@ -277,6 +374,18 @@ Private Sub shutdown_workspace(ByRef wb As Workbook)
     Set xlpro_async = GetObject("new: " & guid)
     xlpro_async.shutdown_workspace wb
 End Sub
+
+' Sub reload_global_config(ByRef wb As Workbook)
+' 'Use a workbook com server to reload the configuration
+'     Dim xlpro_async As Object
+'     Dim guid As String
+'     guid = get_workbook_guid_map_value(wb.Name)
+'     Set xlpro_async = GetObject("new: " & guid)
+'     Dim dict as Object
+'     Set dict = xlpro_async.reload_and_get_config
+'     XLPRO_CLI_PATH = dict.Item("xlpro_cli_path")
+'     VSCODE_PATH = dict.Item("vscode_path")
+' End Sub
 
 
 ' Replacement synchronization functions
@@ -386,46 +495,47 @@ Public Function ptr(rng As Range)
 End Function
 
 
-Sub conditional_format_handler(workbook_name As String, sheet_name As String, range_names As Variant, colors As Variant, return_uid As String)
-    'pass the areas and conditional formatting colours for each area
-    Dim Workbook As Workbook
-    Dim Worksheet As Worksheet
-    
-    Dim area As Range
-    Dim rng As Range
-    Dim i As Long
-    
-    If Not (LBound(range_names) = LBound(colors) And UBound(colors) = UBound(range_names)) Then
-        Err.Raise 9999, "xlproError", "Array bounds do not match"
-    End If
-    
-    Set Workbook = Workbooks(workbook_name)
-    Set Worksheet = Workbook.Sheets(sheet_name)
 
-    Dim cell_color As Long
 
-    ' create the range (which could have multi-areas)
-    ' loop over the areas and set the interior color to the target color.
-    For i = LBound(range_names) To UBound(range_names)
-        Set rng = Worksheet.Range(range_names(i))
-        cell_color = colors(i)
-        For Each area In rng.areas
-            area.Interior.Color = cell_color
-        Next area
-    Next i
-    
-    Set rng = Nothing
-    Set Workbook = Nothing
-    Set Worksheet = Nothing
-    Set area = Nothing
-    
-    'Dim xlpro As Object
-    'Set xlpro = GetObject("new: " & XLPRO_GUID)
-    'xlpro.set_return_value(uid, "Success('" & uid & "')"
-    
-End Sub
 
+' Sub conditional_format_handler(workbook_name As String, sheet_name As String, range_names As Variant, colors As Variant, return_uid As String)
+'     'pass the areas and conditional formatting colours for each area
+'     Dim Workbook As Workbook
+'     Dim Worksheet As Worksheet
     
+'     Dim area As Range
+'     Dim rng As Range
+'     Dim i As Long
+    
+'     If Not (LBound(range_names) = LBound(colors) And UBound(colors) = UBound(range_names)) Then
+'         Err.Raise 9999, "xlproError", "Array bounds do not match"
+'     End If
+    
+'     Set Workbook = Workbooks(workbook_name)
+'     Set Worksheet = Workbook.Sheets(sheet_name)
+
+'     Dim cell_color As Long
+
+'     ' create the range (which could have multi-areas)
+'     ' loop over the areas and set the interior color to the target color.
+'     For i = LBound(range_names) To UBound(range_names)
+'         Set rng = Worksheet.Range(range_names(i))
+'         cell_color = colors(i)
+'         For Each area In rng.areas
+'             area.Interior.Color = cell_color
+'         Next area
+'     Next i
+    
+'     Set rng = Nothing
+'     Set Workbook = Nothing
+'     Set Worksheet = Nothing
+'     Set area = Nothing
+    
+'     'Dim xlpro As Object
+'     'Set xlpro = GetObject("new: " & XLPRO_GUID)
+'     'xlpro.set_return_value(uid, "Success('" & uid & "')"
+    
+' End Sub
 
 ' Function conditional_formatter(formula_str As String, rng As Range, root_cell As Range) As Variant
 

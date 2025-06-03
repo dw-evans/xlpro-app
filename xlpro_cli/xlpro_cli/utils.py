@@ -1388,6 +1388,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
     # process.wait()
 
     # result_pid = result.pid
+    print("sleeping for 60 seconds...")
+    time.sleep(60)
     pass
 
 
@@ -1498,5 +1500,3 @@ if __name__ == "__main__":
     
 
     pass
-
-pass

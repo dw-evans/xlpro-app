@@ -55,7 +55,6 @@ XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
 def configure_env():
     os.environ["PATH"] = f"{XLPRO_BIN_DIR};" + os.environ["PATH"]
 
-
 def load_uv_help() -> str:
     result = subprocess.run(
         [
@@ -68,7 +67,6 @@ def load_uv_help() -> str:
     )
     ret = result.stdout
     return ret
-
 
 
 def main():

@@ -1,7 +1,9 @@
 xlpro_functions_stem = "functions"
 xlpro_subroutines_stem = "subroutines"
+
 max_worker_threads = 24
+
 logging_level = "DEBUG"
 
-
-
+xlpro_cli_path = "xlpro-cli.exe"
+vscode_path = "code.exe"

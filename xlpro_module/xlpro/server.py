@@ -26,7 +26,7 @@ import sys
 from xlpro import errors
 from xlpro import config
 
-cfg = config.load()
+CFG = config.load()
 wd = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class xlproServer:
 
     def getpid(self):
         return os.getpid()
-    
+
     @classmethod
     def signal_shutdown(cls):
         cls._is_pending_close = True
@@ -321,15 +321,15 @@ class xlproWorkspace:
 
     def register_functions_in_self(self):
         logger.info(f"Registering workspace functions...")
-        self._temp_module_name = f"{cfg.xlpro_functions_stem}_{self._uid}"
-        _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{cfg.xlpro_functions_stem}.py")
+        self._temp_module_name = f"{CFG.xlpro_functions_stem}_{self._uid}"
+        _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{CFG.xlpro_functions_stem}.py")
         self.update_module_func_map_wrapper()
         logger.info(f"Registration complete.")
 
     def register_subs_in_self(self):
         logger.info(f"Registering workspace subroutines...")
-        self._sub_module_name = f"{cfg.xlpro_subroutines_stem}_{self._uid}"
-        _wrappers.import_module_subs_with_registration(self._sub_module_name, self._wd / f"{cfg.xlpro_subroutines_stem}.py")
+        self._sub_module_name = f"{CFG.xlpro_subroutines_stem}_{self._uid}"
+        _wrappers.import_module_subs_with_registration(self._sub_module_name, self._wd / f"{CFG.xlpro_subroutines_stem}.py")
         self.update_module_sub_map_wrapper()
         logger.info(f"Registration complete.")
 
@@ -792,8 +792,8 @@ class xlproWorkspace:
 # @utils.type_converter_wrapper
 # @utils.com_init_dispatch_release_wrapper
 def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
-    module_name = f"{cfg.xlpro_functions_stem}_{uid}"
-    _utils.import_module(f"{cfg.xlpro_functions_stem}_{uid}", wd / f"{cfg.xlpro_functions_stem}.py")
+    module_name = f"{CFG.xlpro_functions_stem}_{uid}"
+    _utils.import_module(f"{CFG.xlpro_functions_stem}_{uid}", wd / f"{CFG.xlpro_functions_stem}.py")
     raise NotImplementedError
     func = getattr(sys.modules[module_name], func_name)
 
@@ -897,7 +897,7 @@ class WorkerManager:
     @property
     def MAX_THREADS(self):
         # return 24
-        return cfg.max_worker_threads
+        return CFG.max_worker_threads
 
     def start(self):
         self._thread.start()
