@@ -1,33 +1,5 @@
 Attribute VB_Name = "xlpro_static"
 
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-04, 00:04:46
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-04, 00:04:35
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-03, 23:45:49
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-03, 23:45:34
-' ### END METADATA ###
-
-
 Option Explicit
 
 Public XLPRO_CLI_PATH As String
@@ -210,6 +182,8 @@ Sub xlproRegister(ByRef control As Office.IRibbonControl)
     Set wb = ActiveWorkbook
     Debug.Print ActiveWorkbook.Path
     
+    LoadConfigTOML
+
     On Error GoTo RegistrationErrorHandler
     register_workbook ActiveWorkbook
     On Error GoTo 0
@@ -232,6 +206,8 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     
     Dim wb As Workbook
     Set wb = ActiveWorkbook
+
+    LoadConfigTOML
 
     command = """" & VSCODE_PATH & """" & " " & """" & wb.Path & "\" & ActiveWorkbook.Name & ".xlpro" & """"
     Debug.Print command
