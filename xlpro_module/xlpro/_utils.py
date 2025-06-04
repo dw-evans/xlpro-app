@@ -202,6 +202,9 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     
     a_list = [a for a, t in args_and_types]
 
+    # should add in here some code to check if any single values are "argnotreadyexceptions" or "promises"
+    # so we can significantly reduce the number of com calls.
+
     from xlpro import server 
     ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     Dim xlpro As Object
@@ -759,7 +762,7 @@ def show_image(val, name:str,
             raise FileNotFoundError(f"{tmp_path.parent} does not exist!")
         tmp_path.mkdir(exist_ok=True)
 
-        fp = tmp_path / f"{uuid.uuid4()}.svg"
+        fp = tmp_path / f"{uuid.uuid4()}.png"
         tmp.savefig(fp)
 
         # sizex = sizex if sizex is not None else 
@@ -768,7 +771,8 @@ def show_image(val, name:str,
             np.array(tmp.get_size_inches()) * 72,
             xl_name=name
         )
-        tmp.savefig(ret.fp, format="svg", dpi=600, backend="svg")
+        # tmp.savefig(ret.fp, format="svg", dpi=600, backend="svg")
+        tmp.savefig(ret.fp, format="png", dpi=600)
 
         # return the xlproImage
         return ret
