@@ -20,7 +20,7 @@ Public WSCRIPT_SHELL_INITIALIZED As Boolean
 #End If
 
 
-Sub LoadConfigTOML()
+Sub LoadXlproConfigTOML()
     Dim fso As Object
     Dim file As Object
     Dim fileText As String
@@ -141,7 +141,7 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     
     Set wb = ActiveWorkbook
 
-    LoadConfigTOML
+    LoadXlproConfigTOML
 
     ' Use the Shell function to call the program
     ' Could replace this with a call to the server to start it up instead tbh
@@ -164,7 +164,7 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
     Dim command As String
 
-    LoadConfigTOML
+    LoadXlproConfigTOML
 
     ' Use the Shell function to call the program
     'taskID = Shell("cmd.exe /K xlpro", vbNormalFocus)
@@ -182,7 +182,7 @@ Sub xlproRegister(ByRef control As Office.IRibbonControl)
     Set wb = ActiveWorkbook
     Debug.Print ActiveWorkbook.Path
     
-    LoadConfigTOML
+    LoadXlproConfigTOML
 
     On Error GoTo RegistrationErrorHandler
     register_workbook ActiveWorkbook
@@ -207,17 +207,24 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     Dim wb As Workbook
     Set wb = ActiveWorkbook
 
-    LoadConfigTOML
+    LoadXlproConfigTOML
 
     command = """" & VSCODE_PATH & """" & " " & """" & wb.Path & "\" & ActiveWorkbook.Name & ".xlpro" & """"
     Debug.Print command
     taskID = shell(command, vbNormalFocus)
 End Sub
 
-sub dummy(ByRef control as Office.IRibbonControl)
-    MsgBox "placeholder sub"
-end sub
+Sub EditConfigGlobal()
+    ' Edit the global xlpro configuration file.
+    Dim configPath As String
+    configPath = Environ("USERPROFILE") & "\.xlpro\config.toml"
+    ' Add quotes in case the path contains spaces
+    Shell "cmd /c start """" """ & configPath & """", vbNormalFocus
+End Sub
 
+Sub EditConfigGlobalButton(ByRef control As Office.IRibbonControl)
+    EditConfigGlobal
+End Sub
 
 
 '------------------------------------------------------------------------

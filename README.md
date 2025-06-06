@@ -34,62 +34,78 @@
 
 ## Development Notes
 
-1. HIGH Stability testing - In progress
+1. `HIGH` Stability testing - In progress
 
-2. HIGH Example development
-   1. HIGH `Functions`
-      1. MED `Matplotlib` plotting examples
-      2. MED `Seaborn` plotting examples
-      3. MED `Bokeh` plotting examples
-      4. HIGH Data-focused example - dataframe handling, file loading
+2. `HIGH` Example development
+   1. `HIGH` `Functions`
+      1. `MED` `Matplotlib` plotting examples
+      2. `MED` `Seaborn` plotting examples
+      3. `MED` `Bokeh` plotting examples
+      4. `HIGH` Data-focused example - dataframe handling, file loading
       5. LOW AI example
-      6. MED Financial modelling
+      6. `MED` Financial modelling
 
-   2. HIGH `Subroutines`
+   2. `HIGH` `Subroutines`
       1. Excel COM interop subroutine (may run into stability issues due to multiple threads accessing trying to access Excel at the same time -> requires a scheduler, e.g. sending a callable to the client manager's queue. If its a callableWrapperClass execute the function...? Possible to fetch the result)
       2. Non-Excel subroutine
-   3. EXPERIMENTAL Conditional formatting
+   3. `EXPERIMENTAL` Conditional formatting
 
 3. Record videos of usage for website
 
-4. LOW Tidy calculation cycle - Eliminate COM calls for promised arguments etc within VBA.
+4. `LOW` Tidy calculation cycle - Eliminate COM calls for promised arguments etc within VBA.
    1. At least can mitigate the non-array data, checking all the nested values of an array is probably not worthwhile.
    2. Estimated cost overlap for an out of process COM call versus checking values would be around 6000 - could implement a threshold value
 
-5. LOW Implement `@vectorize` decorator similar to the jsonify decorator.
+5. `LOW` Implement `@vectorize` decorator similar to the jsonify decorator.
 
-6. MED Implement relative Paths for path objects.
+6. `MED` Implement relative Paths for path objects.
    1. All Path-typed variables can have the option to be relative to the workbook Path(\_\_file\_\_).parent.parent
 
 7. `Website`
-   1. MED Fix home page hamburger menu breaking
-   2. HIGH Fix home page content
-   3. HIGH Add home page assets (4x videos)
-   4. HIGH Rework 'Getting Started' slash tutorial 
+   1. `MED` Fix home page hamburger menu breaking
+   2. `HIGH` Fix home page content
+   3. `HIGH` Add home page assets (4x videos)
+   4. `HIGH` Rework 'Getting Started' slash tutorial 
 
-8. BUG MED Debug errors with modules failing over time
+8. `BUG` `MED` De`BUG` errors with modules failing over time
 
-9.  HIGH Investigate how to prevent shell window freezing and needing an enter press
+9.  `HIGH` Investigate how to prevent shell window freezing and needing an enter press
 
-10. HIGH Sync up serve/start so they hevave the same.
+10. `HIGH` Sync up serve/start so they hevave the same.
     1.  Serving can detect the existing process and just ignore the request
     2.  Serving is followed up by issuing a start call
     3.  Start call probably needs to be captured using checks on stdout pipe text content for trigger.
 
-11. HIGH Investigate undo-ing
+11. `HIGH` Investigate undo-ing
     1.  Test implementing a synchronous calculation mode which executes each function sequentially.
     2.  Investigate doing workbook backups. Could save the workbook e.g. ./.xlpro/Book1.xlsm.2025-06-04_1134.bak. Timeframe between backups could be set in the user's xlpro configuration file. Button to revert to previous backups. Could be a console menu with several selections
 
-12. 
+12. `EXPERIMENTAL` `MED` Asynchronous functions
+    1.  yielding functions can be decorated with a timer (breaks undo stack) 
+    2.  hook onto existing rtd functionality by spinning up another com process
 
-13. 
+13. `HIGH` Develop way to push requirements
+    1.  Start with a function to push reqs.txt. This should warn that the files (reqs.txt, .python-version may be different, and the user should compare.)
+    2.  Git should probably be used inherently
 
-14. 
+14. `LOW` Git integration
 
-15. 
+15. `HIGH` Test reloading a configured environment on multiple machines 
 
-16. 
+16. `MED` Add .xlpro-version file to ./Book1.xlsx.xlpro directory
 
-17. 
+17. `MED` test behaviour for external files. 
+    1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
 
-18. 
+18. `MED` non-destructive launch.json writing
+    1.  Prototyped, not tested.
+
+19. `HIGH` pushing requirements on workbook save
+    1.  Prototyped, not tested. Not reckless
+
+20. `HIGH` Editing config from excel button 
+    1.  Prototyped, not tested.
+    2.  Looks ok
+
+21. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
+22. `MED` Close Server function in xlpro-cli
