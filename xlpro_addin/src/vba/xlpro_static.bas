@@ -1,5 +1,40 @@
 Attribute VB_Name = "xlpro_static"
 
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-06, 18:23:15
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-06, 18:05:25
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-06, 17:58:52
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-06, 17:58:41
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-06, 17:53:26
+' ### END METADATA ###
+
+
 Option Explicit
 
 Public XLPRO_CLI_PATH As String
@@ -81,7 +116,6 @@ RegistrationErrorHandler:
     Exit Sub
 
 End Sub
-
 
 Public Sub initialize_workbook_guid_map()
     If Not WORKBOOK_GUID_MAP_INITIALIZED Then
@@ -226,10 +260,47 @@ Sub EditConfigGlobalButton(ByRef control As Office.IRibbonControl)
     EditConfigGlobal
 End Sub
 
+Sub PushRequirementsTxtButton(ByRef control As Office.IRibbonControl)
+    PushRequirementsTxt
+End Sub
+
+Sub OpenWorkingDirButton(ByRef control As Office.IRibbonControl)
+    OpenWorkingDir
+End Sub
 
 '------------------------------------------------------------------------
 'Items below here are helper subroutines for the addin.
 '------------------------------------------------------------------------
+
+Sub PushRequirementsTxt()
+    Dim command As String
+    Dim taskID As Double
+    
+    Dim wb As Workbook
+    Set wb = ActiveWorkbook
+
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & wb.Path & "\" & wb.Name & """"
+    Debug.Print command
+    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+
+End Sub
+
+Sub OpenWorkingDir()
+    Dim command As String
+    Dim taskID As Double
+    
+    Dim wb As Workbook
+    Set wb = ActiveWorkbook
+    
+    Dim folderPath As String
+
+    folderPath = wb.Path
+    command = "explorer.exe """ & folderPath & """"
+    Debug.Print command
+    shell command, vbNormalFocus
+
+End Sub
 
 Function RunCommandAndCaptureOutput(command As String) As String
     'Dim shell As Object

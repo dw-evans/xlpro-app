@@ -24,6 +24,20 @@
                   screentip="start vs code" 
                   onAction="xlproStartIDE"/> 
         </group> 
+        <group id="group4" label="Develop"> 
+          <button id="Button5" image="gear-16" 
+                  label="Edit Config" 
+                  screentip="Edit xlpro configutation file" 
+                  onAction="EditConfigGlobalButton"/> 
+          <button id="Button6" image="gear-16" 
+                  label="Push Reqs" 
+                  screentip="Push python requirements to server location" 
+                  onAction="PushRequirementsTxtButton"/> 
+          <button id="Button7" image="gear-16" 
+                  label="Show WD" 
+                  screentip="Open the working directory of the workbook in explorer.exe" 
+                  onAction="OpenWorkingDirButton"/> 
+        </group> 
         <!-- <group id="group5" label="Excel Calcs"> 
           <button id="Button7" image="gear-16" 
                   label="Manual" 

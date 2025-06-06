@@ -98,14 +98,17 @@
     1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
 
 18. `MED` non-destructive launch.json writing
-    1.  Prototyped, not tested.
+    1.  Prototyped, not tested - pushed
+    
+19. `MED` non-descrutcute settings.json writing
+    1.  
 
-19. `HIGH` pushing requirements on workbook save
+20. `HIGH` pushing requirements on workbook save
     1.  Prototyped, not tested. Not reckless
 
-20. `HIGH` Editing config from excel button 
+21. `HIGH` Editing config from excel button 
     1.  Prototyped, not tested.
     2.  Looks ok
 
-21. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
-22. `MED` Close Server function in xlpro-cli
+22. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
+23. `MED` Close Server function in xlpro-cli

@@ -5,6 +5,10 @@ from . import utils
 import sys
 import argparse
 
+from rich.console import Console
+from rich import print
+from rich.style import Style
+
 import os
 os.chdir(Path(__file__).parent.parent.parent)
 
@@ -48,6 +52,27 @@ def handle_get_guid(args):
     sys.stderr.write(str(guid))
     pass
 
+def handle_write_requirements(args):
+    """ Writes requirements txt, .python-version, .xlpro-version - pending...
+    """
+    workbook_path = Path(args.workbook)
+    if not args.force:
+        if utils.prompt_yes_no_input(f"You are about to write the requirements for {workbook_path}, are you sure?", "yes") == "no":
+            utils.print_info("exiting")
+    try:
+        utils.print_info("Writing requirements...")
+        utils.write_reqs_for_workbook(workbook_path)
+        utils.print_info("Requirements written successfully")
+
+        utils.print_info("Writing python-version...")
+        utils.write_python_version_file_for_workbook(workbook_path)
+        utils.print_info(".python-version written successfully")
+        
+    except Exception as e:
+        print(f"Exception occured when attempting to write workbook requirements data: {e}")
+        return
+    print(f"Requirements written successfully for {workbook_path}")
+
 
 XLPRO_INSTALL_DIR = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
 XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
@@ -83,28 +108,38 @@ def main():
         help=""
     )
 
-
     parser_start = subparsers.add_parser("start", help="run the xlpro server")
     parser_init = subparsers.add_parser("init", help="initialize a workbook for xlpro")
     parser_uninit = subparsers.add_parser("uninit", help="uninitialize a workbook for xlpro")
     parser_get_guid = subparsers.add_parser("guid", help="get the guid for a workbook (if the process is active?)")
-    # parser_uv = subparsers.add_parser("uv", help=load_uv_help())
+    parser_write_reqs = subparsers.add_parser("write-reqs", help="write the requirements to the sever location")
 
     parser_start.add_argument("workbook", type=str, help="workbook to start xlpro server for")
-
     parser_init.add_argument("workbook", type=str, help="workbook to initialize xlpro for (writes adjacent folder structure)")
     parser_uninit.add_argument("workbook", type=str, help="workbook to uninitialize xlpro for (removes adjacent folder structure)")
-    parser_get_guid.add_argument("workbook", type=str, help="workbook to uninitialize xlpro for (removes adjacent folder structure)")
+    parser_get_guid.add_argument("workbook", type=str, help="workbook to get running serverfor (removes adjacent folder structure)")
+    
+    parser_write_reqs.add_argument("workbook", type=str, help="workbook to write requirements for.")
+    parser_write_reqs.add_argument("--force", action="store_true", help="force the update", required=False)
 
     parser_start.set_defaults(func=handle_start_server)
     parser_init.set_defaults(func=handle_init)
     parser_uninit.set_defaults(func=handle_uninit)
     parser_get_guid.set_defaults(func=handle_get_guid)
+    parser_write_reqs.set_defaults(func=handle_write_requirements)
 
     args = parser.parse_args()
     args.func(args)
 
 import sys
+import time
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"Exception encountered: {e}")
+    finally:
+        input("press enter to continue")
+    time.sleep(5)
+    
