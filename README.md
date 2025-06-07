@@ -48,6 +48,7 @@
    2. `HIGH` `Subroutines`
       1. Excel COM interop subroutine (may run into stability issues due to multiple threads accessing trying to access Excel at the same time -> requires a scheduler, e.g. sending a callable to the client manager's queue. If its a callableWrapperClass execute the function...? Possible to fetch the result)
       2. Non-Excel subroutine
+      
    3. `EXPERIMENTAL` Conditional formatting
 
 3. Record videos of usage for website
@@ -67,7 +68,7 @@
    3. `HIGH` Add home page assets (4x videos)
    4. `HIGH` Rework 'Getting Started' slash tutorial 
 
-8. `BUG` `MED` De`BUG` errors with modules failing over time
+8. `BUG` `MED` Debug errors with modules failing over time
 
 9.  `HIGH` Investigate how to prevent shell window freezing and needing an enter press
 
@@ -97,18 +98,40 @@
 17. `MED` test behaviour for external files. 
     1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
 
-18. `MED` non-destructive launch.json writing
+18. `DONE` `MED` non-destructive launch.json writing
     1.  Prototyped, not tested - pushed
     
-19. `MED` non-descrutcute settings.json writing
-    1.  
+19. `DONE` `MED` non-descrutcute settings.json writing
+    1.  Prototyped - looks ok
 
-20. `HIGH` pushing requirements on workbook save
-    1.  Prototyped, not tested. Not reckless
+20. `PARTIAL``HIGH` pushing requirements on workbook save
+    1.  Prototyped function and button
+    2.  
 
-21. `HIGH` Editing config from excel button 
+21. `DONE` `HIGH` Editing config from excel button 
     1.  Prototyped, not tested.
     2.  Looks ok
+    3.  
 
 22. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
 23. `MED` Close Server function in xlpro-cli
+
+24. `HIGH` Investigate trimming com calls by running an argument check before execution  
+
+25.  
+
+26.  
+
+27.  
+
+28.  
+
+29.  
+
+30.  
+
+31.  
+
+32.  
+
+33.  
