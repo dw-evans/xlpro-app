@@ -33,6 +33,7 @@ class Configuration:
     logging_level:str
     vscode_path:str
     xlpro_cli_path:str
+    # xlpro_xlam_path:str
 
     def to_dict(self):
         attrs = (
@@ -42,6 +43,7 @@ class Configuration:
             "logging_level",
             "vscode_path",
             "xlpro_cli_path",
+            # "xlpro_xlam_path",
         )
         ret = {attr: getattr(self, attr) for attr in attrs}
         return ret

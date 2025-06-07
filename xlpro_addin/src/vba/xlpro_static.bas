@@ -3,49 +3,29 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-06, 18:23:15
+' At 2025-06-07, 01:59:12
 ' ### END METADATA ###
 
 
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-06, 18:05:25
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-06, 17:58:52
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-06, 17:58:41
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-06, 17:53:26
-' ### END METADATA ###
 
 
 Option Explicit
 
 Public XLPRO_CLI_PATH As String
 Public VSCODE_PATH As String
-
+' Public XLPRO_ADDIN_PATH As String
 
 Public WORKBOOK_GUID_MAP As Object
 Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
 
 Public WSCRIPT_SHELL As Object
 Public WSCRIPT_SHELL_INITIALIZED As Boolean
+
+
+public const MAX_ARGS_READY_CHECKED as Integer = 32
+
+Public rePromise As Object
+Public reException As Object
 
 
 #If VBA7 Then
@@ -107,6 +87,13 @@ Sub LoadXlproConfigTOML()
     Else:
         GoTo RegistrationErrorHandler
     End If
+    ' re.Pattern = "(?:^|\n)\s*xlpro_xlam_path\s*=\s*""([^""]+)"""
+    ' Set matches = re.Execute(fileText)
+    ' If matches.Count > 0 Then
+    '     XLPRO_ADDIN_PATH = matches(0).SubMatches(0)
+    ' Else:
+    '     GoTo RegistrationErrorHandler
+    ' End If
     Exit Sub
     
 RegistrationErrorHandler:
@@ -301,6 +288,127 @@ Sub OpenWorkingDir()
     shell command, vbNormalFocus
 
 End Sub
+
+
+
+' Sub AddReferenceToMyAddin()
+'     Dim vbProj As VBIDE.VBProject
+'     Dim refPath As String
+
+'     LoadXlproConfigTOML
+
+'     ' Full path to your add-in (adjust as needed)
+'     refPath = XLPRO_ADDIN_PATH
+
+'     ' Set reference to the current project
+'     Set vbProj = ThisWorkbook.VBProject
+
+'     ' Add reference if it's not already present
+'     On Error Resume Next
+'     vbProj.References.AddFromFile refPath
+'     If Err.Number <> 0 Then
+'         MsgBox "Failed to add reference: " & Err.Description, vbExclamation
+'     Else
+'         MsgBox "Reference to myaddin.xlam added.", vbInformation
+'     End If
+'     On Error GoTo 0
+' End Sub
+
+
+Sub TestArg()
+    Dim res as Boolean
+    Dim arg as Variant
+
+    Set arg = ActiveSheet.Range("A1")
+
+    res = Application.Run("'xlpro.xlam'!CheckArgReady", arg)
+
+End Sub
+
+Sub InitRegex()
+    Set rePromise = CreateObject("VBScript.RegExp")
+    rePromise.Global = False
+    rePromise.IgnoreCase = True
+    rePromise.Pattern = "^Promise<.+>$"
+
+    Set reException = CreateObject("VBScript.RegExp")
+    reException.Global = False
+    reException.IgnoreCase = True
+    reException.Pattern = "^\w*((error)|(exception))\(.*\)$"
+End Sub
+
+Function IsValueReady(val as Variant) as Boolean
+    If rePromise Is Nothing Or reException Is Nothing Then
+        InitRegex
+    End If
+    If rePromise.Test(val) Then
+        IsValueReady = False
+        Exit Function
+    ' Test for Error
+    ElseIf reException.Test(val) Then
+        IsValueReady = False
+        Exit Function
+    ElseIf IsError(val) Then
+        IsValueReady = False
+        Exit Function
+    End If
+    IsValueReady = True
+End Function
+
+Public Function CheckArgReady(arg as Variant) as Boolean
+    dim val as Variant
+    dim subval as Variant
+
+    Dim i as Long
+    Dim j as Long
+
+    If TypeName(arg) = "Range" Then
+        val = arg.Value
+    Else
+        val = arg
+    End If
+
+    ' If the value is an array, loop over all the items
+    ' and return false as soon as a bad value is encountered
+    If IsArray(val) Then
+        ' Determine if 1D or 2D array
+        On Error Resume Next
+        dimCount = UBound(val, 2)
+        If Err.Number <> 0 Then
+            ' 1D array (either row or column)
+            Err.Clear
+            On Error GoTo 0
+            For i = LBound(val) To UBound(val)
+                subval = val(i)
+                If Not IsValueReady(subval) Then
+                    CheckArgReady = False
+                    Exit Function
+                End If
+            Next i
+        Else
+            ' 2D array
+            On Error GoTo 0
+            For i = LBound(val, 1) To UBound(val, 1)
+                For j = LBound(val, 2) To UBound(val, 2)
+                    subval = val(i, j)
+                    If Not IsValueReady(subval) Then
+                        CheckArgReady = False
+                        Exit Function
+                    End If
+                Next j
+            Next i
+        End If
+    Else
+        ' Single value (0D)
+        If Not IsValueReady(val) Then
+            CheckArgReady = False
+            Exit Function
+        End If
+    End If
+
+    CheckArgReady = True
+End Function
+
 
 Function RunCommandAndCaptureOutput(command As String) As String
     'Dim shell As Object

@@ -7,3 +7,5 @@ logging_level = "DEBUG"
 
 xlpro_cli_path = "xlpro-cli.exe"
 vscode_path = "code.exe"
+
+# xlpro_xlam_path = "C:/Users/Daniel Evans/AppData/Roaming/Microsoft/Excel/XLSTART/xlpro.xlam"
