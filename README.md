@@ -72,7 +72,7 @@
 
 9.  `DONE` `BUG` `HIGH` Investigate how to prevent shell window freezing and needing an enter press
 
-10. `HIGH` Sync up serve/start so they bevave the same.
+10. `HIGH` Sync up serve/start so they behave the same.
     1.  Serving can detect the existing process and just ignore the request
     2.  Serving is followed up by issuing a start call
     3.  Start call probably needs to be captured using checks on stdout pipe text content for trigger.
@@ -86,7 +86,7 @@
     1.  yielding functions can be decorated with a timer (breaks undo stack) 
     2.  hook onto existing rtd functionality by spinning up another com process
 
-13. `HIGH` Develop way to push requirements
+13. `PARTIAL?` `HIGH` Develop way to push requirements
     1.  Start with a function to push reqs.txt. This should warn that the files (reqs.txt, .python-version may be different, and the user should compare.)
     2.  Git should probably be used inherently
 
@@ -94,7 +94,7 @@
 
 15. `HIGH` Test reloading a configured environment on multiple machines 
 
-16. `MED` Add .xlpro-version file to ./Book1.xlsx.xlpro directory
+16. `LOW` Add .xlpro-version file to ./Book1.xlsx.xlpro directory
 
 17. `MED` test behaviour for external files. 
     1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
@@ -105,19 +105,17 @@
 19. `DONE` `MED` non-descrutcute settings.json writing
     1.  Prototyped - looks ok
 
-20. `PARTIAL``HIGH` pushing requirements on workbook save
+20. `PARTIAL` `HIGH` pushing requirements on workbook save
     1.  Prototyped function and button
-    2.  
 
 21. `DONE` `HIGH` Editing config from excel button 
     1.  Prototyped, not tested.
     2.  Looks ok
-    3.  
 
 22. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
 23. `MED` Close Server function in xlpro-cli
 
-24. `HIGH` Investigate trimming com calls by running an argument check before execution  
+24. `DONE` `HIGH` Investigate trimming com calls by running an argument check before execution  
 
 25.  
 
