@@ -1116,6 +1116,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
             # check=True,
             # capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -1140,6 +1141,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
             # check=True,
             # capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -1162,6 +1164,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
             # check=True,
             # capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -1471,11 +1474,14 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
             f"--debugpy_port={str(port)}",
             f"--workbook_path={str(workbook_path)}"
         ],
+        stdin=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NEW_CONSOLE,
         text=True,
         # stdout=subprocess.PIPE,
         # stderr=subprocess.PIPE,
     )
+
+    # disable_quick_edit_mode(process.pid)
     # timeout_sec = 10 # seconds
     # t0 = time.time()
     # exit_message = "XLPROSTART_TRIGGER_OK"
@@ -1500,7 +1506,6 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
     print("sleeping for 60 seconds...")
     time.sleep(60)
     pass
-
 
 def add_to_user_path(p:Path):
     # Ensure the path is absolute

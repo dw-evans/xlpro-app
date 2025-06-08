@@ -53,7 +53,7 @@
 
 3. Record videos of usage for website
 
-4. `LOW` Tidy calculation cycle - Eliminate COM calls for promised arguments etc within VBA.
+4. `DONE` `HIGH` Tidy calculation cycle - Eliminate COM calls for promised arguments etc within VBA.
    1. At least can mitigate the non-array data, checking all the nested values of an array is probably not worthwhile.
    2. Estimated cost overlap for an out of process COM call versus checking values would be around 6000 - could implement a threshold value
 
@@ -70,12 +70,13 @@
 
 8. `BUG` `MED` Debug errors with modules failing over time
 
-9.  `HIGH` Investigate how to prevent shell window freezing and needing an enter press
+9.  `DONE` `BUG` `HIGH` Investigate how to prevent shell window freezing and needing an enter press
 
-10. `HIGH` Sync up serve/start so they hevave the same.
+10. `HIGH` Sync up serve/start so they bevave the same.
     1.  Serving can detect the existing process and just ignore the request
     2.  Serving is followed up by issuing a start call
     3.  Start call probably needs to be captured using checks on stdout pipe text content for trigger.
+    4.  Implement close server button
 
 11. `HIGH` Investigate undo-ing
     1.  Test implementing a synchronous calculation mode which executes each function sequentially.
