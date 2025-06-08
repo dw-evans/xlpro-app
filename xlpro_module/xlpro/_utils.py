@@ -139,7 +139,8 @@ VB_TYPE_DECLARATION_STRINGS = {
 
 VB_RANGE_CONVERSION_CHECK_STRING = """If TypeName({arg}) = \"Range\" Then
     {arg} = {arg}.Value
-EndIf"""
+End If
+"""
 
 
 RESERVED_XLPRO_KW_LOOKUPS = {
@@ -195,8 +196,18 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
         if a not in RESERVED_ARGS:
             if t not in [float, int, bool, str]:
                 arg_range_conversion_check_list.append(
-                    textwrap.indent(VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a), "    ")
-            )
+                    VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a, fname=func_name)
+                )
+                
+    template = textwrap.dedent((
+        """
+        If Not Application.Run("'xlpro.xlam'!CheckArgReady", {arg}) Then
+            {fname} = "Promise<PENDING_PREDECENTS>"
+            Exit Function
+        End If"""[1:]
+    ))
+
+    pre_check_arg_sequence_strs = [template.format(fname=fname, arg=a) for a, t in args_and_types]
 
     # XXX - todo - ensure no reserved vba arguments are parsed!   
     
@@ -207,9 +218,11 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
 
     from xlpro import server 
     ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
-    Dim xlpro As Object
-    Set xlpro = GetObject("new: " & xlpro_guid)
-{'\n'.join(arg_range_conversion_check_list)}
+    If xlpro is Nothing Or xlpro_guid <> xlpro_guid_prev Then
+        InitXlpro
+    End If
+{textwrap.indent('\n'.join(pre_check_arg_sequence_strs), prefix="    ")}
+{textwrap.indent('\n'.join(arg_range_conversion_check_list), prefix="    ")}
     {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}"{', ' if arg_conversion_list else ''}{', '.join(arg_conversion_list)})
 End Function
 """
@@ -273,6 +286,16 @@ def get_xlpro_vb_dynamic_component_contents(func_register:dict[str: Callable]) -
 
     from xlpro import server 
     s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
+    s_list += [f"public xlpro as object"]
+    s_list += [textwrap.dedent((
+        f"""
+        Public xlpro_guid_prev as string
+        Sub InitXlpro()
+            Set xlpro = GetObject("new: " & xlpro_guid)
+            xlpro_guid_prev = xlpro_guid
+        End Sub
+        """))
+    ]
 
     for fname, f in func_register.items():
         if not isinstance(f, Callable):
@@ -284,7 +307,7 @@ def get_xlpro_vb_dynamic_component_contents_subs(func_register:list[Callable]) -
     s_list = []
 
     from xlpro import server 
-    s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
+    # s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
 
     for f in func_register:
         if not isinstance(f, Callable):
