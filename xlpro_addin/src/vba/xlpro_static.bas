@@ -3,6 +3,34 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 22:05:11
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 21:16:29
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 21:12:47
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 20:51:21
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
 ' At 2025-06-07, 01:59:12
 ' ### END METADATA ###
 
@@ -351,6 +379,9 @@ Function IsValueReady(val as Variant) as Boolean
     ElseIf IsError(val) Then
         IsValueReady = False
         Exit Function
+    ElseIf IsEmpty(val) Then
+        IsValueReady = False
+        Exit Function
     End If
     IsValueReady = True
 End Function
@@ -361,6 +392,11 @@ Public Function CheckArgReady(arg as Variant) as Boolean
 
     Dim i as Long
     Dim j as Long
+    Dim dimCount1 as Long
+    Dim dimCount2 as Long
+
+    dimCount1 = 1
+    dimCount2 = 1
 
     If TypeName(arg) = "Range" Then
         val = arg.Value
@@ -368,17 +404,43 @@ Public Function CheckArgReady(arg as Variant) as Boolean
         val = arg
     End If
 
+    ' If the value is an array, check the dimensions do not exceed
+    ' our specified limit, Assume it is valid for large arrays and let COM
+    ' call handle the rest. 
+    If IsArray(val) Then
+        dimCount1 = UBound(val, 1)
+        ' Determine if 1D or 2D array
+        On Error Resume Next
+        dimCount2 = UBound(val, 2)
+        If Err.Number <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            dimCount2 = 1
+        Else
+            Err.Clear
+            On Error GoTo 0
+            dimCount2 = Ubound(val, 2)
+        End If
+        ' Complete check for max inputs
+        if (dimCount1 * dimCount2) > MAX_ARGS_READY_CHECKED Then
+            CheckArgReady = True
+            Exit Function
+        End If
+    End If
+
     ' If the value is an array, loop over all the items
     ' and return false as soon as a bad value is encountered
     If IsArray(val) Then
         ' Determine if 1D or 2D array
+        dimCount1 = UBound(val, 1)
         On Error Resume Next
-        dimCount = UBound(val, 2)
+        dimCount2 = UBound(val, 2)
         If Err.Number <> 0 Then
             ' 1D array (either row or column)
             Err.Clear
             On Error GoTo 0
-            For i = LBound(val) To UBound(val)
+            dimCount2 = 1
+            For i = LBound(val, 1) To UBound(val, 1)
                 subval = val(i)
                 If Not IsValueReady(subval) Then
                     CheckArgReady = False
@@ -389,6 +451,7 @@ Public Function CheckArgReady(arg as Variant) as Boolean
             ' 2D array
             On Error GoTo 0
             For i = LBound(val, 1) To UBound(val, 1)
+                dimCount2 = Ubound(val, 2)
                 For j = LBound(val, 2) To UBound(val, 2)
                     subval = val(i, j)
                     If Not IsValueReady(subval) Then

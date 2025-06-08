@@ -19,7 +19,7 @@ from pathlib import Path
 import sys
 import textwrap
 
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
 
 logging.basicConfig(
     stream=sys.stdout,

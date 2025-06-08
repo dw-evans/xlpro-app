@@ -33,18 +33,18 @@ Private Sub app_WorkbookBeforeClose(ByVal wb As Workbook, Cancel As Boolean)
     uninitialize wb
 End Sub
 
-' Overwrite the application onclose behaviour
-Private Sub app_Workbook_BeforeClose(Cancel As Boolean)
-    ' Only clean up the event handler if the close is not canceled
-    If Not Cancel Then
-        'uninitialize the workbook on close
-        Debug.Print "Attempting to uninitialize workbook..."
-        uninitialize wb
-        Debug.Print "Uninitialize completed (maybe?)"
-    Else
-        Debug.Print "Close canceled, event handler still active."
-    End If
-End Sub
+' ' Overwrite the application onclose behaviour
+' Private Sub app_Workbook_BeforeClose(Cancel As Boolean)
+'     ' Only clean up the event handler if the close is not canceled
+'     If Not Cancel Then
+'         'uninitialize the workbook on close
+'         Debug.Print "Attempting to uninitialize workbook..."
+'         uninitialize wb
+'         Debug.Print "Uninitialize completed (maybe?)"
+'     Else
+'         Debug.Print "Close canceled, event handler still active."
+'     End If
+' End Sub
 
 ' Private Sub app_WorkbookBeforeSave(Wb as Workbook, SaveAsUI As Boolean, Cancel As Boolean)
 ' ' Was going to implement a method here to clear the macros of a workbook, but risk of inter-
