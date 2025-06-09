@@ -1430,7 +1430,7 @@ def get_interpreter_port(interpreter_path:Path):
         return port
         
 
-def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool=True):
+def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:bool=True, do_register_wb:bool=True):
     """spins up the xlpro server on a port specified in the launch.json debug configuration"""
 
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -1448,11 +1448,32 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool
     # existing_port = get_interpreter_port(py_interpreter_path)
     # if existing_port:
     #     port = existing_port
+    if do_kill_running:
+        check = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
+        if check is None:
+            print_info("No running server, ok to continue")
+        else:
+            _pid, _guid, _port = check
+            print_info(f"Running server potentially running at pid: {_pid}")
+
+            try:
+                print_info(f"Attempting to close pid: {_pid}")
+                process = psutil.Process(_pid)
+                process.terminate()  # Graceful
+                process.wait(timeout=3)
+                print_success("Process closed successfully.")
+            except psutil.NoSuchProcess:
+                print_info("Process does not exist, ok to continue")
+            except psutil.TimeoutExpired:
+                print_error("Request timed out, could not close the server gracefully. Forcing...")
+                process.kill()  # Force kill if it didn't terminate in time
+                print_warning("Force close complete")
+        
         
     if not check_port("localhost", port):
         print_warning(f"currently specified port {port} in launch.json is not available, finding another")
         port = get_free_port()
-        print_info(f"free port found, {port}")
+        print_success(f"free port found, {port}")
         # write_launch_json(workbook_xlpro_wd, port)
     
     # guid = None
@@ -1481,6 +1502,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool
         stderr=subprocess.PIPE # if do_register_wb else None, # Pipe the stderr to read the triggers
     )
 
+
     def register_wb_on_signal(_process):
         """Registers the workbook once the server is ready."""
         exit_message = "XLPROSTART_TRIGGER_OK"
@@ -1490,10 +1512,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool
         try:
             for line in _process.stderr:
                 sys.stderr.write(line)  # Mirror stderr
-
                 if exit_message in line:
                     break  # Trigger detected
-
                 if time.time() - start_time > timeout_seconds:
                     raise TimeoutError("Timeout waiting for startup signal")
         except TimeoutError as e:
@@ -1516,29 +1536,29 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool
     pass
 
 
-def close_venv_xlpro_server_for_workbook(workbook_path:Path):
-    py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+# def close_venv_xlpro_server_for_workbook(workbook_path:Path):
+#     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
 
-    if py_interpreter_root_dir is None:
-        print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
-        input("Press enter to exit")
-        sys.exit()
+#     if py_interpreter_root_dir is None:
+#         print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
+#         input("Press enter to exit")
+#         sys.exit()
 
-    pid, guid, port = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
+#     pid, guid, port = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
 
-    os.kill(pid, signal.SIGTERM)
+#     os.kill(pid, signal.SIGTERM)
 
-    try:
-        print_info(f"Attempting to close pid: {pid} for workbook: {workbook_path}...")
-        process = psutil.Process(pid)
-        process.terminate()  # Graceful
-        process.wait(timeout=3)
-        print_success(f"Process closed, pid: {pid}")
-    except psutil.NoSuchProcess:
-        print_warning("Process does not exist, no further actions required")
-    except psutil.TimeoutExpired:
-        print_warning("terminate() call timed out, forcing closure")
-        process.kill()  # Force kill if it didn't terminate in time
+#     try:
+#         print_info(f"Attempting to close pid: {pid} for workbook: {workbook_path}...")
+#         process = psutil.Process(pid)
+#         process.terminate()  # Graceful
+#         process.wait(timeout=3)
+#         print_success(f"Process closed, pid: {pid}")
+#     except psutil.NoSuchProcess:
+#         print_warning("Process does not exist, no further actions required")
+#     except psutil.TimeoutExpired:
+#         print_warning("terminate() call timed out, forcing closure")
+#         process.kill()  # Force kill if it didn't terminate in time
 
 
 
