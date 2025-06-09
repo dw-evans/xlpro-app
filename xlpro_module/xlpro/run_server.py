@@ -139,7 +139,7 @@ def serve():
             print("The process with the lock file is not alive.")
             raise Exception(f"Error in lock file '{xlpro_lock_fp}' please correct manually.")
         print("The process appears to be alive.")
-        pid, guid, debugpy_port = [getattr(lockfile_contents_dict, x) for x in ("pid", "guid", "debugpy_port")]
+        pid, guid, debugpy_port = [lockfile_contents_dict.get(x) for x in ("pid", "guid", "debugpy_port")]
         _utils.show_warning(
             "xlpro",
             f"""WARNING: Could not acquire the file lock.
@@ -191,7 +191,11 @@ def serve():
     logger.info(f"xlpro server starting on PID: {os.getpid()}")
     SERVER = xlproServer()
 
-    print("XLPROSTART_TRIGGER_OK")
+    # print("XLPROSTART_TRIGGER_OK")
+    sys.stderr.write("XLPROSTART_TRIGGER_OK\n")
+    sys.stderr.flush()
+    sys.stdout.write("XLPROSTART_TRIGGER_OK\n")
+    sys.stdout.flush()
 
     def tidy_up_lock_file():
         logger.info(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
@@ -294,5 +298,5 @@ def main():
         sys.exit()
 
 if __name__ == "__main__":
-    # sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\xlpro-demo.xlsx", "--debugpy_port", "5678"]
+    sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\test.xlsx", "--debugpy_port", "5678"]
     main()

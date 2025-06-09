@@ -117,7 +117,7 @@
 
 24. `DONE` `HIGH` Investigate trimming com calls by running an argument check before execution  
 
-25.  
+25.  `MED` Investigate configuring xlpro-cli as a server which can receive commands.
 
 26.  
 

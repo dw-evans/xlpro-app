@@ -1,5 +1,26 @@
 Attribute VB_Name = "xlpro_static"
 
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-09, 21:48:58
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 23:34:04
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-08, 23:30:21
+' ### END METADATA ###
+
+
 
 Option Explicit
 
@@ -146,6 +167,47 @@ End Function
 '------------------------------------------------------------------------
 ' UI ribbon elements
 '------------------------------------------------------------------------
+
+' Function RunProcessAndWaitForStdErrMsg(command As String, msg As String, timeoutSeconds As Double) as Boolean
+' ' Runs a shell command in a new window and waits for a signal
+'     Dim shell As Object
+'     Set shell = CreateObject("WScript.Shell")
+
+'     Dim exec As Object
+'     Set exec = shell.Exec(command)
+
+'     Dim output As String
+'     Dim startTime As Single
+'     startTime = Timer
+
+'     Do While Not exec.StdErr.AtEndOfStream
+'         output = exec.StdErr.ReadLine
+'         Debug.Print "stderr: " & output
+
+'         If InStr(output, msg) > 0 Then
+'             MsgBox "Signal string received: " & msg
+'             Exit Do
+'         End If
+
+'         If Timer - startTime > timeoutSeconds Then
+'             MsgBox "Timeout waiting for signal string."
+'             Exit Do
+'         End If
+'     Loop
+
+'     ' Optional: Wait for process to exit
+'     Do While exec.Status = 0
+'         DoEvents
+'         If Timer - startTime > timeoutSeconds Then
+'             MsgBox "Timeout waiting for process to exit."
+'             Exit Do
+'         End If
+'     Loop
+
+'     MsgBox "Process exited with code: " & exec.ExitCode
+' End Sub
+
+
 Sub xlproStart(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
     Dim command As String
@@ -154,22 +216,33 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     
     Set wb = ActiveWorkbook
 
+    ' Load the toml xlpro configuration file to ensure the paths are correct
     LoadXlproConfigTOML
 
     ' Use the Shell function to call the program
-    ' Could replace this with a call to the server to start it up instead tbh
     command = """" & XLPRO_CLI_PATH & """" & " start " & """" & wb.Path & "\" & wb.Name & """"
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+
+    ' ' Run the shell command and wait for the msg in the stderr to signal that it's ready to receive a start call
+    ' dim fullCommand as string
+    ' Debug.Print fullCommand
+    ' fullCommand = "cmd /c " & """" & command & """"    
+    ' dim success as boolean
+    ' success = RunProcessAndWaitForStdErrMsg command:=fullCommand, msg:="XLPRO_TRIGGER_START", timeoutSeconds:=10.0
     
-    ' clear the workbook key if it exists
+    ' if not success Then
+    '     MsgBox "RunProcessAndWaitForStdErr success"
+    ' Else
+    '     MsgBox "RunProcessAndWaitForStdErr fail"
+    ' End if
+
+    ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
     del_workbook_guid_map_key wb.Name
 
-
     ' Optionally, display the Task ID of the program
-    Debug.Print "Program launched with Task ID: " & taskID
-
+    ' Debug.Print "Program launched with Task ID: " & taskID
 
 End Sub
 
@@ -193,6 +266,11 @@ End Sub
 Sub xlproRegister(ByRef control As Office.IRibbonControl)
     Dim wb As Workbook
     Set wb = ActiveWorkbook
+    xlproRegisterWorkbook wb
+End Sub
+
+Sub xlproRegisterWorkbook(wb as Workbook)
+' Register the workbook
     Debug.Print ActiveWorkbook.Path
     
     LoadXlproConfigTOML
@@ -674,6 +752,7 @@ End Sub
 
 
 Public Function ptr(rng As Range)
+' Custom pointer function which is passable to xlpro as an argument.
     Dim wb As Workbook
     Dim ws As Worksheet
     
@@ -682,6 +761,8 @@ Public Function ptr(rng As Range)
     
     ptr = "*<" & wb.FullName & "::" & ws.Name & "::" & rng.Address & ">"
 End Function
+
+
 
 
 

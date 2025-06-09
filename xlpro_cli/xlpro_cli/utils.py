@@ -1430,7 +1430,7 @@ def get_interpreter_port(interpreter_path:Path):
         return port
         
 
-def start_venv_xlpro_server_for_workbook(workbook_path:Path):
+def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_register_wb:bool=True):
     """spins up the xlpro server on a port specified in the launch.json debug configuration"""
 
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -1478,34 +1478,71 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path):
         creationflags=subprocess.CREATE_NEW_CONSOLE,
         text=True,
         # stdout=subprocess.PIPE,
-        # stderr=subprocess.PIPE,
+        stderr=subprocess.PIPE # if do_register_wb else None, # Pipe the stderr to read the triggers
     )
 
-    # disable_quick_edit_mode(process.pid)
-    # timeout_sec = 10 # seconds
-    # t0 = time.time()
-    # exit_message = "XLPROSTART_TRIGGER_OK"
-    
-    # for line in process.stdout:
-    #     print(val:=line, end='')  # Print each line from stdout immediately
-    #     # if exit_message in val:
-    #     #     print(f"Trigger message {exit_message} encountered in stdout, no need to continue breaking")
-    #     #     break
+    def register_wb_on_signal(_process):
+        """Registers the workbook once the server is ready."""
+        exit_message = "XLPROSTART_TRIGGER_OK"
+        timeout_seconds = 10.0
+        start_time = time.time()
 
-    # for line in process.stderr:
-    #     print(line, end='', file=sys.stderr)  # Print stderr immediately
+        try:
+            for line in _process.stderr:
+                sys.stderr.write(line)  # Mirror stderr
 
-    # input("press enter to exit")
+                if exit_message in line:
+                    break  # Trigger detected
 
-    # if time.time() - t0 > timeout_sec:
-    #     raise TimeoutError()
+                if time.time() - start_time > timeout_seconds:
+                    raise TimeoutError("Timeout waiting for startup signal")
+        except TimeoutError as e:
+            print_error(f"startup timedout after {timeout_seconds} sec. You will need to manually register (sync) the workbook.")
 
-    # process.wait()
+        
+        # Ready to link the workbook to the server.
+        # Dispatch the workbook to run the registration macro from here 
+        try:
+            from win32com.client import Dispatch
+            xlapp = Dispatch("Excel.Application")
+            wb = xlapp.Workbooks.Open(str(workbook_path))
+            xlapp.Run("xlpro.xlam!xlproRegisterWorkbook", wb)
+        except Exception as e:
+            print_error("Could not signal to Excel to register the workbook. You will need to manually register (sync) the workbook.")
 
-    # result_pid = result.pid
-    print("sleeping for 60 seconds...")
-    time.sleep(60)
+    if do_register_wb:
+        register_wb_on_signal(process)
+
     pass
+
+
+def close_venv_xlpro_server_for_workbook(workbook_path:Path):
+    py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
+
+    if py_interpreter_root_dir is None:
+        print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
+        input("Press enter to exit")
+        sys.exit()
+
+    pid, guid, port = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
+
+    os.kill(pid, signal.SIGTERM)
+
+    try:
+        print_info(f"Attempting to close pid: {pid} for workbook: {workbook_path}...")
+        process = psutil.Process(pid)
+        process.terminate()  # Graceful
+        process.wait(timeout=3)
+        print_success(f"Process closed, pid: {pid}")
+    except psutil.NoSuchProcess:
+        print_warning("Process does not exist, no further actions required")
+    except psutil.TimeoutExpired:
+        print_warning("terminate() call timed out, forcing closure")
+        process.kill()  # Force kill if it didn't terminate in time
+
+
+
+
 
 def add_to_user_path(p:Path):
     # Ensure the path is absolute
@@ -1568,6 +1605,7 @@ def remove_from_user_path(p:Path):
             
     except Exception as e:
         print_error(f"Error: {e}")
+
 
 
 if __name__ == "__main__":
