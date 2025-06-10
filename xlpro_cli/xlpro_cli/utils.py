@@ -1397,8 +1397,15 @@ def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str
     interpreter_path = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
 
     import xlpro.file_lock
-    # SEE RUN_SERVER LINE 102
+    # the lockfile path will be set adjacent to the interpreter running the xlpro_module
+    # however when running using the debug venv interpreter, there will be a mismatch between the interpreter within xlpro-cli.exe and
+    # the one which generated the lockfile. 
+    # manual run_server calls are therefore now non-functional, until xlpro-cli.exe and the xlpro create the lockfile at a consistent location.
+    # without the lockfile, there is no way for xlpro-cli to return the guid
+
     xlpro_lock_fp = xlpro.file_lock.get_xlpro_lockfile_path_parent(interpreter_path=interpreter_path) / f"{workbook_path.name}.xlpro.lock"
+    # xlpro_lock_fp = xlpro.file_lock.get_xlpro_lockfile_path_parent() / f"{workbook_path.name}.xlpro.lock"
+    
     lockfile_contents_dict = xlpro.file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
     # xlpro_lock_fp = get_xlpro_lockfile_path(interpreter_path=interpreter_path)
     # lockfile_contents_dict = check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
@@ -1412,19 +1419,21 @@ def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str
 
 
 def get_interpreter_pid(interpreter_path:Path):
+    raise NotImplementedError
     check = get_running_pid_guid_port_for_workbook(interpreter_path)
     if check is not None:
         pid, guid, port = check
         return pid
     
-def get_interpreter_guid(interpreter_path:Path):
+def get_interpreter_guid(workbook_path:Path):
     """gets the guid of the running interpreter"""
-    check = get_running_pid_guid_port_for_workbook(interpreter_path)
+    check = get_running_pid_guid_port_for_workbook(workbook_path)
     if check is not None:
         pid, guid, port = check
         return guid
     
 def get_interpreter_port(interpreter_path:Path):
+    raise NotImplementedError
     check = get_running_pid_guid_port_for_workbook(interpreter_path)
     if check is not None:
         pid, guid, port = check
@@ -1446,9 +1455,6 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
     port = read_xlpro_debug_configuration_port(workbook_path)
     workbook_xlpro_wd = get_xlpro_workbook_directory(workbook_path)
 
-    # existing_port = get_interpreter_port(py_interpreter_path)
-    # if existing_port:
-    #     port = existing_port
     if do_kill_running:
         check = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
         if check is None:

@@ -123,6 +123,7 @@ def serve():
     logger.info(f"ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
 
     xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent() / f"{WORKBOOK_NAME}.xlpro.lock"
+
     if not xlpro_lock_fp.parent.exists():
         logger.warning(f"{xlpro_lock_fp.parent} does not exist, making parents")
         xlpro_lock_fp.parent.mkdir()
@@ -291,7 +292,7 @@ def main():
     
         serve()
     except Exception as e:
-        print(e)
+        print(f"Fatal Exception: {e}")
         input("Fatal error encountered. Press enter to exit")
 
     finally:

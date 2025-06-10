@@ -164,6 +164,7 @@ from pathlib import Path
 import sys
 
 def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
+    raise NotImplementedError
     if interpreter_path is not None:
         xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
     else:
