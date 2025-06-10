@@ -3,6 +3,27 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-10, 23:57:26
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-10, 23:56:37
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
+' At 2025-06-10, 23:56:27
+' ### END METADATA ###
+
+
+' ### BEGIN METADATA ###
+' --- xlpro_static.bas ---
+' Compiled with xlpro\xlpro_addin\main.py
 ' At 2025-06-09, 21:48:58
 ' ### END METADATA ###
 
@@ -224,19 +245,6 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 
-    ' ' Run the shell command and wait for the msg in the stderr to signal that it's ready to receive a start call
-    ' dim fullCommand as string
-    ' Debug.Print fullCommand
-    ' fullCommand = "cmd /c " & """" & command & """"    
-    ' dim success as boolean
-    ' success = RunProcessAndWaitForStdErrMsg command:=fullCommand, msg:="XLPRO_TRIGGER_START", timeoutSeconds:=10.0
-    
-    ' if not success Then
-    '     MsgBox "RunProcessAndWaitForStdErr success"
-    ' Else
-    '     MsgBox "RunProcessAndWaitForStdErr fail"
-    ' End if
-
     ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
     del_workbook_guid_map_key wb.Name
@@ -274,6 +282,10 @@ Sub xlproRegisterWorkbook(wb as Workbook)
     Debug.Print ActiveWorkbook.Path
     
     LoadXlproConfigTOML
+
+    ' clear the workbook guid key if it exists
+    initialize_workbook_guid_map
+    del_workbook_guid_map_key wb.Name
 
     On Error GoTo RegistrationErrorHandler
     register_workbook ActiveWorkbook

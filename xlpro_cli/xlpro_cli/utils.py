@@ -6,7 +6,7 @@ import sys
 import subprocess
 import time
 from pathlib import Path
-import regex as re
+# import regex as re
 import logging
 import json
 import os
@@ -18,6 +18,7 @@ import psutil
 from pathlib import Path
 import sys
 import textwrap
+import re
 
 DEVELOPMENT_INSTALL = False
 
