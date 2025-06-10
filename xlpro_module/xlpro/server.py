@@ -1026,6 +1026,8 @@ class FigureGeneratingThread:
 # from concurrent.futures import ThreadPoolExecutor
 # x = ThreadPoolExecutor(max_workers=)
 
+from concurrent.futures import ThreadPoolExecutor, Future
+
 class WorkerManager:
     """Manages function execution for a workspace. Sends results to the results manager"""
     def __init__(self, server:xlproWorkspace):
@@ -1033,9 +1035,12 @@ class WorkerManager:
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
+        self._executor = ThreadPoolExecutor(max_workers=self.MAX_THREADS)
+        self._futures: dict[str, Future] = {}
+        self._futures_lock = threading.Lock()
         # self._threadpool:list[threading.Thread] = []
-        self._threadpool_dict:dict[str, threading.Thread] = {}
-        self._threadpool_dict_lock = threading.Lock()
+        # self._threadpool_dict:dict[str, threading.Thread] = {}
+        # self._threadpool_dict_lock = threading.Lock()
 
     @property
     def MAX_THREADS(self):
@@ -1064,32 +1069,27 @@ class WorkerManager:
         return wrapper
 
     def _process_function_queue(self):
-        with self._threadpool_dict_lock:
-            n_items = len(self._threadpool_dict.keys())
-            
-        if n_items < self.MAX_THREADS:
-            uid = self._server._pending_function_queue.get(timeout=0.01)
-            try:
-                with self._server._uid_pending_function_map_lock:
-                    func = self._server._uid_pending_function_map[uid]
-            except KeyError:
-                logger.warning(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
-                return
-            
-            with self._threadpool_dict_lock:
-                if uid in self._threadpool_dict:
-                    logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
-                    return
-
-                t = threading.Thread(target=func, daemon=True)
-                # t = threading.Thread(target=self.sleep_wrapper(func), daemon=True)
-                self._threadpool_dict[uid] = t
-            # XXX - todo - limit the number of attempts for a given function in some way
-            # XXX - todo - support sending terminate command to lingering worker threads
-            t.start()
+        if len(self._futures) >= self.MAX_THREADS:
             return
 
-        logger.info(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
+        try:
+            uid = self._server._pending_function_queue.get(timeout=0.01)
+        except queue.Empty:
+            return
+
+        with self._server._uid_pending_function_map_lock:
+            func = self._server._uid_pending_function_map.get(uid)
+            if func is None:
+                logger.warning(f"Function for uid '{uid}' not found")
+                return
+
+        with self._futures_lock:
+            if uid in self._futures:
+                logger.debug(f"Rejected to start worker for uid: '{uid}', already running")
+                return
+
+            future = self._executor.submit(func)
+            self._futures[uid] = future
 
     def _clear_completed_threads(self):
         self._threadpool_dict = {uid: t for uid, t in self._threadpool_dict.items() if t.is_alive()}
@@ -1106,7 +1106,7 @@ class WorkerManager:
                     self._process_function_queue()
                 except queue.Empty:
                     break
-                self._clear_completed_threads()
+                # self._clear_completed_threads()
                 time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
