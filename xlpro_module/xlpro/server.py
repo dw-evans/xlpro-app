@@ -186,7 +186,9 @@ class xlproServer:
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        return workspace.execute_function_async(caller=caller, fname=func_name, args=args)
+        # ret = workspace.execute_function_async(caller=caller, fname=func_name, args=args)
+        ret = workspace.execute_function_sync(caller=caller, fname=func_name, args=args)
+        return ret
 
     def execute_sub_async(self, wb_dispatch, func_name):
         # marshalling ok afaik - excel vba interface
@@ -601,148 +603,253 @@ class xlproWorkspace:
             return repr(errors.xlproUnhandledException(repr(e)))
         
 
-    # def execute_function_sync(self, caller, fname, args):
-    #     try:
-    #         func = self._get_function_by_name(fname)
+    def _handle_default_result(self, _ret, _uid):
+        """Default result handler, translated from client manager processing loop"""
+        if type(_ret) == xlproExpandedType:
+            val = _ret.data
+        else:
+            val = _ret
+        if isinstance(val, Exception):
+            logger.warning(f"Value is an exception: '{val}', '{_uid}'")
+            self._client_manager_thread._set_result_display(_uid, retval:=repr(val))
+        else:
+            self._client_manager_thread._set_result_display(_uid, retval:=val)
+        return retval
 
-    #         if not func:
-    #             raise Exception(f"Function {fname} not found.")
-            
-    #         args = _utils.com_args_release_to_stream_reserved(func, args)      
-
-    #         args_less_reserved = _utils.get_args_minus_reserved(func, args)
-
-    #         uid = xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
-
-    #         logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
-
-    #         self._uid_args_cache[uid] = args
-
-    #         result_type = self._module_function_maps_wrapper.fname_type_register[fname]
-            
-    #         with self._uid_result_type_map_lock:
-    #             self._uid_result_type_map[uid] = result_type
-
-    #         # configure default state for result and iscomplete status
-    #         with self._uid_result_display_map_lock:
-    #             self._uid_result_display_map[uid] = f"Promise<{uid}>"
-    #         with self._uid_result_iscomplete_map_lock:
-    #             self._uid_result_iscomplete_map[uid] = False
-
-    #         # handle different function types
-    #         # if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
-    #         if result_type in [FunctionTypes.array_or_value, FunctionTypes.py_object]:
-    #             f = self.create_worker_func(uid, func, args, kwargs={})
-    #             with self._uid_pending_function_map_lock:
-    #                 self._uid_pending_function_map[uid] = f
-    #             self._pending_function_queue.put(uid)
-    #             self._worker_manager.wake()
-
-    #         # return the (incomplete result)
-    #         with self._uid_result_display_map_lock:
-    #             return self._uid_result_display_map[uid]
-
-    #     # Return the python exception string as a fallback
-    #     except Exception as e:
-    #         return repr(errors.xlproUnhandledException(repr(e)))
-
-
-
-    # def create_worker_func_sync(self, uid, func, args, kwargs):
-    #     if kwargs:
-    #         raise Exception("kwargs should not be here!")
-    #     pass
-
-    #     def modify_args_list(args:list):
-    #         for i, arg in enumerate(args):
-    #             if isinstance(arg, str):
-    #                 if not arg.startswith("PyObj"):
-    #                     continue
-    #                 # handle the basic pyobject case
-    #                 if m:=re.match(r"^PyObj<(.*)>$", arg):
-    #                     with self._uid_results_map_lock:
-    #                         temp_uid = m.group(1)
-    #                         args[i] = self._uid_results_map[temp_uid]
-    #                         if isinstance(args[i], xlproCollapsedType):
-    #                             args[i] = args[i].data 
-
-    #                 # handle the case for an address request for expanded values
-    #                 elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
-    #                     with self._uid_results_map_lock:
-    #                         temp_uid = m.group(1)
-    #                         temp_addr = int(m.group(2))
-    #                         # try and look it up, pass the error through to the function if we encounter one.
-    #                         try:
-    #                             args[i] = self._uid_results_map[temp_uid][temp_addr]
-    #                             if isinstance(args[i], xlproCollapsedType):
-    #                                 args[i] = args[i].data 
-    #                         except IndexError as e:
-    #                             args[i] = e
-    #                         except Exception as e:
-    #                             raise errors.xlproUnhandledException
-    #         return args
-            
-    #     # check for py object request
-    #     # args0 = deepcopy(args)
-    #     import copy
-    #     args_original = copy.deepcopy(args)
-    #     args = list(args)
-    #     # modify level 0 of the args
-    #     modify_args_list(args)
-    #     # check if level 1 needs to be modified
-    #     try:
-    #         for i, arg in enumerate(args):
-    #             # a tuple nested arg may contain pyobject strings
-    #             if isinstance(arg, (tuple, list)):
-    #                 args[i] = modify_args_list(list(arg))
-    #                 for i0, arg0 in enumerate(args[i]):
-    #                     if isinstance(arg0, (list, tuple)):
-    #                         args[i][i0] = modify_args_list(list(arg0))
-    #         pass
-    #     except Exception as e:
-    #         raise e
-
-    #     if func.__name__ == "add_legend":
-    #         pass
-                
-    #     def worker():
-    #         fname = _wrappers.get_registered_func_name(func, self._temp_module_name)
-    #         if func.__name__ == "xlpro_getitem":
-    #             pass
-    #         if func.__name__ == "getitem":
-    #             pass
-    #         if func.__name__ == "add_line":
-    #             pass
-    #         f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
-    #         try:
-    #             ret = f(*args, **kwargs)
-    #             self._result_queue.put((uid, ret))
-    #             logger.info(f"Completed function '{uid}' successfully")
-    #         except Exception as e:
-    #             if isinstance(e, errors.ArugmentNotReadyException):
-    #                 pass
-    #             elif isinstance(e, errors.ExcelArugmentIsNoneException):
-    #                 pass
-    #             elif isinstance(e, errors.xlproArgumentExceptionError):
-    #                 pass
-    #             elif isinstance(e, errors.ExcelNotAccessibleError):
-    #                 pass
-    #             elif isinstance(e, errors.xlproUnhandledException):
-    #                 pass
-    #             elif isinstance(e, AttributeError):
-    #                 if re.match(r"^<unknown>\..*$", str(e)):
-    #                     logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
-    #                     e = errors.xlproLikelyCOMAccessError(str(e))
-    #             elif isinstance(e, pythoncom.com_error):
-    #                 pass
-    #             elif isinstance(e, Exception):
-    #                 pass
-    #             self._result_queue.put((uid, e))
-    #             logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
-    #         logger.debug("Waking results manager from worker thread...")
-    #         self._results_manager_thread.wake()
+    # pyobj result
+    def _handle_pyobject_result(self, _ret, _uid):
+        """Pyobject result handler, translated from client manager processing loop"""
+        if isinstance(_ret, xlproCollapsedType):
+            val = _ret.data
+        else:
+            val = _ret
+        if isinstance(val, Exception):
+            logger.warning(f"Value is an exception: '{val}', '{_uid}'")
+            self._client_manager_thread._set_result_display(_uid, retval:=repr(val))
+        else:
+            self._client_manager_thread._set_result_display(_uid, retval:=f"PyObj<{_uid}>")
+        return retval
         
-    #     return worker
+    # iterable result
+    def _handle_iterable_result(self, _ret, _uid):
+        """Iterable result handler, translated from client manager processing loop"""
+        if isinstance(_ret, Exception):
+            logger.warning(f"Value is an exception: '{_ret}', '{_uid}'")
+            self._client_manager_thread._set_result_display(_uid, retval:=repr(_ret))
+
+        # construct a list off the iterable value
+        elif isinstance(_ret, typing.Iterable):
+            val_modified = []
+            for i, subval in enumerate(_ret):
+                if isinstance(subval, (int, float, str, bool)):
+                    val_modified.append(subval)
+                else:
+                    val_modified.append(f"PyObj<{_uid}>_{i}")
+
+            # create a *_expanded variant of the uid result display
+            self._client_manager_thread._set_result_display(
+                f"{_uid}_expanded", retval:=np.array(val_modified, dtype=object)
+            )
+        return retval
+
+
+    def execute_function_sync(self, caller, fname, args):
+        try:
+            func = self._get_function_by_name(fname)
+
+            if not func:
+                raise Exception(f"Function {fname} not found.")
+            
+            args = _utils.com_args_release_to_stream_reserved(func, args)      
+            args_less_reserved = _utils.get_args_minus_reserved(func, args)
+
+            uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
+            logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
+
+            with self._uid_args_cache_lock:
+                self._uid_args_cache[uid] = args
+
+            # return the cached result if it exists
+            with self._uid_result_display_map_lock:
+                with self._uid_result_iscomplete_map_lock:
+                    if self._uid_result_iscomplete_map.get(uid, False):
+                        if f"{uid}_expanded" in self._uid_result_display_map:
+                            ret = self._uid_result_display_map[f"{uid}_expanded"]
+                        else:
+                            ret = self._uid_result_display_map[uid]
+                        logger.debug(f"result marked complete, fetched cached result {ret}")
+                        return ret
+                
+            # Clear any lingering calculations coming from this caller if the result isnt cached
+            # downstream functions should pick up on these being deleted
+            caller_dispatch = Dispatch(caller)
+
+            # irrelevant
+            # with self._caller_address_uid_map_lock:
+            #     if caller_addr in self._caller_address_uid_map.keys():
+            #         self.clear_uid(self._caller_address_uid_map[caller_addr])
+            #     self._caller_address_uid_map[caller_addr] = uid
+
+            # release the com args for use in another thread. convert them to streams
+            # args = utils.com_args_release_to_stream_reserved(func, args)
+
+            result_type = self._module_function_maps_wrapper.fname_type_register[fname]
+            with self._uid_result_type_map_lock:
+                self._uid_result_type_map[uid] = result_type
+
+            # leave this in, but it wont be called
+            caller_stream = _utils.comarshal_release_and_get_stream(caller_dispatch) # this marshal is the OG
+            with self._uid_to_caller_map_lock:
+                self._uid_to_caller_map[uid] = caller_stream
+
+            f = self.create_worker_func_sync(uid, func, args, kwargs={})
+            ret = f()
+
+            do_mark_complete = False
+            if isinstance(ret, Exception):
+                e = ret
+                if isinstance(e, errors.ArugmentNotReadyException):
+                    pass
+                elif isinstance(e, errors.ExcelArugmentIsNoneException):
+                    pass
+                elif isinstance(e, errors.xlproArgumentExceptionError):
+                    pass
+                elif isinstance(e, errors.ExcelNotAccessibleError):
+                    pass
+                elif isinstance(e, errors.xlproUnhandledException):
+                    pass
+                elif isinstance(e, AttributeError):
+                    if re.match(r"^<unknown>\..*$", str(e)):
+                        logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
+                        e = errors.xlproLikelyCOMAccessError(str(e))
+                    pass
+                elif isinstance(e, pythoncom.com_error):
+                    pass
+                else:
+                    do_mark_complete = True
+
+            self._results_manager_thread._set_results_value(uid, ret)
+
+            if any([type(ret) == x for x in (str, bool, int, float)]):
+                ppret = self._handle_default_result(ret, uid)
+                
+            # an array or ret type will send the rets directly to excel via COM
+            elif result_type == FunctionTypes.array_or_value:
+                if type(ret) == xlproCollapsedType:
+                    ppret = self._handle_pyobject_result(ret, uid)
+                else:
+                    ppret = self._handle_default_result(ret, uid)
+
+            # sends a string to excel which effectively points to a stored result
+            elif result_type == FunctionTypes.py_object:
+                # a py_object list must be parsed before sending to excel to ensure the contents are compliant 
+                if any([type(ret) == x for x in (list, tuple)]):
+                    ppret = self._handle_iterable_result(ret, uid)
+                elif type(ret) == xlproExpandedType:
+                    ppret = self._handle_default_result(ret, uid)
+                else:
+                    ppret = self._handle_pyobject_result(ret, uid)
+                    
+            else:
+                raise Exception("Result type invalid")
+        
+            ppret_fetched = self._client_manager_thread._get_result_display(uid)
+            
+            # marking the function complete is needed to handle the cached results.
+            with self._uid_result_iscomplete_map_lock:
+                self._uid_result_iscomplete_map[uid] = do_mark_complete
+
+            return ppret_fetched
+
+        # Return the python exception string as a fallback
+        except Exception as e:
+            return repr(errors.xlproUnhandledException(repr(e)))
+        
+
+    def create_worker_func_sync(self, uid, func, args, kwargs):
+        if kwargs:
+            raise Exception("kwargs should not be here!")
+        pass
+
+        def modify_args_list(args:list):
+            for i, arg in enumerate(args):
+                if isinstance(arg, str):
+                    if not arg.startswith("PyObj"):
+                        continue
+                    # handle the basic pyobject case
+                    if m:=re.match(r"^PyObj<(.*)>$", arg):
+                        with self._uid_results_map_lock:
+                            temp_uid = m.group(1)
+                            args[i] = self._uid_results_map[temp_uid]
+                            if isinstance(args[i], xlproCollapsedType):
+                                args[i] = args[i].data 
+
+                    # handle the case for an address request for expanded values
+                    elif m:=re.match(r"^PyObj<(.*)>_(\d+)$", arg):
+                        with self._uid_results_map_lock:
+                            temp_uid = m.group(1)
+                            temp_addr = int(m.group(2))
+                            # try and look it up, pass the error through to the function if we encounter one.
+                            try:
+                                args[i] = self._uid_results_map[temp_uid][temp_addr]
+                                if isinstance(args[i], xlproCollapsedType):
+                                    args[i] = args[i].data 
+                            except IndexError as e:
+                                args[i] = e
+                            except Exception as e:
+                                raise errors.xlproUnhandledException
+            return args
+            
+        # check for py object request
+        # args0 = deepcopy(args)
+        import copy
+        args_original = copy.deepcopy(args)
+        args = list(args)
+        # modify level 0 of the args
+        modify_args_list(args)
+        # check if level 1 needs to be modified
+        try:
+            for i, arg in enumerate(args):
+                # a tuple nested arg may contain pyobject strings
+                if isinstance(arg, (tuple, list)):
+                    args[i] = modify_args_list(list(arg))
+                    for i0, arg0 in enumerate(args[i]):
+                        if isinstance(arg0, (list, tuple)):
+                            args[i][i0] = modify_args_list(list(arg0))
+            pass
+        except Exception as e:
+            raise e
+                
+        def worker():
+            fname = _wrappers.get_registered_func_name(func, self._temp_module_name)
+            f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
+            try:
+                ret = f(*args, **kwargs)
+                return ret
+            except Exception as e:
+                if isinstance(e, errors.ArugmentNotReadyException):
+                    pass
+                elif isinstance(e, errors.ExcelArugmentIsNoneException):
+                    pass
+                elif isinstance(e, errors.xlproArgumentExceptionError):
+                    pass
+                elif isinstance(e, errors.ExcelNotAccessibleError):
+                    pass
+                elif isinstance(e, errors.xlproUnhandledException):
+                    pass
+                elif isinstance(e, AttributeError):
+                    if re.match(r"^<unknown>\..*$", str(e)):
+                        logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
+                        e = errors.xlproLikelyCOMAccessError(str(e))
+                    pass
+                elif isinstance(e, pythoncom.com_error):
+                    pass
+                elif isinstance(e, Exception):
+                    pass
+
+                return e
+            
+        return worker
 
 
     def create_worker_func(self, uid, func, args, kwargs):
@@ -950,81 +1057,6 @@ def figure_process_func(wd:Path, uid, func_name, args, kwargs, queue):
     queue.put((uid, (fp, size_inches)))
     pass
 
-def setup_scope_and_get_function(module_name, module_path, func_name):
-    _utils.import_module(module_name, wd / f"{module_name}.py")
-    func_map = _utils.get_udf_valid_functions_from_module(module_name)
-    func = func_map[func_name]
-    return func
-
-
-class FigureGeneratingThread:
-    """Class which maintains a thread which waits for a process to finish."""
-    def __init__(self, wd, uid, func_name, args, kwargs, return_value_queue, return_event):
-        self._wd = wd
-        if not isinstance(self._wd, Path):
-            raise TypeError 
-        self._stop_event = threading.Event()
-        self._wake_event = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-
-        self._return_event = return_event
-        self._return_queue = return_value_queue        
-
-        self._process:multiprocessing.Process = None
-        self._multiprocess_queue = multiprocessing.Queue()
-
-        self._uid = uid
-        self._func_name = func_name
-        self._args = args
-        self._kwargs = kwargs
-
-    def start(self):
-        # start the watcher
-        self._thread.start()
-
-    def stop(self, timeout_s=10):
-        self._stop_event.set()
-        self._wake_event.set()  # Wake up if sleeping
-        self._thread.join(timeout=timeout_s)
-        # self._process.terminate()
-
-    def wake(self):
-        self._wake_event.set()
-
-    def _create_process(self) -> multiprocessing.Process:
-
-        p = multiprocessing.Process(
-            # target=utils.type_converter_wrapper(
-            #     utils.com_init_dispatch_release_wrapper(
-            #         figure_process_func,
-            #     )
-            target=figure_process_func,
-            daemon=True,
-            kwargs={
-                "wd": self._wd,
-                "uid": self._uid,
-                "func_name": self._func_name,
-                "args": self._args,
-                "kwargs": self._kwargs,
-                "queue": self._multiprocess_queue,
-            }
-        )
-        return p
-    
-    def _run(self): 
-        p = self._create_process()
-        p.start()
-        p.join() # once joined, we can check the queue
-        # get the uid and value (figure path in this case)
-        uid, val = self._multiprocess_queue.get()
-        # send the uid/value combo to the return queue
-        # the return queue should always be the server value return queue 
-        self._return_queue.put((uid, val))
-        self._return_event.set()
-
-
-# from concurrent.futures import ThreadPoolExecutor
-# x = ThreadPoolExecutor(max_workers=)
 
 from concurrent.futures import ThreadPoolExecutor, Future
 
@@ -1044,7 +1076,6 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        # return 24
         return CFG.max_worker_threads
 
     def start(self):
@@ -1291,8 +1322,8 @@ class ClientManager:
 
     def _get_result_display(self, uid):
         # XXX - todo - move logic to server
-        with self._server._uid_results_map_lock:
-            return self._server._uid_results_map[uid]
+        with self._server._uid_result_display_map_lock:
+            return self._server._uid_result_display_map[uid]
         
     def _get_value(self, uid):
         with self._server._uid_results_map_lock:
