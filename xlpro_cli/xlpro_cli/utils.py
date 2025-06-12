@@ -190,7 +190,7 @@ def get_py_exe_version(py_interpreter_path:Path) -> str:
         shell=True, 
         capture_output=True, 
         text=True, 
-        # check=True,
+        check=True,
     )
     version_match = re.search(r"Python (\d+\.\d+\.\d+)", result.stdout.split("\n")[0])
     return version_match.group(1)
@@ -602,9 +602,10 @@ def write_python_version_file_for_workbook(workbook_path:Path):
         raise Exception
     xlpro_workbook_dir = get_xlpro_workbook_directory(workbook_path)
     write_python_version_file_for_venv(
-        xlpro_venv_root_path,
-        xlpro_workbook_dir,
+        interpreter_path=get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path),
+        parent_dir=xlpro_workbook_dir,
     )
+    pass
 
 
 def read_json_file_with_comments(fp:Path) -> dict:
