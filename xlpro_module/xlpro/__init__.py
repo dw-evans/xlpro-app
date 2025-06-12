@@ -13,7 +13,7 @@ from xlpro._utils import (
     int2rgb,
     xlpro_getattr,
     xlpro_getitem,
-    pynone,
+    # pynone,
     pyrepr,
 )
 

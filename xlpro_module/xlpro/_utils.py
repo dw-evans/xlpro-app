@@ -889,9 +889,24 @@ def xlpro_getattr(obj, attrname:str, default:Any):
     """Typed wrapper for getattr"""
     return getattr(obj, attrname, default)
     
-def pynone():
-    """Returns Python None"""
-    return None    
+
+# class PyNone:
+#     pass
+
+#     def __repr__(self):
+#         return "<pynone>"
+    
+#     def __str__(self):
+#         return repr(self)
+    
+#     @staticmethod
+#     def is_pynone(s:str):
+#         return s == "<pynone>"
+
+
+# def pynone():
+#     """Returns Python None"""
+#     return PyNone()
 
 
 
