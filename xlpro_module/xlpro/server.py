@@ -346,6 +346,7 @@ class xlproWorkspace:
         self._worker_manager = WorkerManager(server=self)
         self._worker_manager.start()
 
+
         # self._sub_worker_manager = SubWorkerManager(server=self)
         # self._sub_worker_manager.start()
 
@@ -355,6 +356,7 @@ class xlproWorkspace:
         self._temp_module_name:str = None
 
         self._module_function_maps_wrapper:ModuleFunctionMapsWrapper = None
+        self.reset_workspace_cache()
 
     def set_xlpro_working_dir(self, wd:Path):
         logger.info(f"Setting working directory for workspace to '{str(wd)}'")
