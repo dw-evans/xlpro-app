@@ -138,6 +138,46 @@ class xlproServer:
         workspace.reset()
         pass
     
+    def register_fnames_in_workbook(self, workspace:xlproWorkspace, wb_dispatch):
+        """Registers fname_* in the workbook names so the user knows what names
+        Are registered"""
+        logger.info("Deleting Names beginning with reserved string `fname_`...")
+        count = 0
+        for name in wb_dispatch.Names:
+            if name.Name.startswith("fname_"):
+                wb_dispatch.Names(name.Name).Delete()
+                count += 1
+        logger.info(f"Deleted {count} names")
+        
+        logger.info("Adding fname names to workbook names")
+        count = 0
+        for fname in workspace.get_active_registered_functon_map().keys():
+            wb_dispatch.Names.Add(f"fname_{fname}", f"=\"{fname}\"")
+            count += 1
+        logger.info(f"Added {count} names to workbook names")
+
+
+        f_map = workspace.get_active_registered_functon_map()
+
+
+        for name in wb_dispatch.Names:
+            if name.Name.startswith("args_"):
+                wb_dispatch.Names(name.Name).Delete()
+
+        for k, v in f_map.items():
+            args:list[str] = _utils.get_excel_args_of_func(v)
+            if len(args) == 0:
+                s = "=\"\""
+            elif len(args) == 1:
+                s = f"={args[0]}"
+            else:
+                s = "={{{}}}".format(";".join([f"\"{x}\"" for x in args]))
+            (a:=f"args_{k}", b:=f"{s}")
+            wb_dispatch.Names.Add(a, b)
+            pass
+        
+        return
+
     def register_and_configure_wb_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
@@ -150,6 +190,8 @@ class xlproServer:
 
             workspace.set_xlpro_working_dir(workspace_wd)
             workspace.reset()
+            self.register_fnames_in_workbook(workspace=workspace, wb_dispatch=Dispatch(wb_dispatch))
+
 
             self._workspace_map[wb_path] = workspace
             self._workspace_uid_to_workbook_path[uid] = wb_path
@@ -160,6 +202,8 @@ class xlproServer:
             logger.info(f"Workspace already exists, resetting workspace '{wb_path}'.")
             workspace = self._get_workspace_from_wb(wb_dispatch)
             workspace.reset()
+            self.register_fnames_in_workbook(workspace=workspace, wb_dispatch=Dispatch(wb_dispatch))
+
             logger.info(f"Workspace reset complete for '{wb_path}'.")
             
             # logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
@@ -186,8 +230,8 @@ class xlproServer:
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        # ret = workspace.execute_function_async(caller=caller, fname=func_name, args=args)
-        ret = workspace.execute_function_sync(caller=caller, fname=func_name, args=args)
+        ret = workspace.execute_function_async(caller=caller, fname=func_name, args=args)
+        # ret = workspace.execute_function_sync(caller=caller, fname=func_name, args=args)
         return ret
 
     def execute_sub_async(self, wb_dispatch, func_name):

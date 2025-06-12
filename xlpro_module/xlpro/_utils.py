@@ -401,6 +401,23 @@ def get_args_minus_reserved(func, args):
         new_args.pop(idx)
     return new_args
 
+def get_excel_args_of_func(func):
+    """Returns the arguments for a function name"""
+    f_name, args_and_types, ret_type, _ = get_function_signature(func)
+    arg_names = [v0 for v0, v1 in args_and_types]
+    arg_idxs_to_del = []
+    if "caller" in arg_names:
+        idx = arg_names.index("caller")
+        arg_idxs_to_del.append(idx)
+    if "thiswb" in arg_names:
+        idx = arg_names.index("thiswb")
+        arg_idxs_to_del.append(idx)
+
+    arg_idxs_to_del.sort(reverse=True)
+    for idx in arg_idxs_to_del:
+        arg_names.pop(idx)
+    return arg_names
+
 
 def import_module(module_name, file_path):
     """Dynamically import a module with a custom name"""
