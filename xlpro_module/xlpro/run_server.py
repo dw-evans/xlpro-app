@@ -299,5 +299,5 @@ def main():
         sys.exit()
 
 if __name__ == "__main__":
-    sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\test.xlsx", "--debugpy_port", "5678"]
+    # sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\test.xlsx", "--debugpy_port", "5678"]
     main()
