@@ -72,7 +72,7 @@ def add_line_unique(ax:matplotlib.axes.Axes, x:ndarray1d, y:ndarray2d, tag:str):
     if tag is None:
         raise Exception(f"InvalidTag")
     for line in ax.get_lines():
-        if tag == getattr(x, "_tag", None):
+        if tag == getattr(line, "_tag", None):
             line.remove()
     ln, = ax.plot(x, y, color=None)
     ln._tag = tag
@@ -276,6 +276,18 @@ def np_create_random_typed(n:int, m:int) -> ndarray2d:
 def get_address(caller:'xl.Range'):
     return caller.Address
 
+
+def pow(val:np.ndarray, exp):
+    return val ** exp
+
+def mul(val:np.ndarray, mu):
+    return val * mu
+
+def div(val:np.ndarray, di):
+    return val / di
+
+def add(val:np.ndarray, ad):
+    return val + ad
 
 # import random
 # import time
