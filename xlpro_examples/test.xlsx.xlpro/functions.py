@@ -31,14 +31,13 @@ xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
 xlpro.register()(xlpro.int2rgb)
 xlpro.register()(xlpro.pyrepr)
+xlpro.register()(xlpro.create_table_if_not_exists)
+xlpro.register()(xlpro.create_table_from_df)
 
 # xlpro.register()(xlpro.conditional_formatter_example)
 
-
-import operator
 xlpro.register(fname="getitem")(xlpro._utils.xlpro_getitem)
 xlpro.register(fname="pylen")(len)
-pass
 # xlpro.register(operator.setitem)
 # xlpro.register(operator.delitem)
 # xlpro.register(len)
@@ -288,6 +287,10 @@ def div(val:np.ndarray, di):
 
 def add(val:np.ndarray, ad):
     return val + ad
+
+
+# xlpro._utils.get
+
 
 # import random
 # import time

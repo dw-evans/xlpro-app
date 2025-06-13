@@ -133,7 +133,6 @@ class xlproServer:
         wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
         if not wb_path in self._workspace_map.keys():
             raise Exception("wb is not registered")
-        
         workspace = self._get_workspace_from_wb(wb_dispatch)
         workspace.reset()
         pass
@@ -326,7 +325,6 @@ class xlproWorkspace:
         self._uid_args_cache_lock = threading.Lock() # XXX - todo - not used.
         self._uid_args_cache:dict=None
 
-        self.reset_workspace_cache()
 
         # maps the uid to the caller and function hash
 
@@ -515,8 +513,6 @@ class xlproWorkspace:
             pass
         pass
 
-
-
         try:
             with self._uid_subresults_map_lock:
                 del self._uid_subresults_map[uid]
@@ -574,6 +570,9 @@ class xlproWorkspace:
     def execute_function_async(self, caller, fname, args):
         try:
             func = self._get_function_by_name(fname)
+
+            if fname == "create_table_if_not_exists":
+                pass
 
             if not func:
                 raise Exception(f"Function {fname} not found.")
@@ -937,7 +936,7 @@ class xlproWorkspace:
         # check for py object request
         # args0 = deepcopy(args)
         import copy
-        args_original = copy.deepcopy(args)
+        # args_original = copy.deepcopy(args)
         args = list(args)
         # modify level 0 of the args
         modify_args_list(args)

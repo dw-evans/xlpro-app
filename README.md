@@ -116,7 +116,10 @@
     1.  Test implementing a synchronous calculation mode which executes each function sequentially.
         1.  `INCOMPLETE` Async work done but not 
     2.  Investigate doing workbook backups. Could save the workbook e.g. ./.xlpro/Book1.xlsm.2025-06-04_1134.bak. Timeframe between backups could be set in the user's xlpro configuration file. Button to revert to previous backups. Could be a console menu with several selections
-    3.  `POSSIBLE OPTION` Write a custom action tracker based on user events
+    3. `POSSIBLE OPTION` Write a custom action tracker based on user events
+       1. Track all excel actions so we can at least track typing events
+       2. Write a xlpro.xlam sub that can be called by xlpro as an atomic formula resetter without event tracking
+
 22. `EXPERIMENTAL` `MED` Asynchronous functions
     1.  yielding functions can be decorated with a timer (breaks undo stack) 
     2.  hook onto existing rtd functionality by spinning up another com process
@@ -148,6 +151,28 @@
      2.   `DONE` Pre process arguments in vba
      3.   Add `@vectorize` decorator similar to the jsonify decorator
 
-36.  
+36.  `HIGH` Find a way to efficiently handle  
 
-37.  
+37.  `HIGH` Implement table generating function
+
+
+38.  `HIGH` Implement 'safe COM call' functionality
+     1.   Technically there can only be one thread which manages all of the excel interfaces. Could create a http server which solely has a connection to excel, and can be sent the workbook, sheet, address coordinates to issue an update
+     2.   Or complete any COM-safe call
+     3.   def comsafe(func)
+          1.   post(test.xlsx, Sheet1, A1)
+          2.   comsafe(lambda: wb.)
+
+39.   
+
+40.   
+
+41.   
+
+42.   
+
+43.   
+
+44.   
+
+45.   

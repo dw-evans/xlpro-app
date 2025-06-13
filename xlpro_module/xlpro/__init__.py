@@ -15,6 +15,8 @@ from xlpro._utils import (
     xlpro_getitem,
     # pynone,
     pyrepr,
+    create_table_from_df,
+    create_table_if_not_exists,
 )
 
 from xlpro._wrappers import (
