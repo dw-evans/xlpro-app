@@ -207,7 +207,8 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
         End If"""[1:]
     ))
 
-    pre_check_arg_sequence_strs = [template.format(fname=fname, arg=a) for a, t in args_and_types]
+
+    pre_check_arg_sequence_strs = [template.format(fname=fname, arg=a) for a, t in args_and_types if a not in RESERVED_ARGS]
 
     # XXX - todo - ensure no reserved vba arguments are parsed!   
     
@@ -908,7 +909,123 @@ def xlpro_getattr(obj, attrname:str, default:Any):
 #     """Returns Python None"""
 #     return PyNone()
 
+class xlRange:
+    """Signal class to preserve range passing version of xl.Range"""
+    pass
 
+def create_table_if_not_exists(caller, table_name:str):
+    # Locate the table
+    ws = caller.Parent
+    wb = ws.Parent
+    found = False
+    for ws in wb.Worksheets:
+        for tbl in ws.ListObjects:
+            if tbl.Name == table_name:
+                table = tbl
+                sheet = ws
+                found = True
+                tbl_range = tbl.Range
+                break
+        if found:
+            break
+
+    if not found:
+        tbl_range = caller.Cells(2, 1)
+        newtbl = ws.ListObjects.Add(
+            SourceType=1,
+            Source=tbl_range,
+            XlListObjectHasHeaders=1,
+        )
+        newtbl.Name = table_name
+
+    return f"xlTable(\"{table_name}\" @ '{tbl_range.Parent.Name}'!{tbl_range.Address})"
+
+
+def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
+    wb = caller.Parent.Parent
+    # Locate the table
+    found = False
+    for ws in wb.Worksheets:
+        for tbl in ws.ListObjects:
+            if tbl.Name == table_name:
+                table = tbl
+                sheet = ws
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        return create_table_if_not_exists(caller=caller, table_name=table_name)
+        # raise ValueError(f"Table '{table_name}' not found.")
+
+    # Get starting cell
+    top_left = table.Range.Cells(1, 1)
+
+    # Get shape of DataFrame
+    n_rows, n_cols = df.shape
+    if n_rows == 0 or n_cols == 0:
+        raise ValueError("DataFrame is empty or has no columns.")
+
+    # Resize table range BEFORE writing anything
+    new_range = sheet.Range(top_left, top_left.Cells(n_rows+1, n_cols))  # +1 row for header
+    table.Resize(new_range)
+
+    # Write headers
+    header_range = sheet.Range(top_left, top_left.Cells(1, n_cols))
+    header_range.Value = [df.columns.tolist()]
+
+    # Write data
+    data_start = top_left.Cells(2, 1)
+    data_end = data_start.Cells(n_rows, n_cols)
+    data_range = sheet.Range(data_start, data_end)
+    data_range.Value = tuple(df.itertuples(index=False, name=None))
+
+    print(f"✅ Table '{table_name}' updated with {n_rows} rows and {n_cols} columns.")
+
+    return f"xlTable(\"{table_name}\" @ '{header_range.Parent.Name}'!{header_range.Address})"
+
+
+def replace_table_with_df(df: pd.DataFrame, table_name: str = "Table1"):
+
+    # Locate the table
+    found = False
+    for ws in wb.Worksheets:
+        for tbl in ws.ListObjects:
+            if tbl.Name == table_name:
+                table = tbl
+                sheet = ws
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise ValueError(f"Table '{table_name}' not found.")
+
+    # Get starting cell
+    top_left = table.Range.Cells(1, 1)
+
+    # Get shape of DataFrame
+    n_rows, n_cols = df.shape
+    if n_rows == 0 or n_cols == 0:
+        raise ValueError("DataFrame is empty or has no columns.")
+
+    # Resize table range BEFORE writing anything
+    new_range = sheet.Range(top_left, top_left.Cells(n_rows+1, n_cols))  # +1 row for header
+    table.Resize(new_range)
+
+    # Write headers
+    header_range = sheet.Range(top_left, top_left.Cells(1, n_cols))
+    header_range.Value = [df.columns.tolist()]
+
+    # Write data
+    data_start = top_left.Cells(2, 1)
+    data_end = data_start.Cells(n_rows, n_cols)
+    data_range = sheet.Range(data_start, data_end)
+    data_range.Value = tuple(df.itertuples(index=False, name=None))
+
+    print(f"✅ Table '{table_name}' updated with {n_rows} rows and {n_cols} columns.")
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)
