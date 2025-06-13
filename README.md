@@ -35,6 +35,7 @@
 ## Development Notes
 
 1. `HIGH` Stability testing - In progress
+   1. Seems pretty good as of now
 
 2. `HIGH` Example development
    1. `HIGH` `Functions`
@@ -42,7 +43,7 @@
       2. `MED` `Seaborn` plotting examples
       3. `MED` `Bokeh` plotting examples
       4. `HIGH` Data-focused example - dataframe handling, file loading
-      5. LOW AI example
+      5. `LOW` AI example
       6. `MED` Financial modelling
 
    2. `HIGH` `Subroutines`
@@ -51,7 +52,7 @@
       
    3. `EXPERIMENTAL` Conditional formatting
 
-3. Record videos of usage for website
+3. `HIGH` `WAITING FOR OTHER ASPECTS TO BE RESOLVED`Record videos of usage for website
 
 4. `DONE` `HIGH` Tidy calculation cycle - Eliminate COM calls for promised arguments etc within VBA.
    1. At least can mitigate the non-array data, checking all the nested values of an array is probably not worthwhile.
@@ -59,7 +60,7 @@
 
 5. `LOW` Implement `@vectorize` decorator similar to the jsonify decorator.
 
-6. `MED` Implement relative Paths for path objects.
+6. `LOW` Implement relative Paths for path objects.
    1. All Path-typed variables can have the option to be relative to the workbook Path(\_\_file\_\_).parent.parent
 
 7. `Website`
@@ -72,65 +73,81 @@
 
 9.  `DONE` `BUG` `HIGH` Investigate how to prevent shell window freezing and needing an enter press
 
-10. `HIGH` Sync up serve/start so they behave the same.
+10. `PARTIAL` `HIGH` Sync up serve/start so they behave the same.
     1.  Serving can detect the existing process and just ignore the request
     2.  Serving is followed up by issuing a start call
     3.  Start call probably needs to be captured using checks on stdout pipe text content for trigger.
-    4.  Implement close server button
+    4.  `INCOMPLETE` Implement close server button
 
-11. `HIGH` Investigate undo-ing
-    1.  Test implementing a synchronous calculation mode which executes each function sequentially.
-    2.  Investigate doing workbook backups. Could save the workbook e.g. ./.xlpro/Book1.xlsm.2025-06-04_1134.bak. Timeframe between backups could be set in the user's xlpro configuration file. Button to revert to previous backups. Could be a console menu with several selections
 
-12. `EXPERIMENTAL` `MED` Asynchronous functions
-    1.  yielding functions can be decorated with a timer (breaks undo stack) 
-    2.  hook onto existing rtd functionality by spinning up another com process
 
-13. `PARTIAL?` `HIGH` Develop way to push requirements
+11. `COMPLETED` `HIGH` Develop way to push requirements
     1.  Start with a function to push reqs.txt. This should warn that the files (reqs.txt, .python-version may be different, and the user should compare.)
     2.  Git should probably be used inherently
+    3.  `COMPLETED` for requirements txt
+    4.  `COMPLETED` `BUG` for python version!
 
-14. `LOW` Git integration
+12. `LOW` Git integration
 
-15. `HIGH` Test reloading a configured environment on multiple machines 
+13. `HIGH` Test reloading a configured environment on multiple machines 
 
-16. `LOW` Add .xlpro-version file to ./Book1.xlsx.xlpro directory
+14. `LOW` Add .xlpro-version file to ./Book1.xlsx.xlpro directory
 
-17. `MED` test behaviour for external files. 
-    1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
 
-18. `DONE` `MED` non-destructive launch.json writing
+15. `DONE` `MED` non-destructive launch.json writing
     1.  Prototyped, not tested - pushed
     
-19. `DONE` `MED` non-descrutcute settings.json writing
+16. `DONE` `MED` non-descrutcute settings.json writing
     1.  Prototyped - looks ok
 
-20. `PARTIAL` `HIGH` pushing requirements on workbook save
+17. `PARTIAL` `HIGH` pushing requirements on workbook save
     1.  Prototyped function and button
 
-21. `DONE` `HIGH` Editing config from excel button 
+18. `DONE` `HIGH` Editing config from excel button 
     1.  Prototyped, not tested.
     2.  Looks ok
 
-22. `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
-23. `MED` Close Server function in xlpro-cli
+19. `DONE` `MED` Investigate lockfile behaviour, integrate sync and start? Create Close button/Function?
+    1.  
+20. `PARTIAL` `MED` Close Server function in xlpro-cli
+    1. Force restart on serve() button press. User still needs to manually close
 
+21. `HIGH` Investigate undo-ing
+    1.  Test implementing a synchronous calculation mode which executes each function sequentially.
+        1.  `INCOMPLETE` Async work done but not 
+    2.  Investigate doing workbook backups. Could save the workbook e.g. ./.xlpro/Book1.xlsm.2025-06-04_1134.bak. Timeframe between backups could be set in the user's xlpro configuration file. Button to revert to previous backups. Could be a console menu with several selections
+    3.  `POSSIBLE OPTION` Write a custom action tracker based on user events
+22. `EXPERIMENTAL` `MED` Asynchronous functions
+    1.  yielding functions can be decorated with a timer (breaks undo stack) 
+    2.  hook onto existing rtd functionality by spinning up another com process
+    3.  `BUG` Developed the functional code for this but only works after the first calculation.
+23. `MED` test behaviour for external files. 
+    1.  Can external files be registered safely? I would guess this would not play nicely with the sys module hack.
 24. `DONE` `HIGH` Investigate trimming com calls by running an argument check before execution  
 
-25.  `MED` Investigate configuring xlpro-cli as a server which can receive commands.
+25. `MED` Investigate configuring xlpro-cli as a server which can receive commands.
+     1.   Just investigate moving the heavy imports to the heavier commands and not the lightweight ones
 
-26.  
+26.  `HIGH` configure xlpro-cli to ensure that VBIDEReference is loaded as a reference for the workbook!
+27.  `HIGH` investigate vbe control options
 
-27.  
+28.  `HIGH` Subroutine
+29.  `HIGH` Button development
+30.  `EXPERIMENTAL` Subroutine configuration via function?
 
-28.  
+31.  `MED` Help
+     1.   Add arguments to workbook namespace so they can be looked up from the workbook
 
-29.  
+32.  `HIGH` Default arguments
+33.  `HIGH` Re-investigate jsonified arguments, probably change to something that can handle n by 2 array key value pairs instead of a json string.
+34.  
 
-30.  
 
-31.  
+35.  `HIGH` Improve performance
+     1.   `LOW` Implement threadpoolexecutor for performance
+     2.   `DONE` Pre process arguments in vba
+     3.   Add `@vectorize` decorator similar to the jsonify decorator
 
-32.  
+36.  
 
-33.  
+37.  
