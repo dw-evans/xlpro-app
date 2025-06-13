@@ -3,44 +3,43 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-10, 23:57:26
+' At 2025-06-13, 17:10:19
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-10, 23:56:37
+' At 2025-06-13, 17:09:01
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-10, 23:56:27
+' At 2025-06-13, 17:08:16
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-09, 21:48:58
+' At 2025-06-13, 17:02:48
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-08, 23:34:04
+' At 2025-06-13, 17:01:46
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-08, 23:30:21
+' At 2025-06-13, 17:01:26
 ' ### END METADATA ###
-
 
 
 Option Explicit
@@ -54,7 +53,6 @@ Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
 
 Public WSCRIPT_SHELL As Object
 Public WSCRIPT_SHELL_INITIALIZED As Boolean
-
 
 public const MAX_ARGS_READY_CHECKED as Integer = 32
 

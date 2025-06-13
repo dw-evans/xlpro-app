@@ -142,8 +142,17 @@ def build():
     print(f"loading the vba contents into the workbook")
     vba_files = list(vba_src_dir.glob("*.bas")) + list(vba_src_dir.glob("*.cls"))
 
+    valid_file_stems = [
+        "xlpro_static",
+        "xlproeventhandler",
+        "undomanager",
+        "modundoentrypoint",
+        "cworkbookeventhandler",
+        "clsundoitem",
+    ]
+
     for file in vba_files:
-        if not file.stem.lower() in ["xlpro_static", "xlproeventhandler"]:
+        if not file.stem.lower() in valid_file_stems:
             continue
         print(f"adding vba code {file}...")
         if file.stem == "xlpro_static":
@@ -151,7 +160,7 @@ def build():
             with open(file, "r") as f:
                 contents = f.read()
                 pattern = r"### BEGIN METADATA ###.*?^### END METADATA ###\n\n"
-                re.sub(pattern, "", contents, flags=re.DOTALL)
+                new_contents = re.sub(pattern, "", contents, flags=re.DOTALL)
                 msg_str = (
                     f"' ### BEGIN METADATA ###\n"
                     f"' --- {file.name} ---\n"
@@ -160,7 +169,7 @@ def build():
                     f"' ### END METADATA ###\n\n"
                 )
                 replacement = lambda m: m.group(1) + '\n' + msg_str
-                new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, contents)
+                new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, new_contents)
                 pass
             with open(file, "w") as f:
                 f.write(new_contents)

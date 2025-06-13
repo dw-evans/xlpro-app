@@ -13,21 +13,19 @@ Option Explicit
 ' Declare a module-level variable to hold the instance of the event handler class
 Dim ehandler As xlproEventHandler
 
-' Workbook_Open event: Called when the add-in is loaded
 Private Sub Workbook_Open()
-    ' Initialize the event handler class when the add-in is loaded
     Set ehandler = New xlproEventHandler
-    Debug.Print "Event handler initialized for the add-in."
+    Debug.Print "xlpro Event handler initialized for the add-in."
 End Sub
 
-' Workbook_BeforeClose event: Called when the add-in is closed
 Private Sub Workbook_BeforeClose(Cancel As Boolean)
-    ' Only clean up the event handler if the close is not canceled
     If Not Cancel Then
         Set ehandler = Nothing
-        Debug.Print "Event handler cleaned up for the add-in."
+        Debug.Print "xlpro Event handler cleaned up for the add-in."
     Else
         Debug.Print "Close canceled, event handler still active."
     End If
 End Sub
+
+
 
