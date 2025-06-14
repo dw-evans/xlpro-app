@@ -3,42 +3,28 @@ Attribute VB_Name = "xlpro_static"
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:10:19
+' At 2025-06-13, 18:11:48
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:09:01
+' At 2025-06-13, 18:07:12
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:08:16
+' At 2025-06-13, 17:40:16
 ' ### END METADATA ###
 
 
 ' ### BEGIN METADATA ###
 ' --- xlpro_static.bas ---
 ' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:02:48
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:01:46
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:01:26
+' At 2025-06-13, 17:35:33
 ' ### END METADATA ###
 
 

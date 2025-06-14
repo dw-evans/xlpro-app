@@ -8,6 +8,7 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = True
 ' ThisWorkbook Module of the Add-In
+
 Option Explicit
 
 ' Declare a module-level variable to hold the instance of the event handler class
@@ -26,6 +27,10 @@ Private Sub Workbook_BeforeClose(Cancel As Boolean)
         Debug.Print "Close canceled, event handler still active."
     End If
 End Sub
+
+
+
+
 
 
 

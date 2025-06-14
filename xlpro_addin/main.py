@@ -149,6 +149,7 @@ def build():
         "modundoentrypoint",
         "cworkbookeventhandler",
         "clsundoitem",
+        "utils",
     ]
 
     for file in vba_files:
