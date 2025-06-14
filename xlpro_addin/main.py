@@ -149,32 +149,30 @@ def build():
         "modundoentrypoint",
         "cworkbookeventhandler",
         "clsundoitem",
-        "utils",
+        "modutils",
     ]
 
     for file in vba_files:
         if not file.stem.lower() in valid_file_stems:
             continue
         print(f"adding vba code {file}...")
-        if file.stem == "xlpro_static":
-            print("adding metadata to ")
-            with open(file, "r") as f:
-                contents = f.read()
-                pattern = r"### BEGIN METADATA ###.*?^### END METADATA ###\n\n"
-                new_contents = re.sub(pattern, "", contents, flags=re.DOTALL)
-                msg_str = (
-                    f"' ### BEGIN METADATA ###\n"
-                    f"' --- {file.name} ---\n"
-                    f"' Compiled with {Path(__file__).relative_to(root_dir.parent.parent)}\n"
-                    f"' At {datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")}\n"
-                    f"' ### END METADATA ###\n\n"
-                )
-                replacement = lambda m: m.group(1) + '\n' + msg_str
-                new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, new_contents)
-                pass
-            with open(file, "w") as f:
-                f.write(new_contents)
+        with open(file, "r") as f:
+            contents = f.read()
+            pattern = r"### BEGIN METADATA ###.*?^### END METADATA ###\n\n"
+            new_contents = re.sub(pattern, "", contents, flags=re.DOTALL)
+            msg_str = (
+                f"' ### BEGIN METADATA ###\n"
+                f"' --- {file.name} ---\n"
+                f"' Compiled with {Path(__file__).relative_to(root_dir.parent.parent)}\n"
+                f"' At {datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")}\n"
+                f"' ### END METADATA ###\n\n"
+            )
+            replacement = lambda m: m.group(1) + '\n' + msg_str
+            new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, new_contents)
             pass
+        with open(file, "w") as f:
+            f.write(new_contents)
+        pass
         proj.VBComponents.Import(str(file.resolve()))
         pass
 
