@@ -24,7 +24,7 @@ Private Sub Class_Initialize()
     Set UndoStack = New Collection
     DoTrackChanges = True
     EnumPointer = 1
-    UndoHistoryLength = 50
+    UndoHistoryLength = 12
 End Sub
 
 ' Track a change
@@ -52,14 +52,22 @@ Public Sub TrackChange( _
     item.val0 = val0
     item.val1 = val1
 
-    ' Trim stack if we undid some changes and are now making a new one
+    ' Trim stack if we undid some changes and are now making a new branch
     If EnumPointer < UndoStack.Count Then
         Do While UndoStack.Count > EnumPointer
             UndoStack.Remove UndoStack.Count
         Loop
     End If
-
+    
     UndoStack.Add item
+    
+    ' If we exceed the maximum undo stack count by adding another
+    If UndoStack.Count > UndoHistoryLength Then
+        UndoStack.Remove 1
+        Debug.Print "Undo Stack maximum length exceeded, dropping"
+    End If
+
+    ' Set the undo stack counter to one past the end of the collection
     EnumPointer = UndoStack.Count + 1
 
     Debug.Print "Tracked change at " & item.WorkbookName & "/" & item.WorksheetName & "/" & item.RangeAddress
