@@ -133,6 +133,7 @@ def build():
 
     wb = xlapp.Workbooks.Add()
 
+
     tmp_xlam_fp = temp_dir / "xlpro_tmp.xlam"
 
     proj = wb.VBProject
@@ -140,6 +141,15 @@ def build():
     # Insert all your modules
     vba_src_dir = src_dir / "vba"
     print(f"loading the vba contents into the workbook")
+
+    for comp in wb.VBProject.VBComponents:
+        if comp.Name == "ThisWorkbook":
+            with open(vba_src_dir / "ThisWorkbook.cls") as f:
+                comp.CodeModule.AddFromString(f.read())
+                pass
+
+    pass
+
     vba_files = list(vba_src_dir.glob("*.bas")) + list(vba_src_dir.glob("*.cls"))
 
     valid_file_stems = [
@@ -158,17 +168,18 @@ def build():
         print(f"adding vba code {file}...")
         with open(file, "r") as f:
             contents = f.read()
-            pattern = r"### BEGIN METADATA ###.*?^### END METADATA ###\n\n"
-            new_contents = re.sub(pattern, "", contents, flags=re.DOTALL)
-            msg_str = (
-                f"' ### BEGIN METADATA ###\n"
-                f"' --- {file.name} ---\n"
-                f"' Compiled with {Path(__file__).relative_to(root_dir.parent.parent)}\n"
-                f"' At {datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")}\n"
-                f"' ### END METADATA ###\n\n"
-            )
-            replacement = lambda m: m.group(1) + '\n' + msg_str
-            new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, new_contents)
+            new_contents = contents
+            # pattern = r"### BEGIN METADATA ###.*?^### END METADATA ###\n\n"
+            # new_contents = re.sub(pattern, "", contents, flags=re.DOTALL)
+            # msg_str = (
+            #     f"' ### BEGIN METADATA ###\n"
+            #     f"' --- {file.name} ---\n"
+            #     f"' Compiled with {Path(__file__).relative_to(root_dir.parent.parent)}\n"
+            #     f"' At {datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")}\n"
+            #     f"' ### END METADATA ###\n\n"
+            # )
+            # replacement = lambda m: m.group(1) + '\n' + msg_str
+            # new_contents = re.sub(r'(Attribute VB_Name = .*?\n)', replacement, new_contents)
             pass
         with open(file, "w") as f:
             f.write(new_contents)

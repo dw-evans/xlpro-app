@@ -1,44 +1,11 @@
 Attribute VB_Name = "xlpro_static"
 
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-14, 11:51:14
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 18:11:48
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 18:07:12
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:40:16
-' ### END METADATA ###
-
-
-' ### BEGIN METADATA ###
-' --- xlpro_static.bas ---
-' Compiled with xlpro\xlpro_addin\main.py
-' At 2025-06-13, 17:35:33
-' ### END METADATA ###
-
 
 Option Explicit
 
 Public XLPRO_CLI_PATH As String
 Public VSCODE_PATH As String
+Public UNDOSTACKDEPTH As Long
 ' Public XLPRO_ADDIN_PATH As String
 
 Public WORKBOOK_GUID_MAP As Object
@@ -47,7 +14,7 @@ Public WORKBOOK_GUID_MAP_INITIALIZED As Boolean
 Public WSCRIPT_SHELL As Object
 Public WSCRIPT_SHELL_INITIALIZED As Boolean
 
-public const MAX_ARGS_READY_CHECKED as Integer = 32
+Public Const MAX_ARGS_READY_CHECKED As Integer = 32
 
 Public rePromise As Object
 Public reException As Object
@@ -60,7 +27,7 @@ Public reException As Object
 #End If
 
 
-Sub LoadXlproConfigTOML()
+Public Sub LoadXlproConfigTOML()
     Dim fso As Object
     Dim file As Object
     Dim fileText As String
@@ -112,13 +79,13 @@ Sub LoadXlproConfigTOML()
     Else:
         GoTo RegistrationErrorHandler
     End If
-    ' re.Pattern = "(?:^|\n)\s*xlpro_xlam_path\s*=\s*""([^""]+)"""
-    ' Set matches = re.Execute(fileText)
-    ' If matches.Count > 0 Then
-    '     XLPRO_ADDIN_PATH = matches(0).SubMatches(0)
-    ' Else:
-    '     GoTo RegistrationErrorHandler
-    ' End If
+    re.Pattern = "(?:^|\n)\s*undo_stack_depth\s*=\s*(\d+)"
+    Set matches = re.Execute(fileText)
+    If matches.Count > 0 Then
+        UNDOSTACKDEPTH = CLng(matches(0).SubMatches(0))
+    Else:
+        GoTo RegistrationErrorHandler
+    End If
     Exit Sub
     
 RegistrationErrorHandler:
@@ -224,21 +191,21 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
     Dim command As String
     
-    Dim wb As Workbook
+    Dim Wb As Workbook
     
-    Set wb = ActiveWorkbook
+    Set Wb = ActiveWorkbook
 
     ' Load the toml xlpro configuration file to ensure the paths are correct
     LoadXlproConfigTOML
 
     ' Use the Shell function to call the program
-    command = """" & XLPRO_CLI_PATH & """" & " start " & """" & wb.Path & "\" & wb.Name & """"
+    command = """" & XLPRO_CLI_PATH & """" & " start " & """" & Wb.Path & "\" & Wb.name & """"
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 
     ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
-    del_workbook_guid_map_key wb.Name
+    del_workbook_guid_map_key Wb.name
 
     ' Optionally, display the Task ID of the program
     ' Debug.Print "Program launched with Task ID: " & taskID
@@ -253,7 +220,7 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
 
     ' Use the Shell function to call the program
     'taskID = Shell("cmd.exe /K xlpro", vbNormalFocus)
-    command = """" & XLPRO_CLI_PATH & """" & " init " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"
+    command = """" & XLPRO_CLI_PATH & """" & " init " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.name & """"
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 
@@ -263,12 +230,12 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
 End Sub
 
 Sub xlproRegister(ByRef control As Office.IRibbonControl)
-    Dim wb As Workbook
-    Set wb = ActiveWorkbook
-    xlproRegisterWorkbook wb
+    Dim Wb As Workbook
+    Set Wb = ActiveWorkbook
+    xlproRegisterWorkbook Wb
 End Sub
 
-Sub xlproRegisterWorkbook(wb as Workbook)
+Sub xlproRegisterWorkbook(Wb As Workbook)
 ' Register the workbook
     Debug.Print ActiveWorkbook.Path
     
@@ -276,7 +243,7 @@ Sub xlproRegisterWorkbook(wb as Workbook)
 
     ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
-    del_workbook_guid_map_key wb.Name
+    del_workbook_guid_map_key Wb.name
 
     On Error GoTo RegistrationErrorHandler
     register_workbook ActiveWorkbook
@@ -298,12 +265,12 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     Dim command As String
     Dim taskID As Double
     
-    Dim wb As Workbook
-    Set wb = ActiveWorkbook
+    Dim Wb As Workbook
+    Set Wb = ActiveWorkbook
 
     LoadXlproConfigTOML
 
-    command = """" & VSCODE_PATH & """" & " " & """" & wb.Path & "\" & ActiveWorkbook.Name & ".xlpro" & """"
+    command = """" & VSCODE_PATH & """" & " " & """" & Wb.Path & "\" & ActiveWorkbook.name & ".xlpro" & """"
     Debug.Print command
     taskID = shell(command, vbNormalFocus)
 End Sub
@@ -313,7 +280,7 @@ Sub EditConfigGlobal()
     Dim configPath As String
     configPath = Environ("USERPROFILE") & "\.xlpro\config.toml"
     ' Add quotes in case the path contains spaces
-    Shell "cmd /c start """" """ & configPath & """", vbNormalFocus
+    shell "cmd /c start """" """ & configPath & """", vbNormalFocus
 End Sub
 
 Sub EditConfigGlobalButton(ByRef control As Office.IRibbonControl)
@@ -336,11 +303,11 @@ Sub PushRequirementsTxt()
     Dim command As String
     Dim taskID As Double
     
-    Dim wb As Workbook
-    Set wb = ActiveWorkbook
+    Dim Wb As Workbook
+    Set Wb = ActiveWorkbook
 
     LoadXlproConfigTOML
-    command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & wb.Path & "\" & wb.Name & """"
+    command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & Wb.Path & "\" & Wb.name & """"
     Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 
@@ -350,12 +317,12 @@ Sub OpenWorkingDir()
     Dim command As String
     Dim taskID As Double
     
-    Dim wb As Workbook
-    Set wb = ActiveWorkbook
+    Dim Wb As Workbook
+    Set Wb = ActiveWorkbook
     
     Dim folderPath As String
 
-    folderPath = wb.Path
+    folderPath = Wb.Path
     command = "explorer.exe """ & folderPath & """"
     Debug.Print command
     shell command, vbNormalFocus
@@ -389,8 +356,8 @@ End Sub
 
 
 Sub TestArg()
-    Dim res as Boolean
-    Dim arg as Variant
+    Dim res As Boolean
+    Dim arg As Variant
 
     Set arg = ActiveSheet.Range("A1")
 
@@ -410,7 +377,7 @@ Sub InitRegex()
     reException.Pattern = "^\w*((error)|(exception))\(.*\)$"
 End Sub
 
-Function IsValueReady(val as Variant) as Boolean
+Function IsValueReady(val As Variant) As Boolean
     If rePromise Is Nothing Or reException Is Nothing Then
         InitRegex
     End If
@@ -431,14 +398,14 @@ Function IsValueReady(val as Variant) as Boolean
     IsValueReady = True
 End Function
 
-Public Function CheckArgReady(arg as Variant) as Boolean
-    dim val as Variant
-    dim subval as Variant
+Public Function CheckArgReady(arg As Variant) As Boolean
+    Dim val As Variant
+    Dim subval As Variant
 
-    Dim i as Long
-    Dim j as Long
-    Dim dimCount1 as Long
-    Dim dimCount2 as Long
+    Dim i As Long
+    Dim j As Long
+    Dim dimCount1 As Long
+    Dim dimCount2 As Long
 
     dimCount1 = 1
     dimCount2 = 1
@@ -451,7 +418,7 @@ Public Function CheckArgReady(arg as Variant) as Boolean
 
     ' If the value is an array, check the dimensions do not exceed
     ' our specified limit, Assume it is valid for large arrays and let COM
-    ' call handle the rest. 
+    ' call handle the rest.
     If IsArray(val) Then
         dimCount1 = UBound(val, 1)
         ' Determine if 1D or 2D array
@@ -464,10 +431,10 @@ Public Function CheckArgReady(arg as Variant) as Boolean
         Else
             Err.Clear
             On Error GoTo 0
-            dimCount2 = Ubound(val, 2)
+            dimCount2 = UBound(val, 2)
         End If
         ' Complete check for max inputs
-        if (dimCount1 * dimCount2) > MAX_ARGS_READY_CHECKED Then
+        If (dimCount1 * dimCount2) > MAX_ARGS_READY_CHECKED Then
             CheckArgReady = True
             Exit Function
         End If
@@ -496,7 +463,7 @@ Public Function CheckArgReady(arg as Variant) as Boolean
             ' 2D array
             On Error GoTo 0
             For i = LBound(val, 1) To UBound(val, 1)
-                dimCount2 = Ubound(val, 2)
+                dimCount2 = UBound(val, 2)
                 For j = LBound(val, 2) To UBound(val, 2)
                     subval = val(i, j)
                     If Not IsValueReady(subval) Then
@@ -558,7 +525,7 @@ Cleanup:
     RunCommandAndCaptureOutput = output
 End Function
 
-Function get_workbook_guid(wb As Workbook) As String
+Function get_workbook_guid(Wb As Workbook) As String
     Dim command As String
     Dim shell As Object
     Dim exec As Object
@@ -567,7 +534,7 @@ Function get_workbook_guid(wb As Workbook) As String
 
     On Error GoTo ErrHandler
 '    Set shell = CreateObject("WScript.Shell")
-    command = """" & XLPRO_CLI_PATH & """" & " guid " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"
+    command = """" & XLPRO_CLI_PATH & """" & " guid " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.name & """"
     ' command = """" & XLPRO_CLI_PATH & """ guid """ & ActiveWorkbook.Path & "\" & ActiveWorkbook.Name & """"
 
     Debug.Print command
@@ -590,15 +557,15 @@ Sub unregister_activeworkbook()
     uninitialize ActiveWorkbook
 End Sub
 
-Private Sub register_workbook(ByRef wb As Workbook)
+Private Sub register_workbook(ByRef Wb As Workbook)
     On Error GoTo 0
     initialize_workbook_guid_map
     InitializeShell
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     If guid = "" Then
-        guid = get_workbook_guid(wb)
-        set_workbook_guid_map_pairing wb.Name, guid
+        guid = get_workbook_guid(Wb)
+        set_workbook_guid_map_pairing Wb.name, guid
     End If
 
     Debug.Print "XLPRO_GUID: " & guid
@@ -606,43 +573,43 @@ Private Sub register_workbook(ByRef wb As Workbook)
     Dim xlpro_async As Object
     Set xlpro_async = GetObject("new: " & guid)
 
-    xlpro_async.register_and_configure_wb_workspace wb
+    xlpro_async.register_and_configure_wb_workspace Wb
 
 End Sub
 
 
-Sub uninitialize(ByRef wb As Workbook)
+Sub uninitialize(ByRef Wb As Workbook)
 'Uninitialize this workbook from the com server
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
-    xlpro_async.shutdown_workspace wb
+    xlpro_async.shutdown_workspace Wb
 End Sub
 
-Private Sub shutdown_xlpro(ByRef wb As Workbook)
+Private Sub shutdown_xlpro(ByRef Wb As Workbook)
 'Attempt to shutdown the xlpro server.
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
     xlpro_async.shutdown
 End Sub
 
-Private Sub getpid(ByRef wb As Workbook)
+Private Sub getpid(ByRef Wb As Workbook)
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
     Debug.Print xlpro_async.getpid
 End Sub
 
-Private Sub shutdown_workspace(ByRef wb As Workbook)
+Private Sub shutdown_workspace(ByRef Wb As Workbook)
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
-    xlpro_async.shutdown_workspace wb
+    xlpro_async.shutdown_workspace Wb
 End Sub
 
 ' Sub reload_global_config(ByRef wb As Workbook)
@@ -659,21 +626,21 @@ End Sub
 
 
 ' Replacement synchronization functions
-Sub write_vba_sync_module(ByRef wb As Workbook)
+Sub write_vba_sync_module(ByRef Wb As Workbook)
     Dim contents1 As String
-    contents1 = get_vba_sync_text(wb)
-    write_text_to_module wb, "xlpro_async", contents1
+    contents1 = get_vba_sync_text(Wb)
+    write_text_to_module Wb, "xlpro_async", contents1
     Dim contents2 As String
-    contents2 = get_vba_sync_text_subs(wb)
-    write_text_to_module wb, "xlpro_async_subs", contents2
+    contents2 = get_vba_sync_text_subs(Wb)
+    write_text_to_module Wb, "xlpro_async_subs", contents2
 End Sub
 
-Function get_vba_sync_text(wb As Workbook) As String
+Function get_vba_sync_text(Wb As Workbook) As String
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
-    get_vba_sync_text = xlpro_async.get_vba_sync_text(wb)
+    get_vba_sync_text = xlpro_async.get_vba_sync_text(Wb)
     
 'SyncTextErrorHandler:
 '    MsgBox "Error: Error during VBA Module sync. Please connect the debugger and retry.", _
@@ -682,16 +649,16 @@ Function get_vba_sync_text(wb As Workbook) As String
 '    Exit Function
 
 End Function
-Function get_vba_sync_text_subs(wb As Workbook) As String
+Function get_vba_sync_text_subs(Wb As Workbook) As String
     Dim xlpro_async As Object
     Dim guid As String
-    guid = get_workbook_guid_map_value(wb.Name)
+    guid = get_workbook_guid_map_value(Wb.name)
     Set xlpro_async = GetObject("new: " & guid)
-    get_vba_sync_text_subs = xlpro_async.get_vba_sync_text_subs(wb)
+    get_vba_sync_text_subs = xlpro_async.get_vba_sync_text_subs(Wb)
     
 End Function
 
-Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As String)
+Sub write_text_to_module(ByRef Wb As Workbook, c_name As String, contents As String)
     ' Dim proj As VBIDE.VBProject
     Dim proj As Object
 
@@ -701,7 +668,7 @@ Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As Str
     ' Dim comp As VBIDE.VBComponent
     Dim comp As Object
 
-    Set proj = wb.VBProject
+    Set proj = Wb.VBProject
 
     Dim names() As String ' Dynamic array to store the names
     Dim i As Long
@@ -711,13 +678,13 @@ Sub write_text_to_module(ByRef wb As Workbook, c_name As String, contents As Str
     
     ' Loop through the collection
     For i = 1 To proj.vbcomponents.Count
-        names(i) = proj.vbcomponents(i).Name ' Extract the .Name property of each element
+        names(i) = proj.vbcomponents(i).name ' Extract the .Name property of each element
     Next i
     
     If Not IsInArray(c_name, names) Then
         ' Set comp = proj.vbcomponents.Add(vbext_ct_StdModule)
         Set comp = proj.vbcomponents.Add(1)
-        comp.Name = c_name
+        comp.name = c_name
     Else:
         Set comp = proj.vbcomponents(c_name)
     End If
@@ -733,10 +700,10 @@ End Sub
 'Helper functions etc
 '------------------------------------------------------------------------
 
-Function IsInArray(target As String, arr As Variant) As Boolean
+Function IsInArray(Target As String, arr As Variant) As Boolean
     Dim element As Variant
     For Each element In arr
-        If element = target Then
+        If element = Target Then
             IsInArray = True
             Exit Function
         End If
@@ -756,13 +723,13 @@ End Sub
 
 Public Function ptr(rng As Range)
 ' Custom pointer function which is passable to xlpro as an argument.
-    Dim wb As Workbook
+    Dim Wb As Workbook
     Dim ws As Worksheet
     
     Set ws = rng.Parent
-    Set wb = ws.Parent
+    Set Wb = ws.Parent
     
-    ptr = "*<" & wb.FullName & "::" & ws.Name & "::" & rng.Address & ">"
+    ptr = "*<" & Wb.FullName & "::" & ws.name & "::" & rng.Address & ">"
 End Function
 
 

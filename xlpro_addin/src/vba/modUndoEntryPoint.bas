@@ -24,30 +24,33 @@ Sub PerformRedo()
     End If
 End Sub
 
-
-Public Sub GlobalUndoManager_RevertChange()
-    GlobalUndoManager.RevertChange
+Sub ButtonPerformUndo(ByRef control As Office.IRibbonControl)
+    PerformUndo
 End Sub
 
-Public Sub GlobalUndoManager_ImplementChange()
-    GlobalUndoManager.ImplementChange
-End Sub
-
-Sub setcustomundo()
-    Application.OnUndo "xlpro Custom Undo", "GlobalUndoManager_RevertChange"
+Sub ButtonPerformRedo(ByRef control As Office.IRibbonControl)
+    PerformRedo
 End Sub
 
 
-Public Sub AtomicFormulaRefreshNoEvents(WbName As String, WsName As String, Address As String)
+' Public Sub GlobalUndoManager_RevertChange()
+'     GlobalUndoManager.RevertChange
+' End Sub
 
-    Dim Wb As Workbook
-    Dim ws As Worksheet
-    Dim rng As Range
+' Public Sub GlobalUndoManager_ImplementChange()
+'     GlobalUndoManager.ImplementChange
+' End Sub
 
-    Set Wb = GetWorkbook(WbName)
-    Set ws = GetWorksheet(Wb, WsName)
+Sub SetCustomUndo()
+    Application.OnUndo "XLPRO: UNDO UNAVAILABLE", "WarnUndo"
+End Sub
 
-    Set rng = ws.Range(Address)
+Sub WarnUndo()
+    MsgBox "Native undo stack is unavailable, use xlpro-undos", vbExclamation
+End Sub
+
+
+Public Sub AtomicFormulaRefreshNoEvents(rng As Range)
 
     ' Turn OFF all Excel events (no events will fire)
     Dim appeventsbefore As Boolean
@@ -58,9 +61,10 @@ Public Sub AtomicFormulaRefreshNoEvents(WbName As String, WsName As String, Addr
 
     rng.Formula2 = rng.Formula2
 
-    Application.OnUndo "xlpro Custom Undo", "GlobalUndoManager_RevertChange"
+    Call SetCustomUndo
 
 Cleanup:
         Application.EnableEvents = appeventsbefore
 
 End Sub
+

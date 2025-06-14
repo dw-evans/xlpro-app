@@ -8,4 +8,6 @@ logging_level = "DEBUG"
 xlpro_cli_path = "xlpro-cli.exe"
 vscode_path = "code.exe"
 
+undo_stack_depth = 12
+
 # xlpro_xlam_path = "C:/Users/Daniel Evans/AppData/Roaming/Microsoft/Excel/XLSTART/xlpro.xlam"

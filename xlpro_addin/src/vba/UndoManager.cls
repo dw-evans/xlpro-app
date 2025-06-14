@@ -3,6 +3,7 @@ BEGIN
   MultiUse = -1  'True
 END
 Attribute VB_Name = "UndoManager"
+
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
@@ -24,7 +25,8 @@ Private Sub Class_Initialize()
     Set UndoStack = New Collection
     DoTrackChanges = True
     EnumPointer = 1
-    UndoHistoryLength = 12
+    LoadXlproConfigTOML
+    UndoHistoryLength = UNDOSTACKDEPTH
 End Sub
 
 ' Track a change

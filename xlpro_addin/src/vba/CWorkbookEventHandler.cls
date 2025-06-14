@@ -3,6 +3,7 @@ BEGIN
   MultiUse = -1  'True
 END
 Attribute VB_Name = "CWorkbookEventHandler"
+
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
@@ -66,7 +67,7 @@ End Sub
 
 Private Sub Wb_SheetSelectionChange(ByVal Sh As Object, ByVal Target As Range)
 
-    If Target.Cells.Count > 1000 Then
+    If Target.Cells.CountLarge > 1000 Then
         Debug.Print "Too many cells to track"
     End If
     

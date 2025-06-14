@@ -33,6 +33,7 @@ class Configuration:
     logging_level:str
     vscode_path:str
     xlpro_cli_path:str
+    undo_stack_depth:int
     # xlpro_xlam_path:str
 
     def to_dict(self):

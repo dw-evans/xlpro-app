@@ -38,6 +38,16 @@
                   screentip="Open the working directory of the workbook in explorer.exe" 
                   onAction="OpenWorkingDirButton"/> 
         </group> 
+        <group id="group5" label="Undo/Redo Custom"> 
+          <button id="Button8" image="gear-24" size="large" 
+                  label="Undo" 
+                  screentip="start vs code" 
+                  onAction="ButtonPerformUndo"/> 
+          <button id="Button9" image="gear-24" size="large" 
+                  label="Redo" 
+                  screentip="start vs code" 
+                  onAction="ButtonPerformRedo"/> 
+        </group> 
         <!-- <group id="group5" label="Excel Calcs"> 
           <button id="Button7" image="gear-16" 
                   label="Manual" 

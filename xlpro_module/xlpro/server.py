@@ -1413,7 +1413,8 @@ class ClientManager:
                 pass
 
             # update by resetting the formula
-            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            # caller_dispatch.Formula2 = caller_dispatch.Formula2
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
             logger.error(f"Error during client update: '{uid}', {e}")
@@ -1439,7 +1440,8 @@ class ClientManager:
                 self._set_result_display(uid, f"PyObj<{uid}>")
 
             # update by resetting the formula
-            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            # caller_dispatch.Formula2 = caller_dispatch.Formula2
             # self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
@@ -1467,7 +1469,8 @@ class ClientManager:
                 self._set_result_display(uid, val)
 
             # update by resetting the formula
-            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
@@ -1518,7 +1521,8 @@ class ClientManager:
             self._set_result_display(uid, f"Image<{xl_name}>")
 
             # update by resetting the formula
-            caller_dispatch.Formula2 = caller_dispatch.Formula2
+            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
 
         except Exception as e:
