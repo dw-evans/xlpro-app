@@ -18,6 +18,13 @@ Private Sub Workbook_BeforeClose(Cancel As Boolean)
 End Sub
 
 
+Sub EnableEvents()
+    Application.EnableEvents = True
+End Sub
+
+
+
+
 
 
 
