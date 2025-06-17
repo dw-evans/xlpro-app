@@ -163,11 +163,9 @@ class xlproServer:
                 wb_dispatch.Names.Add(f"fname_{fname}", f"=\"{fname}\"")
                 count += 1
             logger.info(f"Added {count} names to workbook names")
-        _utils.comsafe(_xlinteract1)()
 
-        f_map = workspace.get_active_registered_functon_map()
+            f_map = workspace.get_active_registered_functon_map()
 
-        def _xlinteract2():
             for name in wb_dispatch.Names:
                 if name.Name.startswith("args_"):
                     wb_dispatch.Names(name.Name).Delete()
@@ -183,7 +181,10 @@ class xlproServer:
                 (a:=f"args_{k}", b:=f"{s}")
                 wb_dispatch.Names.Add(a, b)
                 pass
-        _utils.comsafe(_xlinteract2)()
+
+        _utils.comsafe(_xlinteract1)()
+            
+        # _utils.comsafe(_xlinteract2)()
         
         return
 
@@ -1568,8 +1569,14 @@ class ClientManager:
                 except pythoncom.com_error as e:
                     logger.warning(f"could not find object with name: {xl_name} to delete")
 
-                shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
-                shape.Name = xl_name
+                try:
+                    shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+                    time.sleep(0.1)
+                    shape.Name = xl_name
+                except Exception as e:
+                    shape.Delete()
+                    raise e
+                return
             _utils.comsafe(_xlinteract)()    
             
             # self._set_result_display(uid, f"Image<{fp}>")

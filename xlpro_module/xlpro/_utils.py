@@ -931,9 +931,9 @@ XLAPP_LOCK = threading.Lock()
 def comsafe(func):
     @wraps(func)
     def inner(*args, **kwargs):
-        return func(*args, **kwargs)
-        # with XLAPP_LOCK:
-        #     return func(*args, **kwargs)
+        # return func(*args, **kwargs)
+        with XLAPP_LOCK:
+            return func(*args, **kwargs)
         # return run_on_main_thread(func)(*args, **kwargs)
     return inner
 
@@ -1016,9 +1016,14 @@ def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
     n_rows, n_cols = df.shape
     if n_rows == 0 or n_cols == 0:
         raise ValueError("DataFrame is empty or has no columns.")
+    tblRange = table.Range
+
+    tblcontentsRange = sheet.Range(table.Range.Cells(2,1), table.Range.Cells(tblRange.Rows.Count, tblRange.Columns.Count))
+    tblcontentsRange.Formula2 = ""
 
     # Resize table range BEFORE writing anything
     new_range = sheet.Range(top_left, top_left.Cells(n_rows+1, n_cols))  # +1 row for header
+
     table.Resize(new_range)
 
     # Write headers

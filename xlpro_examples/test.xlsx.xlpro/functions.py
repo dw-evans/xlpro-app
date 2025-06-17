@@ -223,7 +223,7 @@ def plot_function(x:ndarray1d, y:ndarray1d) -> matplotlib.figure.Figure:
     ax.plot(x, y)
     return fig
 
-def set_fig_size_mm(fig:matplotlib.figure.Figure, size:ndarray1d[np.float64]) -> matplotlib.figure.Figure:
+def set_fig_size_mm(fig:matplotlib.figure.Figure, size:ndarray1d) -> matplotlib.figure.Figure:
     fig.set_size_inches(size / 25.4)
     return fig
 
@@ -290,6 +290,12 @@ def div(val:np.ndarray, di):
 def add(val:np.ndarray, ad):
     return val + ad
 
+
+def set_ax_xlims(ax:matplotlib.axes.Axes, xlims:ndarray1d):
+    ax.set_xlim(*xlims)
+
+def set_ax_ylims(ax:matplotlib.axes.Axes, ylims:ndarray1d):
+    ax.set_ylim(*ylims)
 
 # xlpro._utils.get
 
