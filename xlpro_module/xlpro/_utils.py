@@ -39,6 +39,7 @@ from xlpro import errors
 import json
 from xlpro._types import list1d, list2d, ndarray1d, ndarray2d
 
+
 logger = logging.getLogger(__name__)
 
 # VB_DYNAMIC_MODULE_NAME = "xlpro_async"
@@ -913,6 +914,52 @@ class xlRange:
     """Signal class to preserve range passing version of xl.Range"""
     pass
 
+
+# import queue
+# MAIN_THREAD_QUEUE = queue.Queue()
+
+# # Wrapper to run function on the main thread
+# def run_on_main_thread(func):
+#     def wrapper(*args, **kwargs):
+#         result_q = queue.Queue()
+#         MAIN_THREAD_QUEUE.put((func, args, kwargs, result_q))
+#         return result_q.get()  # block until result is available
+#     return wrapper
+
+XLAPP_LOCK = threading.Lock()
+
+def comsafe(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+        # with XLAPP_LOCK:
+        #     return func(*args, **kwargs)
+        # return run_on_main_thread(func)(*args, **kwargs)
+    return inner
+
+# def comsafe(func):
+#     @wraps(func)
+#     def inner(*args, **kwargs):
+#         with XLAPP_LOCK:
+#             return func(*args, **kwargs)
+#     return inner
+
+# def comsafe(func):
+#     @wraps(func)
+#     def inner(*args, **kwargs):
+#         try:
+#             if not XLAPP_LOCK.acquire(timeout=5):
+#                 raise RuntimeError("Timeout waiting for Excel COM access")
+#             return func(*args, **kwargs)
+#         except Exception as e:
+#             pass
+
+#         finally:
+#             XLAPP_LOCK.release()
+#     return inner
+
+
+@comsafe
 def create_table_if_not_exists(caller, table_name:str):
     # Locate the table
     ws = caller.Parent
@@ -941,6 +988,9 @@ def create_table_if_not_exists(caller, table_name:str):
     return f"xlTable(\"{table_name}\" @ '{tbl_range.Parent.Name}'!{tbl_range.Address})"
 
 
+
+
+@comsafe
 def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
     wb = caller.Parent.Parent
     # Locate the table
@@ -986,6 +1036,7 @@ def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
     return f"xlTable(\"{table_name}\" @ '{header_range.Parent.Name}'!{header_range.Address})"
 
 
+
 def replace_table_with_df(df: pd.DataFrame, table_name: str = "Table1"):
 
     # Locate the table
@@ -1026,6 +1077,9 @@ def replace_table_with_df(df: pd.DataFrame, table_name: str = "Table1"):
     data_range.Value = tuple(df.itertuples(index=False, name=None))
 
     print(f"✅ Table '{table_name}' updated with {n_rows} rows and {n_cols} columns.")
+
+
+
 
 if __name__ == "__main__":
     # jsonify_func(hash_str)

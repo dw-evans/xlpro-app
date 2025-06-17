@@ -42,7 +42,6 @@ xlpro.register(fname="pylen")(len)
 # xlpro.register(operator.delitem)
 # xlpro.register(len)
 
-
 def pd_function_create(x) -> pd.DataFrame:
     ret = pd.DataFrame(x[1:], columns=x[0])
     return ret
@@ -238,6 +237,7 @@ def tick_formatter_partial(pattern:str):
 def format_figure_tick_marks(fig):
     ...
 
+@xlpro.comsafe
 def visualise_color(rgb:ndarray1d[int], caller:'xl.Range'):
     rgb = rgb[0]
     caller.Interior.Color = utils.rgb2int(rgb)
@@ -272,8 +272,10 @@ def np_create_random_typed(n:int, m:int) -> ndarray2d:
     return np.random.random((n, m))
 
 
+@xlpro.comsafe
 def get_address(caller:'xl.Range'):
     return caller.Address
+
 
 
 def pow(val:np.ndarray, exp):

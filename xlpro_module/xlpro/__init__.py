@@ -17,13 +17,14 @@ from xlpro._utils import (
     pyrepr,
     create_table_from_df,
     create_table_if_not_exists,
+    comsafe
 )
 
 from xlpro._wrappers import (
     register,
     ignore,
     wrap_jsonify,
-    register_sub
+    register_sub,
 )
 
 # from xlpro._enums import (
@@ -41,6 +42,7 @@ from xlpro._types import (
     xlproCollapsedType,
     xlproImage,
 )
+
 
 
 # from xlpro.formatter import (

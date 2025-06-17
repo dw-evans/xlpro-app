@@ -42,6 +42,7 @@ from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
 
+
 def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = workbook_path.parent / f"{workbook_path.name}.xlpro"
     d.mkdir(exist_ok=True)
@@ -68,7 +69,6 @@ def get_workspace_xlpro_dir(workbook_path:Path) -> Path:
 
 
 SUB_CALLER_FLAG_STRING = "SUB_CALLER_FLAG_STRING"
-
 
 class xlproServer:
     _public_methods_ = [
@@ -98,6 +98,14 @@ class xlproServer:
     # use this flag to tell the server to close it next time
     # it is checked.
     _is_pending_close = False
+
+    # @staticmethod
+    # def comsafe(func):
+    #     @wraps(func)
+    #     def inner(*args, **kwargs):
+    #         with XLAPP_LOCK_MAINTHREAD:
+    #             return func(*args, **kwargs)
+    #     return inner
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -141,39 +149,41 @@ class xlproServer:
         """Registers fname_* in the workbook names so the user knows what names
         Are registered"""
         logger.info("Deleting Names beginning with reserved string `fname_`...")
-        count = 0
-        for name in wb_dispatch.Names:
-            if name.Name.startswith("fname_"):
-                wb_dispatch.Names(name.Name).Delete()
+        def _xlinteract1():
+            count = 0
+            for name in wb_dispatch.Names:
+                if name.Name.startswith("fname_"):
+                    wb_dispatch.Names(name.Name).Delete()
+                    count += 1
+            logger.info(f"Deleted {count} names")
+            
+            logger.info("Adding fname names to workbook names")
+            count = 0
+            for fname in workspace.get_active_registered_functon_map().keys():
+                wb_dispatch.Names.Add(f"fname_{fname}", f"=\"{fname}\"")
                 count += 1
-        logger.info(f"Deleted {count} names")
-        
-        logger.info("Adding fname names to workbook names")
-        count = 0
-        for fname in workspace.get_active_registered_functon_map().keys():
-            wb_dispatch.Names.Add(f"fname_{fname}", f"=\"{fname}\"")
-            count += 1
-        logger.info(f"Added {count} names to workbook names")
-
+            logger.info(f"Added {count} names to workbook names")
+        _utils.comsafe(_xlinteract1)()
 
         f_map = workspace.get_active_registered_functon_map()
 
+        def _xlinteract2():
+            for name in wb_dispatch.Names:
+                if name.Name.startswith("args_"):
+                    wb_dispatch.Names(name.Name).Delete()
 
-        for name in wb_dispatch.Names:
-            if name.Name.startswith("args_"):
-                wb_dispatch.Names(name.Name).Delete()
-
-        for k, v in f_map.items():
-            args:list[str] = _utils.get_excel_args_of_func(v)
-            if len(args) == 0:
-                s = "=\"\""
-            elif len(args) == 1:
-                s = f"={args[0]}"
-            else:
-                s = "={{{}}}".format(";".join([f"\"{x}\"" for x in args]))
-            (a:=f"args_{k}", b:=f"{s}")
-            wb_dispatch.Names.Add(a, b)
-            pass
+            for k, v in f_map.items():
+                args:list[str] = _utils.get_excel_args_of_func(v)
+                if len(args) == 0:
+                    s = "=\"\""
+                elif len(args) == 1:
+                    s = f"={args[0]}"
+                else:
+                    s = "={{{}}}".format(";".join([f"\"{x}\"" for x in args]))
+                (a:=f"args_{k}", b:=f"{s}")
+                wb_dispatch.Names.Add(a, b)
+                pass
+        _utils.comsafe(_xlinteract2)()
         
         return
 
@@ -1118,7 +1128,6 @@ class WorkerManager:
         self._threadpool_dict:dict[str, threading.Thread] = {}
         self._threadpool_dict_lock = threading.Lock()
 
-
     @property
     def MAX_THREADS(self):
         return CFG.max_worker_threads
@@ -1148,6 +1157,21 @@ class WorkerManager:
     #     with self._futures_lock:
     #         self._futures = {}
 
+    def _wrap_with_cleanup(self, uid, func):
+        def wrapped():
+            try:
+                func()
+            finally:
+                try:
+                    with self._threadpool_dict_lock:
+                        thread = self._threadpool_dict.get(uid)
+                        if thread is not None and not thread.is_alive():
+                            del self._threadpool_dict[uid]
+                            logger.debug(f"Cleaned up thread for uid: {uid}")
+                except:
+                    pass
+        return wrapped
+
     def _process_function_queue(self):
         with self._threadpool_dict_lock:
             n_items = len(self._threadpool_dict.keys())
@@ -1156,7 +1180,8 @@ class WorkerManager:
             uid = self._server._pending_function_queue.get(timeout=0.01)
             try:
                 with self._server._uid_pending_function_map_lock:
-                    func = self._server._uid_pending_function_map[uid]
+                    # func = self.sleep_wrapper(self._wrap_with_cleanup(uid, self._server._uid_pending_function_map[uid]))
+                    func = self._wrap_with_cleanup(uid, self._server._uid_pending_function_map[uid])
             except KeyError:
                 logger.warning(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
                 return
@@ -1196,7 +1221,7 @@ class WorkerManager:
                     self._process_function_queue()
                 except queue.Empty:
                     break
-                # self._clear_completed_threads()
+                self._clear_completed_threads()
                 time.sleep(0.01) # fairness sleep
 
             if self._stop_event.is_set():
@@ -1273,6 +1298,17 @@ class ResultsManager:
                 self.signal_worker_manager_to_recalculate(uid)
                 return
 
+            elif isinstance(val, TypeError):
+                # There is a bug of some kind where .Address on a range raises a Type error. This case deals with it
+                if val.args[0] == 'This object does not support enumeration':
+                    logger.info(f"Assuming OBJREF invalid '{uid}', recycling function...")
+                    # self.signal_worker_manager_to_recalculate(uid)
+                    self._set_results_value(uid, ret)
+                    self._server._client_recalculate_queue.put(uid)
+                    logger.debug(f"ResultsManager is waking the ClientManager after successful calculation of '{uid}'")
+                    self._server._client_manager_thread.wake()
+                    return
+
             elif isinstance(val, pythoncom.com_error):
                 # recycle if excel is not accessible
                 if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
@@ -1281,11 +1317,25 @@ class ResultsManager:
                     return
                 elif VBErrorConverter(val) == 285: # The marshaled interface data packet (OBJREF) has an invalid or unknown format.
                     logger.info(f"OBJREF invalid '{uid}', recycling function...")
-                    self.signal_worker_manager_to_recalculate(uid)
+                    # self.signal_worker_manager_to_recalculate(uid)
+                    self._set_results_value(uid, ret)
+                    self._server._client_recalculate_queue.put(uid)
+                    logger.debug(f"ResultsManager is waking the ClientManager after successful calculation of '{uid}'")
+                    self._server._client_manager_thread.wake()
                     return
                 elif VBErrorConverter(val) == 30: # A disk error occurred during a read operation.
                     logger.info(f"disk read failed '{uid}', recycling function...")
-                    self.signal_worker_manager_to_recalculate(uid)
+                    # self.signal_worker_manager_to_recalculate(uid)
+
+                    # with self._server._uid_pending_function_map_lock:
+                    #     logger.debug(f"calculation removed as pending function {uid}")
+                    #     del self._server._uid_pending_function_map[uid]
+
+                    # tell the client manager to issue a recalculate
+                    self._set_results_value(uid, ret)
+                    self._server._client_recalculate_queue.put(uid)
+                    logger.debug(f"ResultsManager is waking the ClientManager after successful calculation of '{uid}'")
+                    self._server._client_manager_thread.wake()
                     return
                 else:
                     logger.info(f"Other COM error for '{uid}', recycling function...")
@@ -1413,7 +1463,8 @@ class ClientManager:
                 pass
 
             # update by resetting the formula
-            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+        
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
@@ -1440,7 +1491,8 @@ class ClientManager:
                 self._set_result_display(uid, f"PyObj<{uid}>")
 
             # update by resetting the formula
-            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             # self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
@@ -1469,7 +1521,8 @@ class ClientManager:
                 self._set_result_display(uid, val)
 
             # update by resetting the formula
-            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
@@ -1498,30 +1551,33 @@ class ClientManager:
             if not fp.suffix.lower()[1:] in ("emf","wmf","jpg","jpeg","jff","jpe","png","bmp","dib","rle","gif","emz","wmz","tif","tiff","svg","ico","webp"):
                 raise Exception(f"Excel does not support this extension {fp.suffix}")
 
-            caller_adjacent = caller_dispatch.Cells(2,1)
-            xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
-            width, height = size_pt
+            def _xlinteract():
+                caller_adjacent = caller_dispatch.Cells(2,1)
+                xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
+                width, height = size_pt
 
-            ws = caller_adjacent.Parent
-            # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+                ws = caller_adjacent.Parent
+                # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
-            # look for an existing shape with the same name
-            ws:'xl._Worksheet'
-            try:
-                shape = ws.Shapes(xl_name)
-                xpos, ypos = shape.Left, shape.Top
-                shape.Delete()
-            except pythoncom.com_error as e:
-                logger.warning(f"could not find object with name: {xl_name} to delete")
+                # look for an existing shape with the same name
+                ws:'xl._Worksheet'
+                try:
+                    shape = ws.Shapes(xl_name)
+                    xpos, ypos = shape.Left, shape.Top
+                    shape.Delete()
+                except pythoncom.com_error as e:
+                    logger.warning(f"could not find object with name: {xl_name} to delete")
 
-            shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
-            shape.Name = xl_name
-
+                shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+                shape.Name = xl_name
+            _utils.comsafe(_xlinteract)()    
+            
             # self._set_result_display(uid, f"Image<{fp}>")
             self._set_result_display(uid, f"Image<{xl_name}>")
 
             # update by resetting the formula
-            caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
 
@@ -1540,15 +1596,17 @@ class ClientManager:
         for _ in range(queue_length):
             try:
                 uid = self._server._client_recalculate_queue.get()
+                if uid.lower().startswith("$e$27"):
+                    pass
                 # logger.debug(f"Client manager fetched uid '{uid}'")
             except queue.Empty:
                 # logger.debug("Client manager queue is empty")
                 return
             
-            with self._server._uid_result_iscomplete_map_lock:
-                if not uid in self._server._uid_result_iscomplete_map.keys():
-                    logger.debug(f"Uid '{uid}' not found as pending function within client manager update. Ignoring this iteration")
-                    return
+            # with self._server._uid_result_iscomplete_map_lock:
+            #     if not uid in self._server._uid_result_iscomplete_map.keys():
+            #         logger.debug(f"Uid '{uid}' not found as pending function within client manager update. Ignoring this iteration")
+            #         return
 
             pass
 
@@ -1575,8 +1633,10 @@ class ClientManager:
             try:
                 value = self._get_value(uid)
 
-                if uid.lower().startswith("$f$36"):
+                if isinstance(value, TypeError):
                     pass
+
+
 
                 # handle images every time
                 if type(value) == xlproImage:
