@@ -297,6 +297,10 @@ def set_ax_xlims(ax:matplotlib.axes.Axes, xlims:ndarray1d):
 def set_ax_ylims(ax:matplotlib.axes.Axes, ylims:ndarray1d):
     ax.set_ylim(*ylims)
 
+
+def test_function_with_defaults(a:str, b:float, c:int=0, d:float=1.0, e:ndarray2d=None):
+    return str((a, b, c, d, e))
+
 # xlpro._utils.get
 
 

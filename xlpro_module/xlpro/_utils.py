@@ -138,6 +138,22 @@ VB_TYPE_DECLARATION_STRINGS = {
     Any: "{} As Variant",
 }
 
+XLPRO_DEFAULT_ARGUMENT_HINT_STR = "XLPRO_DEFAULT"
+
+VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
+    int: lambda x: "{}".format(x),
+    float: lambda x: "{}".format(float(x)),
+    bool: lambda x: "True" if x else "False",
+    str: lambda x: "\"{}\"".format(x),
+    Any: lambda x: f"\"{XLPRO_DEFAULT_ARGUMENT_HINT_STR}\"",
+}
+
+
+
+
+
+# Optional {argname} As {vbtype} = "XLPRO_DEFAULT"
+
 VB_RANGE_CONVERSION_CHECK_STRING = """If TypeName({arg}) = \"Range\" Then
     {arg} = {arg}.Value
 End If
@@ -178,11 +194,25 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
             arg_conversion_list.append(RESERVED_XLPRO_KW_LOOKUPS[a])
             continue
 
-        # define the function declaration values
-        if VB_TYPE_DECLARATION_STRINGS.get(t, None):
-            arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[t].format(a))
+        if a in default_value_map.keys():
+            # Optional {argname} As {vbtype} = {defaultvalue}
+            if t in VB_DEFAULT_VALUE_REPR_FUNCTIONS.keys():
+                arg_declaration_list.append(
+                    f"Optional {VB_TYPE_DECLARATION_STRINGS[t].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[t](default_value_map[a])}"
+                )
+            else:
+                arg_declaration_list.append(
+                    f"Optional {VB_TYPE_DECLARATION_STRINGS[Any].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[Any](default_value_map[a])}"
+                )
+
+
+        # else define it in the signature with its true type
         else:
-            arg_declaration_list.append("{} As Variant".format(a))
+            # define the function declaration values
+            if VB_TYPE_DECLARATION_STRINGS.get(t, None):
+                arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[t].format(a))
+            else:
+                arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[Any].format(a))
 
 
         # define the type conversions/casting to pass to xlpro
@@ -577,7 +607,6 @@ def jsonify(arr:list2d):
     from xlpro._types import ExcelArrayConverter
     arr:list2d = ExcelArrayConverter(arr, list2d)
     
-
     if len(arr[0]) != 2:
         raise Exception("Please provide a nx2 array of key:value pairs")
     ret = {}
@@ -640,11 +669,15 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
     if not kwargs is None and not isinstance(kwargs, dict):
         raise TypeError("kwargs must be a dict")
 
-    _, args_and_types, _, _ = get_function_signature(func)
+    _, args_and_types, _, default_arguments = get_function_signature(func)
 
     ppargs = []
     if args is not None:
         for val, (a, t) in zip(args, args_and_types):
+            # check if the optional argument string has been passed
+            if a in default_arguments.keys():
+                if val == XLPRO_DEFAULT_ARGUMENT_HINT_STR:
+                    val = default_arguments[a]
             ppargs.append(pre_p_an_arg(val, t))
 
     ppkwargs = {}
@@ -774,6 +807,7 @@ def px_to_pt(px, dpi):
 
 def pt_to_px(pt, dpi):
     return pt / 72 * dpi
+
 
 def show_image(val, name:str, 
     # sizex:float=None, sizey:float=None, dpi:int, format:str,
