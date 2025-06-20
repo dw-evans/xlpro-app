@@ -614,16 +614,26 @@ class xlproWorkspace:
             caller_dispatch = Dispatch(caller)
             caller_addr = caller_dispatch.Address
 
-            with self._caller_address_uid_map_lock:
-                # the hash will be constant for a function/args/caller combination so this is valid
-                if caller_addr in self._caller_address_uid_map.keys():
-                    # XXX - todo - this chain will wipe nested calculations within the same cell
-                    # Even if we check which function is being executed we would still fail if the same
-                    # nested function call occurs from the same cell.
-                    # The function hash might pay to be generated from vba using cell range addrs
-                    # Then we can check if ...
-                    self.clear_uid(self._caller_address_uid_map[caller_addr])
-                self._caller_address_uid_map[caller_addr] = uid
+
+            # When to wipe an existing calculation...
+            # Current process: 
+            # send caller, fname, args to xlpro server
+            # hash addr+fname+args to create a uid for that function call
+            # if there are any existing calculations for the same cell, wipe them.
+            # Solutions:
+            # Do not wipe any calculations, will cost speed
+            # Find way to identify sub calls from a cell
+
+            # with self._caller_address_uid_map_lock:
+            #     # the hash will be constant for a function/args/caller combination so this is valid
+            #     if caller_addr in self._caller_address_uid_map.keys():
+            #         # XXX - todo - this chain will wipe nested calculations within the same cell
+            #         # Even if we check which function is being executed we would still fail if the same
+            #         # nested function call occurs from the same cell.
+            #         # The function hash might pay to be generated from vba using cell range addrs
+            #         # Then we can check if ...
+            #         self.clear_uid(self._caller_address_uid_map[caller_addr])
+            #     self._caller_address_uid_map[caller_addr] = uid
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
