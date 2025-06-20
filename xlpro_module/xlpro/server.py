@@ -149,7 +149,12 @@ class xlproServer:
         """Registers fname_* in the workbook names so the user knows what names
         Are registered"""
         logger.info("Deleting Names beginning with reserved string `fname_`...")
+
         def _xlinteract1():
+            logger.info("Adding pyNone and pyEmpty to workbook names")
+            wb_dispatch.Names.Add(_utils.XLPRO_EMPTY_STR, f"=\"{_utils.XLPRO_EMPTY_STR}\"")
+            wb_dispatch.Names.Add(_utils.XLPRO_NONE_STR, f"=\"{_utils.XLPRO_NONE_STR}\"")
+
             count = 0
             for name in wb_dispatch.Names:
                 if name.Name.startswith("fname_"):

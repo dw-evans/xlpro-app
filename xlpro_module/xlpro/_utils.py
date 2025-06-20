@@ -138,14 +138,17 @@ VB_TYPE_DECLARATION_STRINGS = {
     Any: "{} As Variant",
 }
 
-XLPRO_DEFAULT_ARGUMENT_HINT_STR = "XLPRO_DEFAULT"
+# XLPRO_DEFAULT_ARGUMENT_HINT_STR = "XLPRO_DEFAULT"
+XLPRO_EMPTY_STR = "pyEmpty" # used to signal default
+XLPRO_NONE_STR = "pyNone" # used to signal None (this could be a function call but seems extreme)
+
 
 VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
     int: lambda x: "{}".format(x),
     float: lambda x: "{}".format(float(x)),
     bool: lambda x: "True" if x else "False",
     str: lambda x: "\"{}\"".format(x),
-    Any: lambda x: f"\"{XLPRO_DEFAULT_ARGUMENT_HINT_STR}\"",
+    Any: lambda x: f"\"{XLPRO_EMPTY_STR}\"",
 }
 
 
@@ -155,7 +158,14 @@ VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
 # Optional {argname} As {vbtype} = "XLPRO_DEFAULT"
 
 VB_RANGE_CONVERSION_CHECK_STRING = """If TypeName({arg}) = \"Range\" Then
-    {arg} = {arg}.Value
+    {arg}_val = {arg}.Value
+End If
+"""
+
+VB_GENERIC_CONVERSION_CHECK_STRING = """If Application.Run("'xlpro.xlam'!IsNoneOrEmpty", {arg}) Then
+    {arg}_val = {arg}
+Else
+    {arg}_val = {arg_conversion_str}
 End If
 """
 
@@ -182,8 +192,10 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
 
     docstring = func.__doc__
     arg_declaration_list = []
-    arg_conversion_list = []
+    argnames_passed_to_xlpro = []
     arg_range_conversion_check_list = []
+    pre_arg_dim_defs = []
+    pre_arg_dim_defs = []
 
     # loop over each arg and type
     # create the declaration list of strings
@@ -191,19 +203,25 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     for a, t in args_and_types:
         if a in RESERVED_ARGS:
             # handle reserved kwargs
-            arg_conversion_list.append(RESERVED_XLPRO_KW_LOOKUPS[a])
+            argnames_passed_to_xlpro.append(RESERVED_XLPRO_KW_LOOKUPS[a])
             continue
 
+        pre_arg_dim_defs.append(f"Dim {a}_val As Variant")
+
         if a in default_value_map.keys():
-            # Optional {argname} As {vbtype} = {defaultvalue}
-            if t in VB_DEFAULT_VALUE_REPR_FUNCTIONS.keys():
-                arg_declaration_list.append(
-                    f"Optional {VB_TYPE_DECLARATION_STRINGS[t].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[t](default_value_map[a])}"
-                )
-            else:
-                arg_declaration_list.append(
-                    f"Optional {VB_TYPE_DECLARATION_STRINGS[Any].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[Any](default_value_map[a])}"
-                )
+            # # Optional {argname} As {vbtype} = {defaultvalue}
+            # if t in VB_DEFAULT_VALUE_REPR_FUNCTIONS.keys():
+            #     arg_declaration_list.append(
+            #         f"Optional {VB_TYPE_DECLARATION_STRINGS[t].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[t](default_value_map[a])}"
+            #     )
+            # else:
+            #     arg_declaration_list.append(
+            #         f"Optional {VB_TYPE_DECLARATION_STRINGS[Any].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[Any](default_value_map[a])}"
+            #     )
+            arg_declaration_list.append(
+                f"Optional {a} as Variant = \"{XLPRO_EMPTY_STR}\""
+            )
+
 
 
         # else define it in the signature with its true type
@@ -215,20 +233,35 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
                 arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[Any].format(a))
 
 
-        # define the type conversions/casting to pass to xlpro
-        if VB_TYPE_CONVERSION_STRINGS.get(t, None):
-            # handle any args that can be converted
-            arg_conversion_list.append(VB_TYPE_CONVERSION_STRINGS[t].format(a))
+        # # define the type conversions/casting to pass to xlpro
+        # if VB_TYPE_CONVERSION_STRINGS.get(t, None):
+        #     # handle any args that can be converted
+        #     argnames_passed_to_xlpro.append(VB_TYPE_CONVERSION_STRINGS[t].format(a))
+        # else:
+        #     # handle standard args
+        #     argnames_passed_to_xlpro.append("{}".format(a))
+
+        argnames_passed_to_xlpro.append("{}_val".format(a))
+
+
+        # we need to be able to handle
+        if t in VB_TYPE_CONVERSION_STRINGS:
+            arg_range_conversion_check_list.append(
+                VB_GENERIC_CONVERSION_CHECK_STRING.format(arg=a, arg_conversion_str = VB_TYPE_CONVERSION_STRINGS[t].format(a))
+            )
         else:
-            # handle standard args
-            arg_conversion_list.append("{}".format(a))
+            arg_range_conversion_check_list.append(
+                VB_GENERIC_CONVERSION_CHECK_STRING.format(arg=a, arg_conversion_str = VB_TYPE_CONVERSION_STRINGS[Any].format(a))
+            )
 
         # convert all range inputs to their .value attribute
         if a not in RESERVED_ARGS:
+
             if t not in [float, int, bool, str]:
                 arg_range_conversion_check_list.append(
-                    VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a, fname=func_name)
+                    VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a)
                 )
+
                 
     template = textwrap.dedent((
         """
@@ -248,14 +281,17 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     # should add in here some code to check if any single values are "argnotreadyexceptions" or "promises"
     # so we can significantly reduce the number of com calls.
 
+
+
     from xlpro import server 
     ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     If xlpro is Nothing Or xlpro_guid <> xlpro_guid_prev Then
         InitXlpro
     End If
+{textwrap.indent('\n'.join(pre_arg_dim_defs), prefix="    ")}
 {textwrap.indent('\n'.join(pre_check_arg_sequence_strs), prefix="    ")}
 {textwrap.indent('\n'.join(arg_range_conversion_check_list), prefix="    ")}
-    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}"{', ' if arg_conversion_list else ''}{', '.join(arg_conversion_list)})
+    {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}"{', ' if argnames_passed_to_xlpro else ''}{', '.join(argnames_passed_to_xlpro)})
 End Function
 """
     return ret
@@ -663,6 +699,7 @@ def pre_p_an_arg(cval, target_type):
     ppval = _types.ExcelArrayConverter(cval, target_type)
     return ppval
 
+
 def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
     if not args is None and not isinstance(args, typing.Iterable):
         raise TypeError("args must be an iterable")
@@ -676,8 +713,10 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
         for val, (a, t) in zip(args, args_and_types):
             # check if the optional argument string has been passed
             if a in default_arguments.keys():
-                if val == XLPRO_DEFAULT_ARGUMENT_HINT_STR:
+                if val == XLPRO_EMPTY_STR:
                     val = default_arguments[a]
+                elif val == XLPRO_NONE_STR:
+                    val = None
             ppargs.append(pre_p_an_arg(val, t))
 
     ppkwargs = {}
@@ -692,6 +731,7 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
 
     return ppargs, ppkwargs
     
+
 
 import threading
 class ThreadWithException(threading.Thread):
