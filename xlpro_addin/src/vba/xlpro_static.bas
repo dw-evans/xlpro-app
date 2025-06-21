@@ -398,6 +398,14 @@ Function IsValueReady(val As Variant) As Boolean
     IsValueReady = True
 End Function
 
+Public Function IsNoneOrEmpty(arg As Variant) As Boolean
+    If TypeName(arg) <> "String" Then
+        IsNoneOrEmpty = False
+        Exit Function
+    End If
+    IsNoneOrEmpty = (arg = "pyEmpty") Or (arg = "pyNone")
+End Function
+
 Public Function CheckArgReady(arg As Variant) As Boolean
     Dim val As Variant
     Dim subval As Variant

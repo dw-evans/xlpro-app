@@ -289,11 +289,12 @@ class ExcelArrayConverter:
 
 class xlproExpandedType:
     """Class to signal that an array is to be expanded, overwrites xlproCollapsedType"""
+    oned_direction_rowwise = True
     def __init__(self, arraydata):
+        self.data = arraydata
         if isinstance(arraydata, xlproCollapsedType):
             arraydata = arraydata.data
-        oned_direction_rowwise = False
-        if oned_direction_rowwise:
+        if xlproExpandedType.oned_direction_rowwise:
             if len((npdata:=np.array(arraydata)).shape) == 1:
                 self.data = npdata.reshape(-1, 1)
         else:

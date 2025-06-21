@@ -20,7 +20,7 @@ import sys
 import textwrap
 import re
 
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
 
 logging.basicConfig(
     stream=sys.stdout,

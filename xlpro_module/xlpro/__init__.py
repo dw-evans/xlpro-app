@@ -4,20 +4,27 @@ import logging as __logging
 __logger = __logging.getLogger(__name__)
 
 from xlpro._utils import (
-    jsonify,
+    # jsonify,
     show,
     show_image,
-    pytype,
+    show_image_with_seed,
+    create_table_from_df,
     cpy,
     deepcpy,
     int2rgb,
-    xlpro_getattr,
-    xlpro_getitem,
-    # pynone,
+    pytype,
     pyrepr,
-    create_table_from_df,
-    create_table_if_not_exists,
-    comsafe
+    pystr,
+    pygetattr,
+    pygetitem,
+    pyhash,
+    comsafe,
+    show_image_with_seed,
+    pow,
+    mul,
+    div,
+    add,
+    subtract,
 )
 
 from xlpro._wrappers import (

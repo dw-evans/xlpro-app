@@ -34,7 +34,6 @@ class Configuration:
     vscode_path:str
     xlpro_cli_path:str
     undo_stack_depth:int
-    # xlpro_xlam_path:str
 
     def to_dict(self):
         attrs = (
@@ -44,7 +43,7 @@ class Configuration:
             "logging_level",
             "vscode_path",
             "xlpro_cli_path",
-            # "xlpro_xlam_path",
+            "undo_stack_depth",
         )
         ret = {attr: getattr(self, attr) for attr in attrs}
         return ret

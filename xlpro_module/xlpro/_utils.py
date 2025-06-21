@@ -65,7 +65,17 @@ def get_function_types_with_fallback(func:Callable):
 
     return hints
 
-def get_function_signature(func):
+from dataclasses import dataclass
+@dataclass
+class FSig:
+    fname:str
+    args_and_types:tuple[tuple[str, type]]
+    return_type:type
+    default_value_map:dict[str, Any]
+    positional_only_args:tuple
+    keyword_only_args:tuple
+
+def get_function_signature(func) -> FSig:
     # Get the type hints from the function
     # type_hints = typing.get_type_hints(func)
     type_hints = get_function_types_with_fallback(func)
@@ -75,11 +85,20 @@ def get_function_signature(func):
     parameters = signature.parameters
     
     # Build the output list
-    result = []
+    argname_and_types = []
+    positional_only_args = []
+    keyword_only_args = []
     for param_name, param in parameters.items():
         # Get the type hint for the parameter or default to Any
         param_type = type_hints.get(param_name, Any)
-        result.append((param_name, param_type))
+        argname_and_types.append((param_name, param_type))
+
+        # Classify argument by kind
+        if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            positional_only_args.append(param_name)
+        if param.kind in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            keyword_only_args.append(param_name)
+
 
     default_value_map = {
         param.name: param.default
@@ -87,26 +106,28 @@ def get_function_signature(func):
         if param.default is not inspect.Parameter.empty
     }
     
+    return FSig(
+        fname=func.__name__, 
+        args_and_types=tuple(argname_and_types), 
+        return_type=type_hints.get('return', Any), 
+        default_value_map=default_value_map, 
+        positional_only_args=tuple(positional_only_args), 
+        keyword_only_args=tuple(keyword_only_args)
+    )
+
     # return func.__qualname__, result, type_hints.get('return', Any), default_value_map
-    return func.__name__, result, type_hints.get('return', Any), default_value_map
+    return func.__name__, tuple(argname_and_types), type_hints.get('return', Any), default_value_map, tuple(positional_only_args), tuple(keyword_only_args)
 
 
 
 from xlpro._enums import FunctionTypes
 import pandas as pd
 
-from dataclasses import dataclass
-@dataclass
-class FunctionSignature:
-    fname:str
-    args_and_types:tuple[str, type]
-    return_type:type
-    default_values:dict[str, Any]
-
-
 def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
     # XXX - todo - link this up with the enum in the server at some point
-    f_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    fsig = get_function_signature(func)
+    ret_type = fsig.return_type
+
     # if ret_type == matplotlib.figure.Figure:
     #     return FunctionTypes.py_object
     # elif ret_type == pd.DataFrame:
@@ -122,7 +143,7 @@ def infer_func_result_type_from_type_hints(func) -> FunctionTypes:
 
 # Converts python type to vb type
 VB_TYPE_CONVERSION_STRINGS = {
-    int: "Cint({})",
+    int: "CLngLng({})",
     float: "Cdbl({})",
     bool: "Cbool({})",
     str: "{}",
@@ -131,7 +152,7 @@ VB_TYPE_CONVERSION_STRINGS = {
 
 # Use in function definitions
 VB_TYPE_DECLARATION_STRINGS = {
-    int: "{} As Integer",
+    int: "{} As Long",
     float: "{} As Double",
     bool: "{} As Boolean",
     str: "{} As String",
@@ -182,11 +203,17 @@ if TYPE_CHECKING:
     from win32typelibs import excel as xl
 
 
+from xlpro.vba_reserved_names import RESERVED_VBA_NAMES
+
 def function_template_with_caller(func:Callable, fname:str=None) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
-    func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    fsig = get_function_signature(func)
+    func_name = fsig.fname
+    args_and_types = fsig.args_and_types
+    default_value_map = fsig.default_value_map
+
     if fname is not None:
         func_name = fname
 
@@ -196,19 +223,50 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     arg_range_conversion_check_list = []
     pre_arg_dim_defs = []
     pre_arg_dim_defs = []
+    argnames = [a for a, t in args_and_types]
 
+    pre_check_template = textwrap.dedent((
+        """
+        If Not Application.Run("'xlpro.xlam'!CheckArgReady", {arg}) Then
+            {fname} = "Promise<PENDING_PREDECENTS>"
+            Exit Function
+        End If"""[1:]
+    ))
+
+    if func_name == "mpl_add_line_unique":
+        pass
+
+    pre_check_arg_sequence_strs = []
     # loop over each arg and type
     # create the declaration list of strings
     # create the conversion list of strings.
     for a, t in args_and_types:
+        a_orig = a
         if a in RESERVED_ARGS:
             # handle reserved kwargs
             argnames_passed_to_xlpro.append(RESERVED_XLPRO_KW_LOOKUPS[a])
             continue
 
+        # Add a trailing underscore to the vba variable names to avoid clashes with 
+        # vba reserved words
+        if a.lower() in RESERVED_VBA_NAMES:
+            a = f"{a}_"
+            while a in argnames:
+                a = f"{a}_"
+        # handle any argument starting with a leading underscore
+        elif a.startswith("_"):
+            a = a.lstrip("_")
+            a = f"{a}_"
+            while a in argnames:
+                a = f"{a}_"
+
+        # should add in here some code to check if any single values are "argnotreadyexceptions" or "promises"
+        # so we can significantly reduce the number of com calls.
+        pre_check_arg_sequence_strs.append(pre_check_template.format(fname=fname, arg=a))
+
         pre_arg_dim_defs.append(f"Dim {a}_val As Variant")
 
-        if a in default_value_map.keys():
+        if a_orig in default_value_map.keys():
             # # Optional {argname} As {vbtype} = {defaultvalue}
             # if t in VB_DEFAULT_VALUE_REPR_FUNCTIONS.keys():
             #     arg_declaration_list.append(
@@ -262,26 +320,6 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
                     VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a)
                 )
 
-                
-    template = textwrap.dedent((
-        """
-        If Not Application.Run("'xlpro.xlam'!CheckArgReady", {arg}) Then
-            {fname} = "Promise<PENDING_PREDECENTS>"
-            Exit Function
-        End If"""[1:]
-    ))
-
-
-    pre_check_arg_sequence_strs = [template.format(fname=fname, arg=a) for a, t in args_and_types if a not in RESERVED_ARGS]
-
-    # XXX - todo - ensure no reserved vba arguments are parsed!   
-    
-    a_list = [a for a, t in args_and_types]
-
-    # should add in here some code to check if any single values are "argnotreadyexceptions" or "promises"
-    # so we can significantly reduce the number of com calls.
-
-
 
     from xlpro import server 
     ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
@@ -300,7 +338,8 @@ def sub_template(func:Callable) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
-    func_name, args_and_types, ret_type, default_value_map = get_function_signature(func)
+    fsig = get_function_signature(func)
+    func_name = fsig.fname
 
     from xlpro import server 
 
@@ -409,7 +448,9 @@ def com_args_release_to_stream_reserved(func, args):
     Marshals the caller and thiswb reserved keyword arguments for use
     in another thread. Replaces the args with streams that can be used on another thread.
     """
-    f_name, args_and_types, ret_type, _ = get_function_signature(func)
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
+
     arg_names = [v0 for v0, v1 in args_and_types]
     new_args = list(args) #  args come in immutable (tuples)
     if "caller" in arg_names:
@@ -430,7 +471,9 @@ def com_args_dispatch_reserved(func, args):
     in another thread. Replaces the args with streams that can be used on another thread.
     """
     try:
-        f_name, args_and_types, ret_type, _ = get_function_signature(func)
+        fsig = get_function_signature(func)
+        args_and_types = fsig.args_and_types
+
         arg_names = [v0 for v0, v1 in args_and_types]
         new_args = list(args)
         if "caller" in arg_names:
@@ -454,7 +497,10 @@ def get_args_minus_reserved(func, args):
     """Returns the arguments of a function but removes the reserved keywords
     as to prevent the pyidispatch strings that are generated by memory allocation
     from contaminating the string."""
-    f_name, args_and_types, ret_type, _ = get_function_signature(func)
+
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
+
     arg_names = [v0 for v0, v1 in args_and_types]
     arg_idxs_to_del = []
     new_args = list(args)
@@ -471,7 +517,9 @@ def get_args_minus_reserved(func, args):
 
 def get_excel_args_of_func(func):
     """Returns the arguments for a function name"""
-    f_name, args_and_types, ret_type, _ = get_function_signature(func)
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
+    
     arg_names = [v0 for v0, v1 in args_and_types]
     arg_idxs_to_del = []
     if "caller" in arg_names:
@@ -593,14 +641,16 @@ def hash_str(s:str):
 
 
 def convert_xl_2d_types_args(func, args):
-    _, args_and_types, _, _ = get_function_signature(func)
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
     ppargs = []
     for val, (a, t) in zip(args, args_and_types):
         ppargs.append(_types.ExcelArrayConverter(val, t))
     return ppargs
 
 def convert_xl_2d_types_kwargs(func, kwargs):
-    _, args_and_types, _, _ = get_function_signature(func)
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
     ppkwargs = {}
     for k, v in kwargs.items():
         for a, t in args_and_types:
@@ -706,11 +756,29 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
     if not kwargs is None and not isinstance(kwargs, dict):
         raise TypeError("kwargs must be a dict")
 
-    _, args_and_types, _, default_arguments = get_function_signature(func)
+    fsig = get_function_signature(func)
+    args_and_types = fsig.args_and_types
+    default_arguments = fsig.default_value_map
 
     ppargs = []
+    ppkwargs = {}
+
+    args_was_none = args == None
+    kwargs_was_none = kwargs == None
+
+
     if args is not None:
         for val, (a, t) in zip(args, args_and_types):
+            # handle keyword only argument which appears in args.
+            if a in fsig.keyword_only_args:
+                if kwargs_was_none:
+                    if kwargs is None:
+                        kwargs = {}
+                if a in kwargs:
+                    raise Exception(f"argument {a} appeard in kwargs and args!")
+                kwargs[a] = val
+                continue
+
             # check if the optional argument string has been passed
             if a in default_arguments.keys():
                 if val == XLPRO_EMPTY_STR:
@@ -719,15 +787,19 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
                     val = None
             ppargs.append(pre_p_an_arg(val, t))
 
-    ppkwargs = {}
     if kwargs is not None:
         for k, val in kwargs.items():
             for a, t in args_and_types:
                 if a == k:
+                    # check if the optional argument string has been passed
+                    if a in default_arguments.keys():
+                        if isinstance(val, str):
+                            if val == XLPRO_EMPTY_STR:
+                                val = default_arguments[a]
+                            elif val == XLPRO_NONE_STR:
+                                val = None
                     ppkwargs[a] = (pre_p_an_arg(val, t))
                     break
-
-
 
     return ppargs, ppkwargs
     
@@ -836,6 +908,20 @@ def show(val):
     if calc_success:
         return xlproExpandedType(ret)
 
+        # # # Constants for VARIANT type
+        # # VT_ARRAY = 0x2000
+        # # VT_R8 = 5  # double
+
+        # # # Wrap as a VARIANT of type SAFEARRAY of doubles
+        # # safearray_variant = VARIANT(VT_ARRAY | VT_R8, [ret.tolist()])
+        # # return xlproExpandedType(safearray_variant)
+
+        # safe_arr = automation.SafeArrayCreateVector(automation.VT_R8, 0, len(arr))
+        # data_ptr = cast(safe_arr.contents.pvData, POINTER(c_double))
+        # ret2 = np.ctypeslib.as_array(data_ptr, shape=(len(arr),))[:] = arr
+        # return xlproExpandedType(ret2)
+
+
 
     # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")
@@ -916,6 +1002,25 @@ def show_image(val, name:str,
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
+def show_image_with_seed(val, name:str, seed):
+    return show_image(val, name)
+
+def pow(val:np.ndarray, exp):
+    return val ** exp
+
+def mul(val:np.ndarray, rhs):
+    return val * rhs
+
+def div(val:np.ndarray, rhs):
+    return val / rhs
+
+def add(val:np.ndarray, rhs):
+    return val + rhs
+
+def subtract(val:np.ndarray, rhs):
+    return val - rhs
+
+
 def pytype(val):
     if val is None:
         return None
@@ -928,6 +1033,15 @@ def pyrepr(val):
     if val is None:
         return None
     return repr(val)
+
+def pystr(val):
+    if val is None:
+        return None
+    return str(val)
+
+def pyhash(vals):
+    s = "".join([str(x) if x in (float, int, str) else str(id(x)) for x in vals])
+    return hash(s)
         
 
 # def vectorize(func_name:str, args_list) -> list1d:
@@ -957,11 +1071,11 @@ def rgb2int(color:tuple[int, int, int]):
 #     return ExpandedIterable(val)
 
 import operator
-def xlpro_getitem(obj, val:int):
+def pygetitem(obj, val:int):
     """Typed wrapper for getitem"""
     return operator.getitem(obj, val)
     
-def xlpro_getattr(obj, attrname:str, default:Any):
+def pygetattr(obj, attrname:str, default:Any):
     """Typed wrapper for getattr"""
     return getattr(obj, attrname, default)
     

@@ -14,7 +14,7 @@ import typing
 # from typing import TYPE_CHECKING
 # if TYPE_CHECKING:
 
-from xlpro._utils import FunctionSignature
+from xlpro._utils import FSig
 from xlpro import _utils
 
 
@@ -28,7 +28,7 @@ _module_fname_isjsonified_register:dict[dict[str, bool]] = {}
 
 # map of func names to their active status
 _module_fname_isactive_register:dict[dict[str, bool]] = {}
-_module_fname_function_signature_register:dict[dict[str, FunctionSignature]] = {}
+_module_fname_function_signature_register:dict[dict[str, FSig]] = {}
 
 
 _module_subname_func_register:dict = {}
@@ -174,7 +174,8 @@ def get_registered_func_name(func, mname):
     return _module_func_fname_register[mname][func]
 
 def _register(func, _mname, _type, _isactive, fname:str=None):
-    _register_fname(func, _mname, fname if fname is not None else func.__name__)
+    fname = fname if fname is not None else func.__name__
+    _register_fname(func, _mname, fname)
     _register_func(func, _mname)
     _func_set_active(func, _mname, _isactive)
     if _type is None:
@@ -184,8 +185,6 @@ def _register(func, _mname, _type, _isactive, fname:str=None):
 def register(_type:None|int=None, isactive=True, fname:str=None):
     """Registers the function for xlpro. User can set function type or rely on PEP-484 type hints
     per the documentation"""
-    if fname == "getitem":
-        pass
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
         _add_func_module(mname)

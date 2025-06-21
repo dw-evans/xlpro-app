@@ -180,7 +180,7 @@ class xlproServer:
                 if len(args) == 0:
                     s = "=\"\""
                 elif len(args) == 1:
-                    s = f"={args[0]}"
+                    s = f"=\"{args[0]}\""
                 else:
                     s = "={{{}}}".format(";".join([f"\"{x}\"" for x in args]))
                 (a:=f"args_{k}", b:=f"{s}")
@@ -989,6 +989,8 @@ class xlproWorkspace:
             if func.__name__ == "getitem":
                 pass
             if func.__name__ == "add_line":
+                pass
+            if func.__name__ == "mpl_add_line_unique":
                 pass
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
