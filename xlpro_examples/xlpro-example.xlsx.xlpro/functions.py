@@ -2,7 +2,20 @@ import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
-plt.style.use('default')
+
+plt.rcParams.update({
+    "font.family": "Consolas", 
+    "font.size": 10,              
+    "axes.titlesize": "large",    
+    "axes.labelsize": "medium",   
+    "xtick.labelsize": "small",   
+    "ytick.labelsize": "small",
+    "legend.fontsize": "small",
+    "figure.titlesize": "x-large"
+})
+
+# plt.style.use("seaborn-v0_8")  # For global Seaborn-like styling
+
 import numpy as np
 import matplotlib.figure
 
@@ -28,6 +41,12 @@ xlpro.register()(xlpro.div)
 xlpro.register()(xlpro.add)
 xlpro.register()(xlpro.subtract)
 xlpro.register()(xlpro.pyhash)
+xlpro.register()(xlpro.pygetattr)
+xlpro.register()(xlpro.pygetitem)
+xlpro.register()(xlpro.pystr)
+xlpro.register()(xlpro.pyrepr)
+xlpro.register()(xlpro.pylen)
+xlpro.register()(xlpro.condense)
 
 
 def np_linspace(
@@ -36,8 +55,8 @@ def np_linspace(
     num: int = 50,
     endpoint: bool = True,
     retstep: bool = False,
-    dtype: None = None,
     axis:int = 0,
+    dtype: None = None,
     device:str = "cpu"
 ):
     return np.linspace(
@@ -51,15 +70,19 @@ def np_linspace(
         device=device
     )
 
+def pallette():
+    tab10 = plt.get_cmap("tab10").colors  # Returns 10 RGB tuples
+    return tab10
+
 @xlpro.comsafe
-def visualise_color(rgb:ndarray1d[int], caller:'xl.Range'):
-    rgb = rgb[0]
-    caller.Interior.Color = utils.rgb2int(rgb)
+def visualise_color(rgb:ndarray1d[np.int32], caller:'xl.Range'):
+    rgb = rgb
+    caller.Interior.Color = utils.rgb2int(np.astype(rgb, np.int32))
     return str(rgb)
 
 def mpl_create_figure_with_seed(seed) -> matplotlib.figure.Figure:
     fig, ax = plt.subplots()
-    fig.tight_layout()
+    # fig.tight_layout()
     return fig
 
 def mpl_get_axes_of_fig(fig:matplotlib.figure.Figure):
@@ -80,22 +103,63 @@ def mpl_add_line_unique(
     for line in ax.get_lines():
         if tag == getattr(line, "_tag", None):
             line.remove()
-    ln, = ax.plot(x, y, color=color, linewidth=linewidth, markersize=markersize)
+    ln, = ax.plot(x, y, fmt, color=color, linewidth=linewidth, markersize=markersize)
     ln._tag = tag
     return ln
 
-def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d):
+def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d, loc:str="upper left"):
     legend = ax.legend(
         labels=labels,
         handles=handles,
         labelspacing=1.0,        # Line spacing
         fontsize=9.0,            # Text size
-        frameon=False            # No border or background
+        frameon=False,            # No border or background
+        loc=loc,
     )
+
 
     return legend
 
+def mpl_set_xax_name(ax, name:str):
+    ax.set_xlabel(name)
+    return ax
+
+def mpl_set_yax_name(ax, name:str):
+    ax.set_ylabel(name)
+    return ax
 
 
+def mpl_set_xlims(ax:matplotlib.axes.Axes, xlims:ndarray1d):
+    ax.set_xlim(*xlims)
+
+def mpl_set_ylims(ax:matplotlib.axes.Axes, ylims:ndarray1d):
+    ax.set_ylim(*ylims)
+
+
+
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
+
+def get_stock_prices_last_week(ticker: str, days:int=365) -> pd.DataFrame:
+    """
+    Fetches daily stock prices for the past 7 days (including weekends).
+    
+    Args:
+        ticker (str): Stock ticker symbol (e.g., 'AAPL', 'GOOG')
+    
+    Returns:
+        pd.DataFrame: DataFrame with Date as index and columns: Open, High, Low, Close, Volume
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # Download data
+    df = yf.download(ticker, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval='1d')
+    
+    # Optionally, reset index if needed
+    df.reset_index(inplace=True)
+    
+    return df
 
 

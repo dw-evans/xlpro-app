@@ -879,10 +879,12 @@ def show(val):
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
-    elif tval == pd.Series:
-        tdst = ndarray2d
-        val_adj = val.to_numpy()
-        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+    # elif tval == pd.Series:
+    #     tdst = ndarray2d
+    #     val_adj = val.to_numpy()
+    #     ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+    #     calc_success = True
+
 
     elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
         # XXX - todo - fix tuple hack in excelarrayconverter class!
@@ -898,12 +900,20 @@ def show(val):
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
+
     elif isinstance(val, Exception):
         raise val
     
     elif tval == str:
         ret = val
         calc_success = True
+
+    else:
+        try:
+            ret = ExcelArrayConverter(np.array(tuple(val)), tdst=ndarray2d)
+            calc_success = True
+        except Exception as e:
+            raise Exception(f"unable to convert value using ndarray2d as last resort: {tval}")
     
     if calc_success:
         return xlproExpandedType(ret)
@@ -926,6 +936,19 @@ def show(val):
     # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
     raise TypeError(f"type {repr(tval)} is not supported")
 
+import datetime
+
+def datetime_to_excel(dt: datetime.datetime) -> float:
+    """
+    Converts a Python datetime object to an Excel serial number.
+    """
+    excel_epoch = datetime.datetime(1899, 12, 30)  # Excel epoch (1900-01-01 minus 2 days for leap bug)
+    delta = dt - excel_epoch
+    return delta.days + (delta.seconds + delta.microseconds / 1e6) / 86400
+
+def excel_to_datetime(serial: float) -> datetime.datetime:
+    excel_epoch = datetime.datetime(1899, 12, 30)
+    return excel_epoch + datetime.timedelta(days=serial)
 
 
 def px_to_pt(px, dpi):
@@ -1020,6 +1043,8 @@ def add(val:np.ndarray, rhs):
 def subtract(val:np.ndarray, rhs):
     return val - rhs
 
+def condense(iterable_val):
+    return xlproCollapsedType(iterable_val)
 
 def pytype(val):
     if val is None:
@@ -1038,6 +1063,11 @@ def pystr(val):
     if val is None:
         return None
     return str(val)
+
+def pylen(val):
+    if val is None:
+        return None
+    return len(val)
 
 def pyhash(vals):
     s = "".join([str(x) if x in (float, int, str) else str(id(x)) for x in vals])
@@ -1075,7 +1105,7 @@ def pygetitem(obj, val:int):
     """Typed wrapper for getitem"""
     return operator.getitem(obj, val)
     
-def pygetattr(obj, attrname:str, default:Any):
+def pygetattr(obj, attrname:str, default:Any=None):
     """Typed wrapper for getattr"""
     return getattr(obj, attrname, default)
     

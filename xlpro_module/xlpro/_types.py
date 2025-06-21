@@ -144,12 +144,6 @@ class ExcelArrayConverter:
     """
     def __new__(cls, val:Any, tdst:type):
 
-        # excel will provide a range as tuple[tuple]
-        # or a 1x1 range as a value.
-
-        if tdst == list1d[str]:
-            pass
-
         # return the incoming value if not a 2d array needing conversion
         if not isinstance(val, (tuple, list)):
             return val
@@ -170,7 +164,7 @@ class ExcelArrayConverter:
             intermediate = np.array(val)
             shape = intermediate.shape
             # implicitly the shape is 2d, convert it to the user chosen list or ndarray
-            if all([x > 1 for x in shape]):
+            if (not len(shape) == 1) and (all([x > 1 for x in shape])):
                 raise TypeError("Provided value is not compatible with list1d")
             if compare_generic_aliases(tdst, list1d):
                 return intermediate.flatten().tolist()

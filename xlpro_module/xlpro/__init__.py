@@ -25,6 +25,10 @@ from xlpro._utils import (
     div,
     add,
     subtract,
+    datetime_to_excel,
+    excel_to_datetime,
+    pylen,
+    condense,
 )
 
 from xlpro._wrappers import (

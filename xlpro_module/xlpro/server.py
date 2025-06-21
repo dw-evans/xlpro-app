@@ -992,6 +992,10 @@ class xlproWorkspace:
                 pass
             if func.__name__ == "mpl_add_line_unique":
                 pass
+            if func.__name__ == "visualise_color":
+                pass
+            if func.__name__ == "show":
+                pass
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
                 ret = f(*args, **kwargs)
@@ -1476,7 +1480,7 @@ class ClientManager:
                         val_modified.append(f"PyObj<{uid}>_{i}")
 
                 # create a *_expanded variant of the uid result display
-                self._set_result_display(f"{uid}_expanded", np.array(val_modified, dtype=object))
+                self._set_result_display(f"{uid}_expanded", np.array(val_modified, dtype=object).reshape(-1,1))
 
                 pass
 
