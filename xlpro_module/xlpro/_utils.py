@@ -1057,7 +1057,7 @@ def pt_to_px(pt, dpi):
     return pt / 72 * dpi
 
 
-def show_image(val, name:str, 
+def _show_image(val, name:str, 
     # sizex:float=None, sizey:float=None, dpi:int, format:str,
     ):
     if val is None:
@@ -1124,26 +1124,28 @@ def show_image(val, name:str,
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
-def show_image_with_seed(val, name:str, seed):
-    return show_image(val, name)
+def show_image(val, name:str, seed):
+    return _show_image(val, name)
 
-def pow(val:np.ndarray, exp):
-    return val ** exp
 
-def mul(val:np.ndarray, rhs):
-    return val * rhs
 
-def div(val:np.ndarray, rhs):
-    return val / rhs
+def pypow(val:np.ndarray, exp):
+    return val.__pow__(exp)
 
-def add(val:np.ndarray, rhs):
-    return val + rhs
+def pymul(val:np.ndarray, rhs):
+    return val.__mul__(rhs)
 
-def subtract(val:np.ndarray, rhs):
-    return val - rhs
+def pydiv(val:np.ndarray, rhs):
+    return val.__truediv__(rhs)
 
-def condense(iterable_val):
-    return xlproCollapsedType(iterable_val)
+def pymod(val:np.ndarray, rhs):
+    return val.__divmod__(rhs)
+
+def pyadd(val:np.ndarray, rhs):
+    return val.__add__(rhs)
+
+def pysub(val:np.ndarray, rhs):
+    return val.__sub__(rhs)
 
 def pytype(val):
     if val is None:
@@ -1153,25 +1155,49 @@ def pytype(val):
     ret = str(type(val))
     return ret
 
+def pynot(val):
+    return not val
+
+def pyeq(val, rhs):
+    return val.__eq__(rhs)
+
+def pyne(val, rhs):
+    return val.__ne_(rhs)
+
+def pylt(val, rhs):
+    return val.__lt__(rhs)
+
+def pyle(val, rhs):
+    return val.__le__(rhs)
+
+def pygt(val, rhs):
+    return val.__gt__(rhs)
+
+def pyge(val, rhs):
+    return val.__ge__(rhs)
+
 def pyrepr(val):
-    # if val is None:
-        # return None
     return repr(val)
 
 def pystr(val):
-    # if val is None:
-        # return None
     return str(val)
 
 def pylen(val):
-    # if val is None:
-        # return None
     return len(val)
 
-def pyhash(vals):
+def pyshape(val):
+    return val.shape
+
+def pyhash(vals:ndarray1d):
     s = "".join([str(x) if x in (float, int, str) else str(id(x)) for x in vals])
     return hash(s)
         
+def condense(iterable_val):
+    return _types.xlproCollapsedType(iterable_val)
+
+def uncondense(condensed_val):
+    return _types.xlproExpandedType(condensed_val)
+
 
 # def vectorize(func_name:str, args_list) -> list1d:
 #     ret = []
@@ -1180,13 +1206,13 @@ def pyhash(vals):
 #     for args in args_list
 #         ret.append()
 
-def int2rgb(color:int): # -> tuple[int, int, int]:
+def _int2rgb(color:int): # -> tuple[int, int, int]:
     r = color & 0xFF
     g = (color >> 8) & 0xFF
     b = (color >> 16) & 0xFF
     return (r, g, b)
 
-def rgb2int(color:tuple[int, int, int]):
+def _rgb2int(color:tuple[int, int, int]):
     r, g, b = color
     return (b << 16) + (g << 8) + r
 
@@ -1213,7 +1239,7 @@ def _replace_pynone_strs(val, cast:bool=True):
     if isinstance(val, str):
         ret =  None if val == XLPRO_NONE_STR else val
     if isinstance(val, np.ndarray):
-        ret = nd_replace_pynone_pyempty_strs(val, cast=cast)
+        ret = nd_replace_pynone_strs(val, cast=cast)
     # elif isinstance(val, (pd.DataFrame, pd.Series)):
     #     ret = pd_replace_pynone_strs(val, cast=cast)
     elif isinstance(val, (list, tuple)):
@@ -1233,7 +1259,7 @@ def _replace_pynone_strs(val, cast:bool=True):
         ret = val
     return ret
 
-def nd_replace_pynone_pyempty_strs(arr: np.ndarray, cast:bool) -> np.ndarray:
+def nd_replace_pynone_strs(arr: np.ndarray, cast:bool) -> np.ndarray:
     """
     Replaces occurrences of the string 'pynone' in a NumPy array with None.
     Works on object dtype arrays.
@@ -1293,7 +1319,7 @@ def nd_replace_pynone_pyempty_strs(arr: np.ndarray, cast:bool) -> np.ndarray:
 #     return df
 
 XLAPP_LOCK = threading.Lock()
-
+# No idea if this actually helps
 def comsafe(func):
     @wraps(func)
     def inner(*args, **kwargs):
@@ -1302,7 +1328,6 @@ def comsafe(func):
             return func(*args, **kwargs)
         # return run_on_main_thread(func)(*args, **kwargs)
     return inner
-
 
 @comsafe
 def create_table_if_not_exists(caller, table_name:str):
