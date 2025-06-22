@@ -77,7 +77,7 @@ SUB_CALLER_FLAG_STRING = "SUB_CALLER_FLAG_STRING"
 
 class xlproServer:
     _public_methods_ = [
-        "getpid",
+        # "getpid",
 
         "register_and_configure_wb_workspace",
         "register_functions_in_vba",
@@ -85,14 +85,15 @@ class xlproServer:
 
         "execute_function_async",
         "execute_sub_async",
+        "force_refresh_area_calculation",
 
-        "shutdown_workspace",
-        "shutdown",
+        # "shutdown_workspace",
+        # "shutdown",
 
         "get_vba_sync_text",
         "get_vba_sync_text_subs",
 
-        "__dev_shutdown",
+        # "__dev_shutdown",
     ]
     # _reg_progid_ = config.progid
     _reg_clsid_ = "undefined"
@@ -246,6 +247,18 @@ class xlproServer:
         _utils.comarshal_release_and_get_stream(wb) # marshalling ok afaik
         return wb_path
         # return utils.hash_str(wb_path)
+
+
+    def force_refresh_area_calculation(self, wb_dispatch, rng):
+        workspace = self._get_workspace_from_wb(wb_dispatch)
+        rng_dispatch = Dispatch(rng)
+        shtname = rng_dispatch.Parent.Name
+        for area in rng_dispatch.Areas:
+            for cell in area.Cells:
+                workspace.force_clear_addr(sheetaddr=shtname + cell.Address)
+            _utils.comsafe(lambda: rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area))()
+
+
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         # marshalling ok afaik - excel vba interface
@@ -607,6 +620,13 @@ class xlproWorkspace:
             # sys.exit()
             # return 
             # return repr(errors.xlproUnhandledException(repr(e)))
+    
+    def force_clear_addr(self, sheetaddr):
+        with self._caller_function_count_map_lock:
+            uids = self._caller_function_count_map.get(sheetaddr, [])
+            for uid in uids:
+                self.clear_uid(uid)
+
 
     def execute_function_async(self, caller, fname, args):
         try:
@@ -624,19 +644,15 @@ class xlproWorkspace:
 
             caller_dispatch = Dispatch(caller)
             caller_addr = caller_dispatch.Address
+            caller_sheetaddr = caller_dispatch.Parent.Name + caller_dispatch.Address
 
-            calling_time = time.time_ns()
+            # calling_time = time.time_ns()
 
-
-
-            uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
+            uid = caller_sheetaddr + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
             self._uid_args_cache[uid] = args
-
-
-
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
@@ -662,10 +678,10 @@ class xlproWorkspace:
             # if the number of called functions from a caller exceeds a threshold, pop off the left uid 
             # and clear it 
             with self._caller_function_count_map_lock:
-                if not caller_addr in self._caller_function_count_map.keys():
-                    self._caller_function_count_map[caller_addr]  = [uid]
+                if not caller_sheetaddr in self._caller_function_count_map.keys():
+                    self._caller_function_count_map[caller_sheetaddr]  = [uid]
                 else:
-                    l:list = self._caller_function_count_map[caller_addr]
+                    l:list = self._caller_function_count_map[caller_sheetaddr]
                     l.append(uid)
                     if len(l) > 32:
                         spent_uid = l.pop(0)
