@@ -353,6 +353,9 @@ class xlproWorkspace:
         self._caller_addr_timer_map_lock = threading.Lock() # XXX - todo - not used.
         self._caller_addr_timer_map:dict=None
 
+        self._caller_function_count_map_lock = threading.Lock()
+        self._caller_function_count_map:dict=None
+
         # maps the uid to the caller and function hash
 
         self._pending_function_queue = queue.Queue()
@@ -491,6 +494,8 @@ class xlproWorkspace:
             self._uid_subresults_display_map = {}
         with self._caller_addr_timer_map_lock:
             self._caller_addr_timer_map = {}
+        with self._caller_function_count_map_lock:
+            self._caller_function_count_map = {}
 
         self._worker_manager._clear_all_threads()
         force_clear_queue(self._pending_function_queue)
@@ -630,6 +635,9 @@ class xlproWorkspace:
 
             self._uid_args_cache[uid] = args
 
+
+
+
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
                 with self._uid_result_iscomplete_map_lock:
@@ -651,6 +659,19 @@ class xlproWorkspace:
                         return ret
                 
 
+            # if the number of called functions from a caller exceeds a threshold, pop off the left uid 
+            # and clear it 
+            with self._caller_function_count_map_lock:
+                if not caller_addr in self._caller_function_count_map.keys():
+                    self._caller_function_count_map[caller_addr]  = [uid]
+                else:
+                    l:list = self._caller_function_count_map[caller_addr]
+                    l.append(uid)
+                    if len(l) > 32:
+                        spent_uid = l.pop(0)
+                        self.clear_uid(spent_uid)
+
+
             # When to wipe an existing calculation...
             # Current process: 
             # send caller, fname, args to xlpro server
@@ -660,26 +681,26 @@ class xlproWorkspace:
             # Do not wipe any calculations, will cost speed
             # Find way to identify sub calls from a cell
 
-            with self._caller_address_uid_map_lock:
-                # the hash will be constant for a function/args/caller combination so this is valid
-                if caller_addr in self._caller_address_uid_map.keys():
-                    # XXX - todo - this chain will wipe nested calculations within the same cell
-                    # Even if we check which function is being executed we would still fail if the same
-                    # nested function call occurs from the same cell.
-                    # The function hash might pay to be generated from vba using cell range addrs
-                    # Then we canheck if ...
+            # with self._caller_address_uid_map_lock:
+            #     # the hash will be constant for a function/args/caller combination so this is valid
+            #     if caller_addr in self._caller_address_uid_map.keys():
+            #         # XXX - todo - this chain will wipe nested calculations within the same cell
+            #         # Even if we check which function is being executed we would still fail if the same
+            #         # nested function call occurs from the same cell.
+            #         # The function hash might pay to be generated from vba using cell range addrs
+            #         # Then we canheck if ...
 
-                    # race condition hack, sleep if the last call from the cell was too soon!
-                    # with self._caller_addr_timer_map_lock:
-                    #     if not caller_addr in self._caller_addr_timer_map:
-                    #         self._caller_addr_timer_map[caller_addr] = calling_time
-                    #     else:
-                    #         dt = self._caller_addr_timer_map[caller_addr] - calling_time
-                    #         if dt < CALLER_THROTTLE_TIME_NS:
-                    #             time.sleep(dt/1e9)
+            #         # race condition hack, sleep if the last call from the cell was too soon!
+            #         # with self._caller_addr_timer_map_lock:
+            #         #     if not caller_addr in self._caller_addr_timer_map:
+            #         #         self._caller_addr_timer_map[caller_addr] = calling_time
+            #         #     else:
+            #         #         dt = self._caller_addr_timer_map[caller_addr] - calling_time
+            #         #         if dt < CALLER_THROTTLE_TIME_NS:
+            #         #             time.sleep(dt/1e9)
 
-                    self.clear_uid(self._caller_address_uid_map[caller_addr])
-                self._caller_address_uid_map[caller_addr] = uid
+            #         self.clear_uid(self._caller_address_uid_map[caller_addr])
+            #     self._caller_address_uid_map[caller_addr] = uid
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
