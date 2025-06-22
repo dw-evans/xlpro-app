@@ -543,7 +543,8 @@ class xlproWorkspace:
 
     @staticmethod
     def hash_excel_function_call(*args:typing.Iterable[str]):
-        return _utils.hash_str(", ".join([str(x) for x in args]))
+        import random
+        return _utils.hash_str(", ".join([str(x if x is not None else random.random()) for x in args]))
 
     def execute_sub_async(self, fname):
         try:
@@ -995,6 +996,8 @@ class xlproWorkspace:
             if func.__name__ == "visualise_color":
                 pass
             if func.__name__ == "show":
+                pass
+            if func.__name__ == "mpl_set_xlims":
                 pass
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:

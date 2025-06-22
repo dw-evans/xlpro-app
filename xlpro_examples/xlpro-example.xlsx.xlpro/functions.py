@@ -1,6 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
 
+import matplotlib.axes
+import matplotlib.figure
+
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({
@@ -128,12 +131,19 @@ def mpl_set_yax_name(ax, name:str):
     ax.set_ylabel(name)
     return ax
 
+import random
 
-def mpl_set_xlims(ax:matplotlib.axes.Axes, xlims:ndarray1d):
+def mpl_set_xlims(ax:matplotlib.axes.Axes, xlims:list1d, seed=None):
+    ax.relim()
+    ax.autoscale_view(scalex=True, scaley=False)  # Autoscale just y-axis
     ax.set_xlim(*xlims)
+    return random.random()
 
-def mpl_set_ylims(ax:matplotlib.axes.Axes, ylims:ndarray1d):
+def mpl_set_ylims(ax:matplotlib.axes.Axes, ylims:list1d, seed=None):
+    ax.relim()
+    ax.autoscale_view(scalex=False, scaley=True)  # Autoscale just y-axis
     ax.set_ylim(*ylims)
+    return random.random()
 
 
 

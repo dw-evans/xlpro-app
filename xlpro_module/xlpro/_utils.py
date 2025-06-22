@@ -718,9 +718,10 @@ def pre_validate_args(args:tuple|list, kwargs:dict):
         pre_validate_arg(arg=arg)
         
 def pre_validate_arg(arg):
-    if arg is None:
-        raise errors.ExcelArugmentIsNoneException()
-    elif is_arg_promise(arg):
+    # args being None at this point are now supported with addition of pyNone
+    # if arg is None:
+    #     raise errors.ExcelArugmentIsNoneException()
+    if is_arg_promise(arg):
         raise errors.ArugmentNotReadyException()
     elif isinstance(arg, Exception):
         raise errors.xlproArgumentExceptionError()
@@ -729,6 +730,9 @@ def pre_validate_arg(arg):
 
 
 def pre_p_an_arg(cval, target_type):
+    """Preprocess an argument and attempt to cast to a target type.
+    E.g. take a 2D tuple of values from Excel, and cast it to a np.ndarray
+    """
     # 0. raise error if the argument is currently a promise!
     # XXX - todo - check if this is redundant, I suspect it is
     if is_arg_promise(cval):
@@ -738,12 +742,13 @@ def pre_p_an_arg(cval, target_type):
     if is_arg_stringified_exception(cval):
         raise errors.xlproArgumentExceptionError()
     
+    # Replace the pynone strings for arrays
+    cval = _replace_pynone_strs(cval, True)
+
     # 1. check if its an xlproptr. Replace val with the ptr result
     # cval = copy.copy(val)
     if xlproptr.is_ptr(cval):
         cval = xlproptr.decode(cval).evaluate()
-
-    # if m:=re.match("^PyObj<(.*)>$"):
     
     # 2. convert an argument to a target type
     ppval = _types.ExcelArrayConverter(cval, target_type)
@@ -751,6 +756,12 @@ def pre_p_an_arg(cval, target_type):
 
 
 def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
+    """Preprocess the arguments of a function using the function signature
+    type-annotations to attempt casting to the desired input type.
+
+    Recently added support for kwarg-only arguments, not thoroughly tested.
+     
+    """
     if not args is None and not isinstance(args, typing.Iterable):
         raise TypeError("args must be an iterable")
     if not kwargs is None and not isinstance(kwargs, dict):
@@ -766,6 +777,8 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
     args_was_none = args == None
     kwargs_was_none = kwargs == None
 
+    if func.__name__ == "mpl_set_xlims":
+        pass
 
     if args is not None:
         for val, (a, t) in zip(args, args_and_types):
@@ -781,10 +794,10 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
 
             # check if the optional argument string has been passed
             if a in default_arguments.keys():
+                # replace pyEmpty trigger with the default value
                 if val == XLPRO_EMPTY_STR:
                     val = default_arguments[a]
-                elif val == XLPRO_NONE_STR:
-                    val = None
+                # pyNone handling moved elsewhere
             ppargs.append(pre_p_an_arg(val, t))
 
     if kwargs is not None:
@@ -794,10 +807,10 @@ def preprocess_arguments(func, args:typing.Iterable=None, kwargs:dict=None):
                     # check if the optional argument string has been passed
                     if a in default_arguments.keys():
                         if isinstance(val, str):
+                            # replace pyEmpty trigger with the default value
                             if val == XLPRO_EMPTY_STR:
                                 val = default_arguments[a]
-                            elif val == XLPRO_NONE_STR:
-                                val = None
+                            # pyNone handling moved elsewhere
                     ppkwargs[a] = (pre_p_an_arg(val, t))
                     break
 
@@ -817,7 +830,7 @@ class ThreadWithException(threading.Thread):
             if self._target:
                 self._target(*self._args, **self._kwargs)
         except Exception as e:
-            self.exception = e  # Store the exceptionimport
+            self.exception = e  # Store the exception
 
     def get_exception(self):
         return self.exception
@@ -1055,18 +1068,18 @@ def pytype(val):
     return ret
 
 def pyrepr(val):
-    if val is None:
-        return None
+    # if val is None:
+        # return None
     return repr(val)
 
 def pystr(val):
-    if val is None:
-        return None
+    # if val is None:
+        # return None
     return str(val)
 
 def pylen(val):
-    if val is None:
-        return None
+    # if val is None:
+        # return None
     return len(val)
 
 def pyhash(vals):
@@ -1110,39 +1123,88 @@ def pygetattr(obj, attrname:str, default:Any=None):
     return getattr(obj, attrname, default)
     
 
-# class PyNone:
-#     pass
+def _replace_pynone_strs(val, cast:bool=True):
+    if isinstance(val, str):
+        ret =  None if val == XLPRO_NONE_STR else val
+    if isinstance(val, np.ndarray):
+        ret = nd_replace_pynone_pyempty_strs(val, cast=cast)
+    # elif isinstance(val, (pd.DataFrame, pd.Series)):
+    #     ret = pd_replace_pynone_strs(val, cast=cast)
+    elif isinstance(val, (list, tuple)):
+        dtype = type(val)
+        val2:np.ndarray = _replace_pynone_strs(np.array(val, dtype=object), cast)
+        if dtype == tuple:
+            if len(val2.shape) == 2:
+                val3 = tuple(map(tuple, val2.tolist()))
+            elif len(val2.shape) == 1:
+                val3 = val2.tolist()
+            else:
+                raise Exception("what is a 2+d arr doing here? Not supported")
+        else:
+            val3 = val2.tolist()
+        ret = val3
+    else:
+        ret = val
+    return ret
 
-#     def __repr__(self):
-#         return "<pynone>"
+def nd_replace_pynone_pyempty_strs(arr: np.ndarray, cast:bool) -> np.ndarray:
+    """
+    Replaces occurrences of the string 'pynone' in a NumPy array with None.
+    Works on object dtype arrays.
+    """
     
-#     def __str__(self):
-#         return repr(self)
-    
-#     @staticmethod
-#     def is_pynone(s:str):
-#         return s == "<pynone>"
+    idxs = arr == XLPRO_NONE_STR
+    # Vectorized replacement using boolean indexing
+    if idxs.any():
+        if arr.dtype != object:
+            arr = arr.astype(object)
+        arr[arr == XLPRO_NONE_STR] = None
 
+    return arr
+    # # Try to cast to numeric if possible
+    # if cast:
+    #     # Pandas handles type coercion better
+    #     if len(arr.shape) <= 2:
+    #         for col in range(arr.shape[1]):
+    #             try:
+    #                 new_col = pd.to_numeric(arr[:, col], errors='coerce')
+    #                 arr[:, col] = new_col
+    #             except (ValueError, TypeError):
+    #                 pass
+    #     else:
+    #         raise Exception("How did a non 1 or 2d array get in here?")
+    # return arr
 
-# def pynone():
-#     """Returns Python None"""
-#     return PyNone()
+# def pd_replace_pynone_strs(_df: pd.DataFrame | pd.Series, cast: bool) -> pd.DataFrame | pd.Series:
+#     """
+#     Replaces all occurrences of the string 'pynone' in a Series or DataFrame with np.nan,
+#     and optionally casts columns to their inferred types after replacement.
 
-class xlRange:
-    """Signal class to preserve range passing version of xl.Range"""
-    pass
+#     Parameters:
+#     - _df: A pandas DataFrame or Series.
+#     - cast: If True, attempt to convert to the appropriate inferred types (e.g. int, float).
 
+#     Returns:
+#     - A new DataFrame or Series with replacements and optional type casting.
+#     """
+#     # Replace 'pynone' (case insensitive) with np.nan
+#     df = _df.replace(XLPRO_NONE_STR, np.nan, regex=False)
 
-# import queue
-# MAIN_THREAD_QUEUE = queue.Queue()
-
-# # Wrapper to run function on the main thread
-# def run_on_main_thread(func):
-#     def wrapper(*args, **kwargs):
-#         result_q = queue.Queue()
-#         MAIN_THREAD_QUEUE.put((func, args, kwargs, result_q))
-#         return result_q.get()  # block until result is available
-#     return wrapper
+#     if cast:
+#         if isinstance(df, pd.Series):
+#             # Try to cast the Series to numeric if possible
+#             try:
+#                 df = pd.to_numeric(df)
+#             except Exception:
+#                 pass
+#         elif isinstance(df, pd.DataFrame):
+#             # Apply casting per column
+#             for col in df.columns:
+#                 try:
+#                     df[col] = pd.to_numeric(df[col])
+#                 except Exception:
+#                     pass  # keep original if it can't be cast
+#     return df
 
 XLAPP_LOCK = threading.Lock()
 
@@ -1154,27 +1216,6 @@ def comsafe(func):
             return func(*args, **kwargs)
         # return run_on_main_thread(func)(*args, **kwargs)
     return inner
-
-# def comsafe(func):
-#     @wraps(func)
-#     def inner(*args, **kwargs):
-#         with XLAPP_LOCK:
-#             return func(*args, **kwargs)
-#     return inner
-
-# def comsafe(func):
-#     @wraps(func)
-#     def inner(*args, **kwargs):
-#         try:
-#             if not XLAPP_LOCK.acquire(timeout=5):
-#                 raise RuntimeError("Timeout waiting for Excel COM access")
-#             return func(*args, **kwargs)
-#         except Exception as e:
-#             pass
-
-#         finally:
-#             XLAPP_LOCK.release()
-#     return inner
 
 
 @comsafe
@@ -1204,8 +1245,6 @@ def create_table_if_not_exists(caller, table_name:str):
         newtbl.Name = table_name
 
     return f"xlTable(\"{table_name}\" @ '{tbl_range.Parent.Name}'!{tbl_range.Address})"
-
-
 
 
 @comsafe
@@ -1259,9 +1298,7 @@ def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
     return f"xlTable(\"{table_name}\" @ '{header_range.Parent.Name}'!{header_range.Address})"
 
 
-
 def replace_table_with_df(df: pd.DataFrame, table_name: str = "Table1"):
-
     # Locate the table
     found = False
     for ws in wb.Worksheets:

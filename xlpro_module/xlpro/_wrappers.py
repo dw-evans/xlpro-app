@@ -244,6 +244,9 @@ def _pyobj_func_wrapper(func):
         _utils.pre_validate_args(args, kwargs)
         ppargs, ppkwargs = _utils.preprocess_arguments(func=func, args=args, kwargs=kwargs)
 
+        if func.__name__ == "mpl_set_xlims":
+            pass
+
         # XXX - todo - could add multilevel nesting to this...
         all_args = ppargs + [v for v in ppkwargs.values()]
         for a in all_args:

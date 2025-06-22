@@ -29,6 +29,7 @@ from xlpro._utils import (
     excel_to_datetime,
     pylen,
     condense,
+    _replace_pynone_strs,
 )
 
 from xlpro._wrappers import (
