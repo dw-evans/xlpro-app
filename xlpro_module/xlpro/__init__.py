@@ -30,6 +30,12 @@ from xlpro._utils import (
     pylen,
     condense,
     _replace_pynone_strs,
+    datetime_to_excel,
+    excel_to_datetime,
+    datetime_to_excel_vectorized,
+    excel_to_datetime_vectorized,
+    pd_df_convert_dt_to_excel_serial,
+    pd_series_convert_dt_to_excel_serial,
 )
 
 from xlpro._wrappers import (

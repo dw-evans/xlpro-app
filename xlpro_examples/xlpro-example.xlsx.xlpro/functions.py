@@ -5,6 +5,7 @@ import matplotlib.axes
 import matplotlib.figure
 
 import matplotlib.pyplot as plt
+import random
 
 plt.rcParams.update({
     "font.family": "Consolas", 
@@ -119,8 +120,6 @@ def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d, loc:s
         frameon=False,            # No border or background
         loc=loc,
     )
-
-
     return legend
 
 def mpl_set_xax_name(ax, name:str):
@@ -131,17 +130,35 @@ def mpl_set_yax_name(ax, name:str):
     ax.set_ylabel(name)
     return ax
 
-import random
+def mpl_set_ax_title(ax:matplotlib.axes.Axes, title:str):
+    ax.set_title(title)
+    return random.random()
+
+def mpl_set_fig_suptitle(fig:matplotlib.figure.Figure, suptitle:str):
+    fig.suptitle(suptitle)
+    return random.random()
+
 
 def mpl_set_xlims(ax:matplotlib.axes.Axes, xlims:list1d, seed=None):
-    ax.relim()
-    ax.autoscale_view(scalex=True, scaley=False)  # Autoscale just y-axis
-    ax.set_xlim(*xlims)
+    # ax.relim()
+    # ax.autoscale_view()
+    # xlims1 = ax.get_xlim()
+    # ax.set_xlim(*xlims1)
+    try:
+        ax.set_xlim(*xlims)
+    except:
+        try:
+            ax.set_xlim(*xlims)
+        except Exception as e:
+            raise e
+
     return random.random()
 
 def mpl_set_ylims(ax:matplotlib.axes.Axes, ylims:list1d, seed=None):
-    ax.relim()
-    ax.autoscale_view(scalex=False, scaley=True)  # Autoscale just y-axis
+    # ax.relim()
+    # ax.autoscale_view()
+    # ylims1 = ax.get_ylim()
+    # ax.set_ylim(*ylims1)
     ax.set_ylim(*ylims)
     return random.random()
 

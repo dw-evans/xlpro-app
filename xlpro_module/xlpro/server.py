@@ -42,6 +42,7 @@ from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
 
+SLEEP_DURATION = 0.01
 
 def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = workbook_path.parent / f"{workbook_path.name}.xlpro"
@@ -66,6 +67,10 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
 
 def get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     return workbook_path.parent / f"{workbook_path.name}.xlpro"
+
+def force_clear_queue(q: queue.Queue):
+    with q.mutex:
+        q.queue.clear()
 
 
 SUB_CALLER_FLAG_STRING = "SUB_CALLER_FLAG_STRING"
@@ -303,8 +308,12 @@ class xlproServer:
                 return self._workspace_map[self._workspace_uid_to_workbook_path[uid]]
 
 
+CALLER_THROTTLE_TIME_NS = 200_000_000
+
 class xlproWorkspace:
     def __init__(self, server:xlproServer, wb_uid, uid):
+
+
         self._server = server
         self._wb_uid = wb_uid
         self._wb_path = Path(wb_uid)
@@ -341,6 +350,8 @@ class xlproWorkspace:
         self._uid_args_cache_lock = threading.Lock() # XXX - todo - not used.
         self._uid_args_cache:dict=None
 
+        self._caller_addr_timer_map_lock = threading.Lock() # XXX - todo - not used.
+        self._caller_addr_timer_map:dict=None
 
         # maps the uid to the caller and function hash
 
@@ -474,11 +485,17 @@ class xlproWorkspace:
             self._caller_address_uid_map = {} # uid: address
         with self._uid_args_cache_lock:
             self._uid_args_cache = {}
-
         with self._uid_subresults_map_lock:
-            self._uid_subresults_map ={}
+            self._uid_subresults_map = {}
         with self._uid_subresults_display_map_lock:
-            self._uid_subresults_display_map ={}
+            self._uid_subresults_display_map = {}
+        with self._caller_addr_timer_map_lock:
+            self._caller_addr_timer_map = {}
+
+        self._worker_manager._clear_all_threads()
+        force_clear_queue(self._pending_function_queue)
+        force_clear_queue(self._result_queue)
+        force_clear_queue(self._client_recalculate_queue)
 
         # self._worker_manager.clear_futures()
 
@@ -543,8 +560,10 @@ class xlproWorkspace:
 
     @staticmethod
     def hash_excel_function_call(*args:typing.Iterable[str]):
-        import random
-        return _utils.hash_str(", ".join([str(x if x is not None else random.random()) for x in args]))
+        return _utils.hash_str(", ".join([str(x) for x in args]))
+        # import random
+        # return _utils.hash_str(", ".join([str(x if x is not None else random.random()) for x in args]))
+        # return _utils.hash_str(", ".join([str(x) for x in args]))
 
     def execute_sub_async(self, fname):
         try:
@@ -598,6 +617,13 @@ class xlproWorkspace:
 
             args_less_reserved = _utils.get_args_minus_reserved(func, args)
 
+            caller_dispatch = Dispatch(caller)
+            caller_addr = caller_dispatch.Address
+
+            calling_time = time.time_ns()
+
+
+
             uid = Dispatch(caller).Address + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
@@ -607,19 +633,23 @@ class xlproWorkspace:
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
                 with self._uid_result_iscomplete_map_lock:
+                    # return_cached = False
                     if self._uid_result_iscomplete_map.get(uid, False):
                         if f"{uid}_expanded" in self._uid_result_display_map:
                             ret = self._uid_result_display_map[f"{uid}_expanded"]
                         else:
                             ret = self._uid_result_display_map[uid]
+                        # if isinstance(ret, str):
+                        #     if ret.startswith("Promise"):
+                        #         logger.warning("Promise is marked complete, ignoring cache")
+                        #     else:
+                        #         return_cached = True
+                        # if return_cached:
+                        #     logger.debug(f"result marked complete, fetched cached result {ret}")
+                        #     return ret
                         logger.debug(f"result marked complete, fetched cached result {ret}")
                         return ret
                 
-            # Clear any lingering calculations coming from this caller if the result isnt cached
-            # downstream functions should pick up on these being deleted
-            caller_dispatch = Dispatch(caller)
-            caller_addr = caller_dispatch.Address
-
 
             # When to wipe an existing calculation...
             # Current process: 
@@ -630,16 +660,26 @@ class xlproWorkspace:
             # Do not wipe any calculations, will cost speed
             # Find way to identify sub calls from a cell
 
-            # with self._caller_address_uid_map_lock:
-            #     # the hash will be constant for a function/args/caller combination so this is valid
-            #     if caller_addr in self._caller_address_uid_map.keys():
-            #         # XXX - todo - this chain will wipe nested calculations within the same cell
-            #         # Even if we check which function is being executed we would still fail if the same
-            #         # nested function call occurs from the same cell.
-            #         # The function hash might pay to be generated from vba using cell range addrs
-            #         # Then we can check if ...
-            #         self.clear_uid(self._caller_address_uid_map[caller_addr])
-            #     self._caller_address_uid_map[caller_addr] = uid
+            with self._caller_address_uid_map_lock:
+                # the hash will be constant for a function/args/caller combination so this is valid
+                if caller_addr in self._caller_address_uid_map.keys():
+                    # XXX - todo - this chain will wipe nested calculations within the same cell
+                    # Even if we check which function is being executed we would still fail if the same
+                    # nested function call occurs from the same cell.
+                    # The function hash might pay to be generated from vba using cell range addrs
+                    # Then we canheck if ...
+
+                    # race condition hack, sleep if the last call from the cell was too soon!
+                    # with self._caller_addr_timer_map_lock:
+                    #     if not caller_addr in self._caller_addr_timer_map:
+                    #         self._caller_addr_timer_map[caller_addr] = calling_time
+                    #     else:
+                    #         dt = self._caller_addr_timer_map[caller_addr] - calling_time
+                    #         if dt < CALLER_THROTTLE_TIME_NS:
+                    #             time.sleep(dt/1e9)
+
+                    self.clear_uid(self._caller_address_uid_map[caller_addr])
+                self._caller_address_uid_map[caller_addr] = uid
 
             # release the com args for use in another thread. convert them to streams
             # args = utils.com_args_release_to_stream_reserved(func, args)
@@ -1232,7 +1272,13 @@ class WorkerManager:
 
 
     def _clear_completed_threads(self):
-        self._threadpool_dict = {uid: t for uid, t in self._threadpool_dict.items() if t.is_alive()}
+        with self._threadpool_dict_lock:
+            self._threadpool_dict = {uid: t for uid, t in self._threadpool_dict.items() if t.is_alive()}
+
+    def _clear_all_threads(self):
+        with self._threadpool_dict_lock:
+            for uid, t in self._threadpool_dict.items():
+                t.join()
 
     def _run(self):
         while not self._stop_event.is_set():
@@ -1247,7 +1293,7 @@ class WorkerManager:
                 except queue.Empty:
                     break
                 self._clear_completed_threads()
-                time.sleep(0.01) # fairness sleep
+                time.sleep(SLEEP_DURATION) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
@@ -1393,6 +1439,8 @@ class ResultsManager:
         # signal that it is complete
         with self._server._uid_result_iscomplete_map_lock:
             logger.debug(f"calculation marked complete {uid}")
+            if uid.startswith("$H$25"):
+                pass
             self._server._uid_result_iscomplete_map[uid] = True
         # remove from the pending function map once successfully completed.
         with self._server._uid_pending_function_map_lock:
@@ -1422,11 +1470,73 @@ class ResultsManager:
                     self._process_queue_element()
                 except queue.Empty:
                     break
-                time.sleep(0.01) # fairness sleep
+                time.sleep(SLEEP_DURATION) # fairness sleep
 
             if self._stop_event.is_set():
                 break 
 
+import pandas as pd
+import datetime
+import decimal
+
+SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION = {
+    # Native Python types
+    str: lambda x: x,
+    bool: lambda x: x,
+    int: lambda x: x,
+    float: lambda x: x,
+    type(None): lambda x: _utils.XLPRO_NONE_STR,
+
+    # NumPy numeric types
+    np.bool_: lambda x: bool(x),
+    np.int8: lambda x: int(x),
+    np.int16: lambda x: int(x),
+    np.int32: lambda x: int(x),
+    np.int64: lambda x: int(x),
+    np.uint8: lambda x: int(x),
+    np.uint16: lambda x: int(x),
+    np.uint32: lambda x: int(x),
+    np.uint64: lambda x: int(x),
+    np.float16: lambda x: float(x),
+    np.float32: lambda x: float(x),
+    np.float64: lambda x: float(x),
+
+    # Complex numbers
+    # np.complex64: lambda x: complex(x),
+    # np.complex128: lambda x: complex(x),
+    # np.complexfloating: lambda x: complex(x),
+
+    # Pandas scalar types
+    pd.Int8Dtype(): lambda x: int(x),
+    pd.Int16Dtype(): lambda x: int(x),
+    pd.Int32Dtype(): lambda x: int(x),
+    pd.Int64Dtype(): lambda x: int(x),
+    pd.UInt8Dtype(): lambda x: int(x),
+    pd.UInt16Dtype(): lambda x: int(x),
+    pd.UInt32Dtype(): lambda x: int(x),
+    pd.UInt64Dtype(): lambda x: int(x),
+    pd.BooleanDtype(): lambda x: bool(x),
+    pd.StringDtype(): lambda x: str(x),
+
+    # Dates / Times
+    # np.datetime64: lambda x: pd.to_datetime(x),
+    # datetime.datetime: lambda x: x,
+    # datetime.date: lambda x: x,
+    # pd.Timestamp: lambda x: x,
+    # np.timedelta64: lambda x: pd.to_timedelta(x),
+    # datetime.timedelta: lambda x: x,
+    # pd.Timedelta: lambda x: x,
+
+    # Decimal
+    # decimal.Decimal: lambda x: float(x),
+    
+}
+
+# handle 128 bit
+if hasattr(np, 'float128'):
+    SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION[np.float128] = lambda x: float(x)
+
+SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION_KEYS = SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION.keys()
 
 class ClientManager:
     """Hooks to the excel client so we can trigger events"""
@@ -1502,6 +1612,8 @@ class ClientManager:
     
     def _update_client_pyobject_result(self, uid) -> None:
         """Update the data for the py_object case (row-major arrays, strings, values)"""
+        if uid.startswith("$H$25"):
+            pass
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val0 = self._get_value(uid)
@@ -1513,7 +1625,11 @@ class ClientManager:
                 logger.warning(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
             else:
-                self._set_result_display(uid, f"PyObj<{uid}>")
+                if type(val) in SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION_KEYS:
+                    self._set_result_display(uid, SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION[type(val0)](val))
+                else:
+                    self._set_result_display(uid, f"PyObj<{uid}>")
+                    # self._set_result_display(uid, val)
 
             # update by resetting the formula
             _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
@@ -1544,6 +1660,8 @@ class ClientManager:
                 self._set_result_display(uid, repr(val))
             else:
                 self._set_result_display(uid, val)
+
+
 
             # update by resetting the formula
             _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
@@ -1595,7 +1713,7 @@ class ClientManager:
 
                 try:
                     shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
-                    time.sleep(0.1)
+                    time.sleep(0.10)
                     shape.Name = xl_name
                 except Exception as e:
                     shape.Delete()
@@ -1641,17 +1759,6 @@ class ClientManager:
 
             pass
 
-            # xxx - todo - hack to skip checks on subroutines
-            # subroutines will never need to be recycled by the client manager
-            # subroutines will be recycled by the results manager since there will
-            # never be any result to reach the client.
-            # so we are ok to just skip the loop here, happy days.
-            caller_dispatch = self._server.get_caller_stream(uid)
-            if caller_dispatch is SUB_CALLER_FLAG_STRING:
-                logger.debug("caller_dispatched checked as None, assuming this is a subroutine and skipping further.")
-                time.sleep(0.01) # copy the fairness sleep
-                continue
-            
             # fetch the result type so we know how to handle it
             with self._server._uid_result_type_map_lock:
                 result_type = self._server._uid_result_type_map[uid]
@@ -1662,12 +1769,22 @@ class ClientManager:
 
             # Decide whether to recycle
             try:
+                # xxx - todo - hack to skip checks on subroutines
+                # subroutines will never need to be recycled by the client manager
+                # subroutines will be recycled by the results manager since there will
+                # never be any result to reach the client.
+                # so we are ok to just skip the loop here, happy days.
+
+                caller_dispatch = self._server.get_caller_stream(uid)
+                if caller_dispatch is SUB_CALLER_FLAG_STRING:
+                    logger.debug("caller_dispatched checked as None, assuming this is a subroutine and skipping further.")
+                    time.sleep(SLEEP_DURATION) # copy the fairness sleep
+                    continue
+                
                 value = self._get_value(uid)
 
                 if isinstance(value, TypeError):
                     pass
-
-
 
                 # handle images every time
                 if type(value) == xlproImage:
@@ -1717,9 +1834,10 @@ class ClientManager:
 
             except AttributeError as e:
                 logger.warning("AttributeError during cell update, Application may be in dialogue")
+            except KeyError as e:
+                logger.critical(f"Error during client queue processing1! {e}")
             except Exception as e:
-                logger.critical(f"Error during client queue processing!")
-                raise e
+                logger.critical(f"Error during client queue processing2! {e}")
             finally:
                 # XXX - Marshalling the caller back to the pool in case
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")
@@ -1734,7 +1852,7 @@ class ClientManager:
             if replace_in_queue:
                 self._server._client_recalculate_queue.put(uid)
 
-            time.sleep(0.01) # fairness sleep
+            time.sleep(SLEEP_DURATION) # fairness sleep
 
 
     def _run(self):

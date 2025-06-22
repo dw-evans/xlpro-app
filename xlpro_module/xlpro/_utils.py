@@ -151,11 +151,20 @@ VB_TYPE_CONVERSION_STRINGS = {
 }
 
 # Use in function definitions
+# VB_TYPE_DECLARATION_STRINGS = {
+#     int: "{} As Long",
+#     float: "{} As Double",
+#     bool: "{} As Boolean",
+#     str: "{} As String",
+#     Any: "{} As Variant",
+# }
+# leave the inputs as variant and cast them only before sending them to xlpro to
+# suit the checkargsready function call
 VB_TYPE_DECLARATION_STRINGS = {
-    int: "{} As Long",
-    float: "{} As Double",
-    bool: "{} As Boolean",
-    str: "{} As String",
+    int: "{} As Variant",
+    float: "{} As Variant",
+    bool: "{} As Variant",
+    str: "{} As Variant",
     Any: "{} As Variant",
 }
 
@@ -886,17 +895,34 @@ def show(val):
     ret = None
     calc_success = False
 
+    # Consider supporting the below types
+    # from pandas.api.types import (
+    #     is_datetime64_any_dtype, # done
+    #     is_timedelta64_dtype, 
+    #     is_categorical_dtype,
+    #     is_bool_dtype, # done?
+    #     is_object_dtype, # definitely not done
+    #     is_integer_dtype, # done
+    #     is_float_dtype, # done
+    #     is_complex_dtype,
+    # )
+
+
     if tval == pd.DataFrame:
         tdst = ndarray2d
-        val_adj = val.to_numpy()
+        # when showing a dataframe, we must convert the dataframe datetime columns to excel serial dates
+        val_adj = pd_df_convert_dt_to_excel_serial(df=val_adj, colname=None, inplace=False)
+        val_adj = val_adj.to_numpy()
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
-    # elif tval == pd.Series:
-    #     tdst = ndarray2d
-    #     val_adj = val.to_numpy()
-    #     ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
-    #     calc_success = True
+    elif tval == pd.Series:
+        tdst = ndarray1d
+        # when showing a pd.series, we should convert the dataframe datetime columns to excel serial dates
+        val_adj = pd_series_convert_dt_to_excel_serial(val)
+        val_adj = val_adj.to_numpy()
+        ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
+        calc_success = True
 
 
     elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
@@ -963,6 +989,66 @@ def excel_to_datetime(serial: float) -> datetime.datetime:
     excel_epoch = datetime.datetime(1899, 12, 30)
     return excel_epoch + datetime.timedelta(days=serial)
 
+
+def datetime_to_excel_vectorized(dt_array):
+    excel_epoch = datetime.datetime(1899, 12, 30)
+
+    # Convert to pandas datetime if needed
+    dt_series = pd.to_datetime(dt_array)
+
+    # Calculate difference
+    delta = dt_series - pd.Timestamp(excel_epoch)
+    
+    return delta.dt.days + delta.dt.seconds / 86400 + delta.dt.microseconds / (86400 * 1e6)
+
+def excel_to_datetime_vectorized(serial_array):
+    excel_epoch = datetime.datetime(1899, 12, 30)
+    serial_array = np.asarray(serial_array, dtype=np.float64)
+    return pd.to_datetime(excel_epoch) + pd.to_timedelta(serial_array, unit="D")
+
+
+def pd_series_convert_dt_to_excel_serial(s: pd.Series) -> pd.Series:
+    """
+    Converts a pandas Series of datetime values to Excel serial number format.
+    
+    Parameters:
+        s (pd.Series): Input Series, expected to be datetime-like.
+
+    Returns:
+        pd.Series: Series of Excel serial numbers.
+    """
+    if pd.api.types.is_datetime64_any_dtype(s):
+        excel_epoch = datetime.datetime(1899, 12, 30)
+        delta = s - pd.Timestamp(excel_epoch)
+        return (
+            delta.dt.days +
+            delta.dt.seconds / 86400 +
+            delta.dt.microseconds / (86400 * 1e6)
+        )
+    return s
+
+def pd_df_convert_dt_to_excel_serial(df: pd.DataFrame, colname: str = None, inplace: bool = False) -> pd.DataFrame:
+    """
+    Converts a datetime column in a DataFrame to Excel serial number format if it is datetime-like.
+    
+    Parameters:
+        df (pd.DataFrame): Input DataFrame.
+        col (str): Column name to check and convert.
+        inplace (bool): Whether to modify the DataFrame in-place. Default False.
+
+    Returns:
+        pd.DataFrame: DataFrame with converted column (or same if not datetime).
+    """
+    if not inplace:
+        df = df.copy()
+    
+    if colname is not None:
+        df[colname] = pd_series_convert_dt_to_excel_serial(df[colname])
+    else:
+        for colname in df.columns:
+            df = pd_df_convert_dt_to_excel_serial(df, colname, inplace=True)
+
+    return df
 
 def px_to_pt(px, dpi):
     return px * 72 / dpi
