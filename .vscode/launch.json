@@ -25,7 +25,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "init",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/test.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
             ],
         },
         {
@@ -35,7 +35,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "start",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/test.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
             ],
         },
         {
@@ -45,7 +45,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "guid",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/test.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
             ],
         },
         {
@@ -55,7 +55,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "write-reqs",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/test.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
             ],
         },
 
@@ -66,7 +66,7 @@
             "subProcess": true,
             "connect":{
                 "host":"localhost",
-                "port":58136
+                "port":5678
             },
             "pathMappings":[
                 {

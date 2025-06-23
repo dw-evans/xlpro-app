@@ -41,19 +41,29 @@
         <group id="group5" label="Undo/Redo Custom"> 
           <button id="Button8" image="gear-24" size="large" 
                   label="Undo" 
-                  screentip="start vs code" 
+                  screentip="x" 
                   onAction="ButtonPerformUndo"/> 
           <button id="Button9" image="gear-24" size="large" 
                   label="Redo" 
-                  screentip="start vs code" 
+                  screentip="x" 
                   onAction="ButtonPerformRedo"/> 
+        </group> 
+        <group id="group6" label="Tools"> 
+          <button id="Button10" image="gear-24" 
+                  label="Force Recalc Regions" 
+                  screentip="x" 
+                  onAction="force_refresh_area_calculationButton"/> 
+          <button id="Button11" image="gear-24" 
+                  label="Restart Undo Tracker" 
+                  screentip="x" 
+                  onAction="ResetUndoButton"/> 
         </group> 
         <!-- <group id="group5" label="Excel Calcs"> 
           <button id="Button7" image="gear-16" 
                   label="Manual" 
                   screentip="something" 
                   onAction="xlproStartIDE"/> 
-          <button id="Button8" image="gear-16" 
+        <button id="Button8" image="gear-16" 
                   label="Automatic" 
                   screentip="start vs code" 
                   onAction="xlproStartIDE"/> 

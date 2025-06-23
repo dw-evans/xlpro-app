@@ -1,5 +1,3 @@
-# > C:\Users\Daniel Evans\projects\xlpro\xlpro_testing\main.xlsx.xlpro\subroutines.py
-# xlpro will automatically detect functions in this file as Excel subroutines.
 import tkinter as tk
 import subprocess
 import sys

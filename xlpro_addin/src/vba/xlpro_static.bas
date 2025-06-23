@@ -295,6 +295,33 @@ Sub OpenWorkingDirButton(ByRef control As Office.IRibbonControl)
     OpenWorkingDir
 End Sub
 
+Private Sub force_refresh_area_calculation(ByRef Wb As Workbook, rng as Range)
+
+    Dim guid As String
+    guid = get_workbook_guid_map_value(Wb.name)
+    If guid = "" Then
+        guid = get_workbook_guid(Wb)
+        set_workbook_guid_map_pairing Wb.name, guid
+    End If
+
+    Debug.Print "XLPRO_GUID: " & guid
+
+    Dim xlpro_async As Object
+    Set xlpro_async = GetObject("new: " & guid)
+
+    xlpro_async.force_refresh_area_calculation Wb, rng
+
+End Sub
+
+Sub force_refresh_area_calculationButton(ByRef control As Office.IRibbonControl)    
+    Dim wb as Workbook
+    set wb = ActiveWorkbook
+    force_refresh_area_calculation wb, Application.Selection
+End Sub
+
+Sub ResetUndoButton(ByRef control As Office.IRibbonControl)    
+    Call ThisWorkbook.ResetEventHandler
+End Sub
 '------------------------------------------------------------------------
 'Items below here are helper subroutines for the addin.
 '------------------------------------------------------------------------
@@ -565,6 +592,8 @@ Sub unregister_activeworkbook()
     uninitialize ActiveWorkbook
 End Sub
 
+
+
 Private Sub register_workbook(ByRef Wb As Workbook)
     On Error GoTo 0
     initialize_workbook_guid_map
@@ -584,6 +613,11 @@ Private Sub register_workbook(ByRef Wb As Workbook)
     xlpro_async.register_and_configure_wb_workspace Wb
 
 End Sub
+
+
+
+
+
 
 
 Sub uninitialize(ByRef Wb As Workbook)

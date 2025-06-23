@@ -88,7 +88,7 @@
 24. `DONE` `HIGH` Investigate trimming com calls by running an argument check before execution  
 
 25. `OBSOLETE` `MED` Investigate configuring xlpro-cli as a server which can receive commands.
-26. 
+ 
 27.  `HIGH` Just investigate moving the heavy imports to the heavier commands and not the lightweight ones FOR XLPRO-CLI to improve performance
 
 29.  `HIGH` Subroutines development
@@ -100,22 +100,28 @@
      2.   Implementation done
 
 33.  `HIGH` Default arguments
+     1.   Options
+          1.   Have a pydefault type
+               1.   User cannot inspect the values
+          2.   Store the defaults
+               1.   Cannot store defaults in vba
 
 34.  `HIGH` Re-investigate jsonified arguments, probably change to something that can handle n by 2 array key value pairs instead of a json string.
 
-36.  `MED` Add `@vectorize` decorator similar to the jsonify decorator
+35.  `MED` Add `@vectorize` decorator similar to the jsonify decorator
      1.   @vectorize(((arg_name_to_vectorise1, new_type1), (arg_name_to_vectorise2, new_type2)))
 
-39.   `FEATURE` Yield-timer functions
+36.  `FEATURE` Yield-timer functions
+
+37.  `MED` Investigate why rapid cell updates break the code in the following ways
+     1.   Resetting the workspace does not seem to reset anything
+     2.   Multiple figures get added to Excel even if a lock is held by the thread via comsafe.
+          1.   Seems to be helped a little by a sleep 0.1s
+
+38.   
+
+39.   
 
 40.   
 
 41.   
-
-42.   
-
-43.   
-
-44.   
-
-45.   

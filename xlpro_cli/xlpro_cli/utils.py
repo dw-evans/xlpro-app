@@ -20,7 +20,7 @@ import sys
 import textwrap
 import re
 
-DEVELOPMENT_INSTALL = True
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -1177,7 +1177,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         install_production_reqs()
     
     for line in process.stdout:
-        print(line, end='')  # Print each line from stdout immediately
+        print(line, end='')  # Print each`` line from stdout immediately
     for line in process.stderr:
         print(line, end='', file=sys.stderr)  # Print stderr immediately
     # Wait for the subprocess to finish

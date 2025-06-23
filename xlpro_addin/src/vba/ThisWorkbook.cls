@@ -4,6 +4,10 @@ Option Explicit
 Dim ehandler As xlproEventHandler
 
 Private Sub Workbook_Open()
+    ResetEventHandler
+End Sub
+
+Sub ResetEventHandler()
     Set ehandler = New xlproEventHandler
     Debug.Print "xlpro Event handler initialized for the add-in."
 End Sub
