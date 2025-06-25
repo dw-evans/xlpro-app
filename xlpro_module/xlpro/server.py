@@ -1076,6 +1076,24 @@ class xlproWorkspace:
                 pass
             if func.__name__ == "mpl_set_xlims":
                 pass
+
+            # SIGNIFICANT FIX RECOMMENDED
+            # PyObj variables make no sense to go through the pre-validation steps
+            # These functions should only be called on the arguments coming from Excel
+            #   - preprocess_arguments
+            #   - pre_validate_args
+            # Sequence for validation for reference:
+            #   - generate_wrapped_function
+            #     - _pyobj_func_wrapper
+            #       - pre_validate_args (validate no bad inputs exist)
+            #       - preprocess_arguments (cast based on function signature)
+            #       - pre_validate_args (validate no nested bad inputs exist on preprocessed, is this just to capture ptrs...?)
+            #         - pre_p_an_arg (replaces pynone strings, evalulates pointer, converts argument to a target type, duplicates repeats prevalidate arg check lol)
+            #     - _com_init_dispatch_release_wrapper
+            # In summary, there is some cost to doing all the extra processing to validate the python arguments
+            # As they should already be legitimate. But nothing that would break the calculation cycle
+            # Split off the wrappers into individual steps time permitting.
+
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
                 ret = f(*args, **kwargs)
