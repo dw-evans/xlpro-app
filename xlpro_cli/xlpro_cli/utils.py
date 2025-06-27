@@ -19,6 +19,8 @@ from pathlib import Path
 import sys
 import textwrap
 import re
+import threading
+import stat
 
 DEVELOPMENT_INSTALL = False
 
@@ -45,6 +47,7 @@ XLPRO_ROOT_PATH = XLPRO_WD
 XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
 XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ENVS_DIR / "venv-mappings.json"
 XLPRO_ASSETS_DIR = XLPRO_WD / "assets"
+XLPRO_TMP_FOLDER_PATH = XLPRO_ROOT_PATH / "tmp"
 
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
@@ -54,10 +57,10 @@ def clear_text(text:str) -> None:
     terminal_width = shutil.get_terminal_size().columns
     lines = text.split("\n")
     for line in lines:
-        line_count_of_line = (len(text) // terminal_width) + 1
+        line_count_of_line = (len(line) // terminal_width) + 1
         for _ in range(line_count_of_line):
             sys.stdout.write("\033[A\r" + f" " * terminal_width + "\r")  # Overwrite the line with spaces
-            sys.stdout.flush()
+    sys.stdout.flush()
 
 
 def clear_line(count=1):
@@ -111,14 +114,16 @@ def get_xlpro_python_interpreters() -> list[Path]:
 
 
 def get_uv_python_interpreters() -> list[Path]:
-    result = subprocess.run("uv python dir", shell=True, capture_output=True, text=True, check=True)
+    # result = subprocess.run("uv python dir", shell=True, capture_output=True, text=True, check=True)
+    result = subprocess.run(["uv", "python", "dir"], capture_output=True, text=True, check=True)
     uv_py_dir = Path(result.stdout.split("\n")[0])
     uv_py_exes = [x for x in uv_py_dir.glob("*/python.exe")]
     return uv_py_exes
 
 
 def get_global_python_interpreters():
-    result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
+    # result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
+    result = subprocess.run(["where.exe", "python"], capture_output=True, text=True, check=True)
     ret = result.stdout.split("\n")[:-1]
     return ret
 
@@ -335,6 +340,7 @@ def validate_xlpro_workbook_folder(xlpro_folder:Path):
 
 
 def is_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
+    """Check if the ...xlpro/ directory exists, validate and return true if so."""
     potential_dir = get_xlpro_workbook_directory(workbook_path)
     if potential_dir.exists():
         validate_xlpro_workbook_folder(potential_dir)
@@ -500,25 +506,26 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             "--python",
             str(python_exe.resolve()),
             f"{str(external_requirements_txt_fp.resolve())}",
+            f"--find-links={XLPRO_ASSETS_DIR}",
         ], 
         cwd=str(environment_root_path),
         capture_output=True, 
-        shell=True,
+        # shell=True,
         text=True,
         check=True,
     )
 
     lines = result.stderr.split("\n")[:-1]
     if lines[-1] == "Would make no changes":
-        print_success(f"requirements.txt match, ok to continue")
+        print_success(f"requirements.txt match, ok to continue.")
     else:
-        logger.warning(f"requirements.txt does not match! \nmsg:\n{'  '.join(lines)}\n")
+        # logger.warning(f"requirements.txt does not match.\nmsg:\n{'  '.join(lines)}\n")
         # input("press enter to update the environment per the above")
-        print_warning("venv requirements do not match target environment, see output below for installation requirements")
-        print_info(f"{'  '.join(lines)}\n")
-        if (v:=prompt_yes_no_input("Would you like to update the environment")) == "yes":
-            print_info("Updating the environment...")
-            result = subprocess.run(
+        print_warning("Virtual environment requirements do not match target, see the following output for installation requirements")
+        print(f"{textwrap.indent('\n'.join(lines), '  ')}\n")
+        if (v:=prompt_yes_no_input("Would you like to update the environment per the above changes")) == "yes":
+            print_info("Updating the environment dependencies...")
+            process = subprocess.Popen(
                 [
                     "uv",
                     "pip",
@@ -526,16 +533,38 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
                     "--python",
                     str(python_exe.resolve()),
                     f"{str(external_requirements_txt_fp.resolve())}",
+                    f"--find-links={XLPRO_ASSETS_DIR}",
                 ], 
                 cwd=str(environment_root_path),
-                capture_output=True, 
-                shell=True,
                 text=True,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
                 # check=True,
             )
-            print_success("Updates complete.")
+
+            def stdout_writer():
+                for line in process.stdout:
+                    print(line, end='')  # Print each`` line from stdout immediately
+
+            def stderr_writer():
+                for line in process.stderr:
+                    print(line, end='', file=sys.stderr)  # Print stderr immediately
+
+            t1 = threading.Thread(target=stdout_writer)
+            t2 = threading.Thread(target=stderr_writer)
+
+            t1.start()
+            t2.start()
+
+            # Wait for the subprocess to finish
+            process.wait()
+
+            t1.join()
+            t2.join()
+
+            print_success("Dependency updates completed successfully.")
         elif v == "no":
-            print_warning("Updates skipped, you may be missing requirements for your environment.")
+            print_warning("Updates skipped due to error, you may be missing requirements for your environment and may need to rectify this manually!")
     return
 
 
@@ -543,17 +572,17 @@ def dlg_compare_venv_environment_to_required_environment(environment_root_path:P
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path)
     required_py_version = read_python_version_file_within_dir(xlpro_server_dir)
     if not environment_root_path.exists():
-        print_warning(f"path does not exist '{environment_root_path}'")
+        print_warning(f"Environment path does not exist '{environment_root_path}'")
         raise FileNotFoundError(f"the environment does not exist, please create another {environment_root_path}")
     active_py_version = get_py_exe_version(get_python_exe_from_xlpro_root_venv_path(environment_root_path))
 
-    print_info(f"Comparing python version of local environment {environment_root_path} for {workbook_path}...")
+    print_info(f"Comparing Python version of local environment {environment_root_path} for {workbook_path}...")
     if not compare_py_version_t2(required_py_version, active_py_version):
-        print_warning(f"T2 python versions do not match, active: {active_py_version}, suggested: {required_py_version}")
-        print_error(f"Unacceptable T2 python version mismatch, you may want to reconfigure your environment if you run into issues.")
-        raise Exception("Python version mismatch, please correct. (Risk of overwriting server .python-version is pending development)")
+        print_warning(f"T2 Python versions do not match, active: {active_py_version}, suggested: {required_py_version}")
+        # print_error(f"Major warning: T2 Python version mismatch, your environment differs from t")
+        # raise Exception("Python version mismatch, please correct. (Risk of overwriting server .python-version is pending development)")
     else:
-        print_success(f"t2 python versions match, ok to continue.")
+        print_success(f"T2 Python versions match, ok to continue.")
 
     dlg_compare_environment_to_requirements_txt(environment_root_path, xlpro_server_dir / "requirements.txt")
 
@@ -577,7 +606,7 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
         ],
         # cwd=str(xlpro_venv_root_path.resolve()), # PATH EXISTS
         capture_output=True, 
-        shell=True,
+        # shell=True,
         check=True,
         # text=True,
     )
@@ -626,6 +655,7 @@ def read_json_file(fp:Path) -> dict:
 
 
 def write_json_file(fp:Path, data:dict, indent=2):
+    XLPRO_ENVS_DIR.mkdir(exist_ok=True)
     with open(fp, "w", encoding="utf-8") as f:
         f.write(json.dumps(data, indent=indent))
     return
@@ -996,9 +1026,10 @@ class venv_types:
     REUSED_XLPRO_VENV = "reused-xlpro"
 
 
-def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None) -> tuple[Path, venv_types]:
+def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None, allow_override:bool=False) -> tuple[Path, venv_types]:
 
-    result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
+    # result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
+    result = subprocess.run(["where.exe", "python"], capture_output=True, text=True, check=True)
     py_path_locations_system = result.stdout.split("\n")[:-1]
 
     menu_items = []
@@ -1022,71 +1053,123 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
         f"{uv_dl_prefix} Python 3.13",
         f"{uv_dl_prefix} Python 3.14",
         other_version_str:="(uv-download) Other [specify version]",
-        local_version_str2:="(local) Reuse other [specify path]"
+        local_version_str2:="(local) Reuse other [specify path]",
     ]
 
+    override_str = "(override) Allow overriding of the Python version [NOT RECOMMENDED]"
+    if not allow_override:
+        menu_items.append(override_str)
 
-    def convert_to_path(s:str):
+    def _convert_menu_item_to_path(s:str):
         return re.match(r"^\(.+\)\s+(.*)$", s).group(1)
 
-    prompt = "Select your python interpreter" + ("" if version_required is None else f"[requires {version_required}]")
+    prompt = "Select your python interpreter" + ("" if version_required is None else f"[requires {version_required}]") + (" [OVERRIDES ALLOWED WITH PROMPT]" if allow_override else "")
 
     ret = get_user_selection(prompt=prompt, selection_items=menu_items)
 
+    # Handle the override toggle
+    if ret == override_str:
+        print_warning("User has requested to override the python version safeguards, mismatched versions can be forced on the next prompt")
+        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+
     rettype:venv_types = None
+
     # handle uv other version
     if ret == other_version_str:
-        uv_py_version = prompt_user_input(msg:="Provide a python version to download e.g. 3.12.2")
+        uv_py_version = prompt_user_input(msg:="Provide a python version to download e.g. 3.12.2, (b to go back)")
+        if uv_py_version.lower() == "b":
+            return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
         if version_required is not None:
+            # 
             while not compare_py_version_t2(uv_py_version, version_required):
                 print_error(f"provided version {uv_py_version} is not compatible with {version_required}, please correct")
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
                 uv_py_version = prompt_user_input(msg)
+                if uv_py_version.lower() == "b":
+                    return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+
         ret = uv_download_python_version(uv_py_version)
         rettype = venv_types.UV_DOWNLOAD_NEW_VENV
 
-    # handle specific download request (must occur after handling uv other version for namespace clash)
+    # handle prescribed uv-download request specific download request 
+    # (must occur after handling uv other version for namespace clash)
     elif ret.startswith(uv_dl_prefix):
         provided_py_version = re.search(r"Python (\d\.\d+)", ret).group(1)
         if version_required is not None:
-            while not compare_py_version_t2(provided_py_version, version_required):
+            if not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"provided version {provided_py_version} is not compatible with {version_required}, restarting this dialogue")
-                ret = dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required)
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+                    
         ret = uv_download_python_version(provided_py_version)
         rettype = venv_types.UV_DOWNLOAD_NEW_VENV
 
     # XXX - todo - handle reuse of an xlpro venv...
     # if the user selects an existing xlpro venv, we don't want to create a new virtual environment.
     elif ret.startswith(local_version_str1):
-        ret = convert_to_path(ret)
-        ret = Path(ret)        
+        ret = _convert_menu_item_to_path(ret)
+        ret = Path(ret)      
+
         if not ret.exists():
-            raise FileNotFoundError(f"the file does not exist {ret}")
+            raise FileNotFoundError(f"The file does not exist at '{ret}'. Aborting")
+        
+        provided_py_version = get_py_exe_version(ret)
+        if version_required is not None:
+            while not compare_py_version_t2(provided_py_version, version_required):
+                print_error(f"Provided version {provided_py_version} does not match {version_required}, please correct")
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+        
+        ret = py_path
         rettype = venv_types.REUSED_XLPRO_VENV
 
     # handle mapping to a local virtual environment.
     elif ret == local_version_str2:
-        py_path = Path() / prompt_user_input(msg:="Provide a path to a local virtual environment python.exe")#
+        py_path = Path() / prompt_user_input(msg:="Provide a path to a local virtual environment python.exe, (b to go back)")
         check, err = is_interpreter_valid_venv_and_exists(py_path)
         while not check:
-            print_error(f"path invalid: {str(err)}")
+            print_error(f"Interpreter path is invalid: {str(err)}")
+            if prompt_user_input(msg).lower() == "b":
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
             py_path = Path() / prompt_user_input(msg)
             check, err = is_interpreter_valid_venv_and_exists(py_path)
 
 
         provided_py_version = get_py_exe_version(py_path)
         if version_required is not None:
-            while not compare_py_version_t2(provided_py_version, version_required):
-                print_error(f"provided version {provided_py_version} is not compatible with {version_required}, please correct")
-                py_path = Path() / prompt_user_input(msg)
+            if not compare_py_version_t2(provided_py_version, version_required):
+                print_error(f"Provided version {provided_py_version} is not compatible with {version_required}, please correct")
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+                
+
         ret = py_path
         rettype = venv_types.REUSED_LOCAL_VENV
 
-    # for plain virtual environments, convert the input to a path
+    # any of the automatically fetched environments? at least uv-local environments.
     else:
-        ret = convert_to_path(ret)
+        ret = _convert_menu_item_to_path(ret)
         ret = Path(ret)        
         if not ret.exists():
             raise FileNotFoundError(f"the file does not exist {ret}")
+        
+        provided_py_version = get_py_exe_version(ret)
+        if version_required is not None:
+            if not compare_py_version_t2(provided_py_version, version_required):
+                print_error(f"Provided version {provided_py_version} is not compatible with {version_required}, please correct")
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+
         rettype = venv_types.SYSTEM_INTERPRETER
 
     if rettype is None:
@@ -1153,13 +1236,16 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         path_to_xlpro_whl = get_xlpro_whl_fp()
         reqs = [
             "pip",
-            f"{str(path_to_xlpro_whl)}",
+            "xlpro",
+            # f"{str(path_to_xlpro_whl)}",
+            # f"xlpro=={xlpro.__version__}",
         ]
         process = subprocess.Popen(
             [
                 "uv",
                 "pip",
                 "install",
+                f"--find-links={XLPRO_ASSETS_DIR}",
                 "--python",
                 str(py_interpreter_path),
             ] + reqs,
@@ -1175,13 +1261,26 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         install_editable_reqs()
     else:
         install_production_reqs()
-    
-    for line in process.stdout:
-        print(line, end='')  # Print each`` line from stdout immediately
-    for line in process.stderr:
-        print(line, end='', file=sys.stderr)  # Print stderr immediately
+
+    def stdout_writer():
+        for line in process.stdout:
+            print(line, end='')  # Print each`` line from stdout immediately
+
+    def stderr_writer():
+        for line in process.stderr:
+            print(line, end='', file=sys.stderr)  # Print stderr immediately
+
+    t1 = threading.Thread(target=stdout_writer)
+    t2 = threading.Thread(target=stderr_writer)
+
+    t1.start()
+    t2.start()
+
     # Wait for the subprocess to finish
     process.wait()
+
+    t1.join()
+    t2.join()
 
     pass
 
@@ -1211,7 +1310,7 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
     """dialogue run when initializing a workbook. user is prompted to create a new virtual environment if the current one is not compatible
     nb: compatibility checks are crude, only checks if the x.xx python version string is a match."""
 
-    def initialize_workbook_with_new_venv(version_required=None) -> Path:
+    def dlg_user_selects_or_creates_valid_interpreter(version_required=None) -> Path:
         interpreter_path, request_type = dlg_select_and_optionally_create_valid_python_interpreter(version_required)
         print_info(f"user requested venv type: {request_type}")
 
@@ -1229,30 +1328,32 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
             xlpro_venv_root_path = get_venv_root_directory_for_xlpro(xlpro_venv_path)
             print_success(f"symlinked venv maps {interpreter_path} to {xlpro_venv_root_path} creation successful")
         
-
         # handle a reused xlpro venv (does not create a new environment)
         elif request_type == venv_types.REUSED_XLPRO_VENV:
             print_info(f"re-using existing xlpro interpreter {interpreter_path}...")
             user_specified_venv_root_dir = get_venv_root_directory(interpreter_path)
             xlpro_venv_root_path = get_venv_root_directory_for_xlpro(user_specified_venv_root_dir)
 
-        # XXX - todo - this shouldn't be a catch all, add logic at some point...
-        xlpro_py_exe = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
-        install_default_requirements(xlpro_py_exe)
-
-
-        # update the local venv mappings
-        print_info(f"updating local venv for {workbook_path} and {xlpro_venv_root_path}...")
-        write_local_venv_workbook_link_data(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
-        print_success(f"updating local venv completed successfully.")
-
-        # update the workbook .xlpro directory metadata
-        xlpro_on_save_to_server(workbook_path=workbook_path)
-
-        # return the environment path
-        new_venv_path = xlpro_venv_root_path
-        return new_venv_path
+        return xlpro_venv_root_path
     
+    # def install_requirements():
+    #     # XXX - todo - this shouldn't be a catch all, add logic at some point...
+    #     xlpro_py_exe = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
+    #     install_default_requirements(xlpro_py_exe)
+
+    #     # update the local venv mappings
+    #     print_info(f"Updating local venv for {workbook_path} and {xlpro_venv_root_path}...")
+    #     write_local_venv_workbook_link_data(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
+    #     print_success(f"Updating local venv completed successfully.")
+
+    #     # update the workbook .xlpro directory metadata
+    #     xlpro_on_save_to_server(workbook_path=workbook_path)
+
+    #     # return the environment path
+    #     new_venv_path = xlpro_venv_root_path
+    #     return new_venv_path
+    
+
     is_xlpro = is_existing_xlpro_workbook_folder(workbook_path=workbook_path)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
 
@@ -1260,38 +1361,53 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
     # prompt the user to initialize their own environment if one does not already exist
     # the user has several options to create a new virtual environment from an intepreter, or map to an existing virtual environment.
     if is_xlpro:
+        print_warning("Workbook appears to already be configured for xlpro")
         venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
-
         xlpro_recommended_py_version = read_python_version_file_within_dir(xlpro_server_dir)
         print_info(f"the recommended py version for this workbook is {xlpro_recommended_py_version}")
         # if the virtual environment does not exist on the user's machine, we must create a new one.
         if venv_root_path is None:
-            print_warning(f"could not locate environment '{venv_root_path}' in xlpro folder")
-            if prompt_yes_no_input("would you like to clear this link and link a new virtual environment to this workbook?"):
-                # print_warning(f"you must select a python version matching {re.search(r'(\d\.\d+)', xlpro_recommended_py_version).group(1)}.* in order to proceed beyond the following prompts")
-                venv_root_path = initialize_workbook_with_new_venv(version_required=get_t2_version_str(xlpro_recommended_py_version))
+            print_warning(f"Could not locate environment a user environment registered with this workbook")
+            if prompt_yes_no_input("Would you like to initialise a new python environment for this workbook?"):
+                # We should do the following
+                # 1. install the correct python version (let the user choose)
+                # 2. this is an xlpro file, read the requirements, try and compare the environments and fall back to the default requirements.
+                print_warning(f"Please select a Python version matching: '{re.search(r'(\d\.\d+)', xlpro_recommended_py_version).group(1)}.*'")
+                venv_root_path = dlg_user_selects_or_creates_valid_interpreter(version_required=get_t2_version_str(xlpro_recommended_py_version))
             else:
                 print_warning("no further actions could be taken")
                 return
-        
+
         # walk the user through comparing the venv environment to the required.
-        print_info("comparing venv requirements to required...")
+        # do not push anything to the server requirements! Let the user do this manually.
+        print_info("Comparing venv requirements to required...")
         dlg_compare_venv_environment_to_required_environment(environment_root_path=venv_root_path, workbook_path=workbook_path)
-        print_info("comparison complete.")
+        print_info("Comparison complete.")
+        print_info("No modifications have been made to the server environment settings. The author should push these via the add-in.")
 
     # if its not an xlpro directory, we can start a new venv for it
     # the user has the same options to create the environment as above.
     else:
         print_info(f"workbook is not initialized for xlpro, the following steps will configure your environment, no version required")
-        venv_root_path = initialize_workbook_with_new_venv(version_required=None)
+        venv_root_path = dlg_user_selects_or_creates_valid_interpreter(version_required=None)
+        #i install the default requirements
+        py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(venv_root_path)
+        install_default_requirements(py_interpreter_path=py_interpreter_path)
+        xlpro_on_save_to_server(workbook_path=workbook_path)
+
+
+    print_info(f"Updating local venv for {workbook_path} and {venv_root_path}...")
+    write_local_venv_workbook_link_data(workbook_path=workbook_path, active_venv=venv_root_path)
+    print_success(f"Updating local venv completed successfully.")
+
 
 
 def xlpro_on_save_to_server(workbook_path:Path):
     """code run to save the environment configuration to the server location"""
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
-    print_info(f"writing server files for {workbook_path} and {xlpro_venv_root_path}...")
+    print_info(f"Writing server files for {workbook_path} and {xlpro_venv_root_path}...")
     write_server_environment_settings(workbook_path=workbook_path, active_venv=xlpro_venv_root_path)
-    print_info(f"writing server files completed successfully.")
+    print_success(f"Writing server files completed successfully.")
 
 
 def xlpro_change_workbook_venv(workbook_path:Path):
@@ -1448,8 +1564,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
 
     if py_interpreter_root_dir is None:
         print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
-        input("Press enter to exit")
-        sys.exit()
+        raise Exception
 
     py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
     # look for the current launch json configuration
@@ -1543,6 +1658,79 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
 
     pass
 
+def get_folder_size(path: str | Path) -> int:
+    path = Path(path)
+    return sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+
+def get_folder_size_fast(path):
+    if isinstance(path, Path):
+        path = str(path)
+    total_size = 0
+    with os.scandir(path) as it:
+        for entry in it:
+            try:
+                if entry.is_file(follow_symlinks=False):
+                    total_size += entry.stat().st_size
+                elif entry.is_dir(follow_symlinks=False):
+                    total_size += get_folder_size(entry.path)
+            except (OSError, PermissionError):
+                continue  # Skip inaccessible files
+    return total_size
+
+def delete_folder_onerror(func, path, exc_info):
+    # Handle readonly or locked files
+    os.chmod(path, stat.S_IWRITE)
+    try:
+        func(path)
+    except Exception as e:
+        print(f"Failed to delete {path}: {e}")
+
+def delete_folder(path):
+    if os.path.exists(path):
+        shutil.rmtree(path, onexc=delete_folder_onerror)
+        print(f"Deleted folder: {path}")
+    else:
+        print(f"Folder does not exist: {path}")
+
+def check_tmp_folder_size_prompt_delete():
+    print_info(f"Calculating temporary folder size at {XLPRO_TMP_FOLDER_PATH}...")
+    if not XLPRO_TMP_FOLDER_PATH.exists():
+        print_info("Temporary folder does not exist. No actions required")
+        return
+    size_bytes = get_folder_size(XLPRO_TMP_FOLDER_PATH)
+    # size_bytes = get_folder_size_fast(XLPRO_TMP_FOLDER_PATH)
+    size_mb = size_bytes / (1024 * 1024)
+    print_info(f"Temporary folder size is {size_mb:.2f} MB")
+    if prompt_yes_no_input("Do you want to clear temporary files?") == "yes":
+        print_info("Deleting...")
+        try:
+            delete_folder(XLPRO_TMP_FOLDER_PATH)
+            new_size_bytes = get_folder_size(XLPRO_TMP_FOLDER_PATH)
+            new_size_mb = new_size_bytes / (1024 * 1024)
+            print_success(f"Deleting finished, {size_mb} MB to {new_size_mb} MB")
+        except Exception as e:
+            print_error(f"Unable to delete the directory. {e}")
+
+def check_envs_folder_size_prompt_delete():
+    print_info(f"Calculating virtual environment folder size at {XLPRO_ENVS_DIR}...")
+    if not XLPRO_ENVS_DIR.exists():
+        print_info("Venvs folder does not exist. No actions required")
+        return
+    size_bytes = get_folder_size(XLPRO_ENVS_DIR)
+    # size_bytes = get_folder_size_fast(XLPRO_TMP_FOLDER_PATH)
+    size_mb = size_bytes / (1024 * 1024)
+    print_info(f"Virtual environment folder size is {size_mb:.2f} MB")
+    if prompt_yes_no_input("Do you want to delete the folder?") == "yes":
+        print_info("Deleting...")
+        try:
+            delete_folder(XLPRO_ENVS_DIR)
+            print_success("Successfully deleted.")
+        except Exception as e:
+            print_error(f"Unable to delete the directory. {e}")
+
+def press_enter_to_exit():
+    input("Press enter to exit")
+
 
 # def close_venv_xlpro_server_for_workbook(workbook_path:Path):
 #     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -1633,6 +1821,8 @@ def remove_from_user_path(p:Path):
             
     except Exception as e:
         print_error(f"Error: {e}")
+
+
 
 
 

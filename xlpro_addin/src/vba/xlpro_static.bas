@@ -281,6 +281,7 @@ Sub EditConfigGlobal()
     configPath = Environ("USERPROFILE") & "\.xlpro\config.toml"
     ' Add quotes in case the path contains spaces
     shell "cmd /c start """" """ & configPath & """", vbNormalFocus
+    ' shell """" & configPath & """", vbNormalFocus
 End Sub
 
 Sub EditConfigGlobalButton(ByRef control As Office.IRibbonControl)
@@ -293,6 +294,18 @@ End Sub
 
 Sub OpenWorkingDirButton(ByRef control As Office.IRibbonControl)
     OpenWorkingDir
+End Sub
+
+Sub OpenXlproInstallDirButton(ByRef control As Office.IRibbonControl)
+    OpenXlproInstallDir
+End Sub
+
+Sub ClearVenvDataButton(ByRef control As Office.IRibbonControl)
+    ClearVenvData
+End Sub
+
+Sub ClearTempDataButton(ByRef control As Office.IRibbonControl)
+    ClearTempData
 End Sub
 
 Private Sub force_refresh_area_calculation(ByRef Wb As Workbook, rng as Range)
@@ -335,9 +348,25 @@ Sub PushRequirementsTxt()
 
     LoadXlproConfigTOML
     command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & Wb.Path & "\" & Wb.name & """"
-    Debug.Print command
+    ' Debug.Print command
     taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 
+End Sub
+
+Sub ClearVenvData()
+    Dim command As String
+    Dim taskID As Double
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " clear-venvs" 
+    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+End Sub
+
+Sub ClearTempData()
+    Dim command As String
+    Dim taskID As Double
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " clear-tmp"
+    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
 End Sub
 
 Sub OpenWorkingDir()
@@ -351,12 +380,27 @@ Sub OpenWorkingDir()
 
     folderPath = Wb.Path
     command = "explorer.exe """ & folderPath & """"
-    Debug.Print command
+    ' Debug.Print command
     shell command, vbNormalFocus
 
 End Sub
 
+Sub OpenXlproInstallDir()
+    Dim command As String
+    Dim taskID As Double
+    
+    Dim userProfilePath As String
+    Dim folderPath As String
 
+    ' Get the USERPROFILE environment variable
+    userProfilePath = Environ("USERPROFILE")
+    folderPath = userProfilePath & "\.xlpro"
+
+    command = "explorer.exe """ & folderPath & """"
+    ' Debug.Print command
+    shell command, vbNormalFocus
+
+End Sub
 
 ' Sub AddReferenceToMyAddin()
 '     Dim vbProj As VBIDE.VBProject

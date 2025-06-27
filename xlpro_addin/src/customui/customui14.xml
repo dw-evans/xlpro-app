@@ -24,22 +24,8 @@
                   screentip="start vs code" 
                   onAction="xlproStartIDE"/> 
         </group> 
-        <group id="group4" label="Develop"> 
-          <button id="Button5" image="gear-16" 
-                  label="Edit Config" 
-                  screentip="Edit xlpro configutation file" 
-                  onAction="EditConfigGlobalButton"/> 
-          <button id="Button6" image="gear-16" 
-                  label="Push Reqs" 
-                  screentip="Push python requirements to server location" 
-                  onAction="PushRequirementsTxtButton"/> 
-          <button id="Button7" image="gear-16" 
-                  label="Show WD" 
-                  screentip="Open the working directory of the workbook in explorer.exe" 
-                  onAction="OpenWorkingDirButton"/> 
-        </group> 
         <group id="group5" label="Undo/Redo Custom"> 
-          <button id="Button8" image="gear-24" size="large" 
+          <button id="Button8a" image="gear-24" size="large" 
                   label="Undo" 
                   screentip="x" 
                   onAction="ButtonPerformUndo"/> 
@@ -49,14 +35,42 @@
                   onAction="ButtonPerformRedo"/> 
         </group> 
         <group id="group6" label="Tools"> 
-          <button id="Button10" image="gear-24" 
+          <button id="Button10" image="gear-16" 
                   label="Force Recalc Regions" 
                   screentip="x" 
                   onAction="force_refresh_area_calculationButton"/> 
-          <button id="Button11" image="gear-24" 
+          <button id="Button11" image="gear-16" 
                   label="Restart Undo Tracker" 
                   screentip="x" 
                   onAction="ResetUndoButton"/> 
+        </group> 
+        <group id="group4b" label="Develop"> 
+          <button id="Button6b" image="gear-16" 
+                  label="Push Reqs" 
+                  screentip="Push python requirements to server location" 
+                  onAction="PushRequirementsTxtButton"/> 
+          <button id="Button7" image="gear-16" 
+                  label="Show Working Directory" 
+                  screentip="Open the working directory of the workbook in explorer.exe" 
+                  onAction="OpenWorkingDirButton"/> 
+        </group> 
+        <group id="group4a" label="Global"> 
+          <button id="Button5a" image="gear-16" 
+                  label="Edit xlpro Config" 
+                  screentip="Edit xlpro configutation file" 
+                  onAction="EditConfigGlobalButton"/> 
+          <button id="Button7a" image="gear-16" 
+                  label="xlpro Install Directory" 
+                  screentip="Open the working directory of the workbook in explorer.exe" 
+                  onAction="OpenXlproInstallDirButton"/> 
+          <button id="ClearVenvDataButton" image="gear-16" 
+                  label="Clear all venvs" 
+                  screentip="Open the working directory of the workbook in explorer.exe" 
+                  onAction="ClearVenvDataButton"/> 
+          <button id="ClearTempDataButton" image="gear-16" 
+                  label="Clear Temp Files" 
+                  screentip="Open the working directory of the workbook in explorer.exe" 
+                  onAction="ClearTempDataButton"/> 
         </group> 
         <!-- <group id="group5" label="Excel Calcs"> 
           <button id="Button7" image="gear-16" 

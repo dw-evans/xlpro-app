@@ -1079,12 +1079,15 @@ def _show_image(val, name:str,
         
         # # save the figure as an image in a temporary location
         # val_uid = workspace.get_uid_of_val_thread_safe(val)
-        tmp:matplotlib.figure.Figure = val
+        tmp:matplotlib.figure.Figure = val  
         # create a tmp folder. This matches where the lockfile is created...
-        tmp_path = Path(sys.executable).parent.parent.parent / ".xlpro/tmp"
-        if not tmp_path.parent.exists():
-            raise FileNotFoundError(f"{tmp_path.parent} does not exist!")
-        tmp_path.mkdir(exist_ok=True)
+        venv_uid = Path(sys.executable).parent.parent.parent
+        root_tmp_path = Path(sys.executable).parent.parent.parent.parent.parent / "tmp"
+        tmp_path = root_tmp_path / venv_uid
+        tmp_path.mkdir(exist_ok=True, parents=True)
+        # if not tmp_path.parent.exists():
+        #     raise FileNotFoundError(f"{tmp_path.parent} does not exist!")
+        # tmp_path.mkdir(exist_ok=True)
 
         fp = tmp_path / f"{uuid.uuid4()}.png"
         tmp.savefig(fp)
