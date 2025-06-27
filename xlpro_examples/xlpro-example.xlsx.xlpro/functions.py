@@ -33,23 +33,38 @@ from xlpro import list1d, list2d, ndarray1d, ndarray2d
 
 import pandas as pd
 
+
 xlpro.register()(xlpro.show)
 xlpro.register()(xlpro.show_image)
-xlpro.register()(xlpro.show_image_with_seed)
+
+xlpro.register()(xlpro.pypow)
+xlpro.register()(xlpro.pymul)
+xlpro.register()(xlpro.pydiv)
+xlpro.register()(xlpro.pymod)
+xlpro.register()(xlpro.pyadd)
+xlpro.register()(xlpro.pysub)
+xlpro.register()(xlpro.pynot)
+xlpro.register()(xlpro.pyeq)
+xlpro.register()(xlpro.pyne)
+xlpro.register()(xlpro.pylt)
+xlpro.register()(xlpro.pyle)
+xlpro.register()(xlpro.pygt)
+xlpro.register()(xlpro.pyge)
+
+xlpro.register()(xlpro.pyrepr)
+xlpro.register()(xlpro.pystr)
+xlpro.register()(xlpro.pylen)
+xlpro.register()(xlpro.pyshape)
 xlpro.register()(xlpro.pytype)
-xlpro.register()(xlpro.cpy)
-xlpro.register()(xlpro.deepcpy)
-xlpro.register()(xlpro.pow)
-xlpro.register()(xlpro.mul)
-xlpro.register()(xlpro.div)
-xlpro.register()(xlpro.add)
-xlpro.register()(xlpro.subtract)
-xlpro.register()(xlpro.pyhash)
+
 xlpro.register()(xlpro.pygetattr)
 xlpro.register()(xlpro.pygetitem)
-xlpro.register()(xlpro.pystr)
-xlpro.register()(xlpro.pyrepr)
-xlpro.register()(xlpro.pylen)
+
+xlpro.register()(xlpro.cpy)
+xlpro.register()(xlpro.deepcpy)
+
+xlpro.register()(xlpro.pyhash)
+
 xlpro.register()(xlpro.condense)
 
 
@@ -81,7 +96,7 @@ def pallette():
 @xlpro.comsafe
 def visualise_color(rgb:ndarray1d[np.int32], caller:'xl.Range'):
     rgb = rgb
-    caller.Interior.Color = utils.rgb2int(np.astype(rgb, np.int32))
+    caller.Interior.Color = utils._rgb2int(np.astype(rgb, np.int32))
     return str(rgb)
 
 def mpl_create_figure_with_seed(seed) -> matplotlib.figure.Figure:
@@ -111,7 +126,7 @@ def mpl_add_line_unique(
     ln._tag = tag
     return ln
 
-def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d, loc:str="upper left"):
+def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d, loc:str="upper left", frameon:bool=False, ncol:int=1):
     legend = ax.legend(
         labels=labels,
         handles=handles,
@@ -119,8 +134,11 @@ def mpl_add_legend(ax:matplotlib.axes.Axes, handles:list1d, labels:list1d, loc:s
         fontsize=9.0,            # Text size
         frameon=False,            # No border or background
         loc=loc,
+        ncol=ncol
     )
     return legend
+
+
 
 def mpl_set_xax_name(ax, name:str):
     ax.set_xlabel(name)
@@ -168,7 +186,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
-def get_stock_prices_last_week(ticker: str, days:int=365) -> pd.DataFrame:
+def get_stock_prices(ticker: str, days:int=365, interval:str="1d") -> pd.DataFrame:
     """
     Fetches daily stock prices for the past 7 days (including weekends).
     
