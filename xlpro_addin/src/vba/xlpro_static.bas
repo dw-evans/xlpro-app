@@ -128,12 +128,15 @@ End Sub
 Sub set_workbook_guid_map_pairing(wb_name As String, guid As String)
     WORKBOOK_GUID_MAP.Add wb_name, guid
 End Sub
+
 Sub del_workbook_guid_map_key(wb_name As String)
     If WORKBOOK_GUID_MAP.Exists(wb_name) Then
         WORKBOOK_GUID_MAP.Remove wb_name
     End If
 End Sub
+
 Public Function get_workbook_guid_map_value(wb_name As String) As String
+    ' TODO add contingency for the guid map not existing without initializing the workbook
     If WORKBOOK_GUID_MAP.Exists(wb_name) Then
         get_workbook_guid_map_value = WORKBOOK_GUID_MAP(wb_name)
     Else
@@ -146,46 +149,6 @@ End Function
 '------------------------------------------------------------------------
 ' UI ribbon elements
 '------------------------------------------------------------------------
-
-' Function RunProcessAndWaitForStdErrMsg(command As String, msg As String, timeoutSeconds As Double) as Boolean
-' ' Runs a shell command in a new window and waits for a signal
-'     Dim shell As Object
-'     Set shell = CreateObject("WScript.Shell")
-
-'     Dim exec As Object
-'     Set exec = shell.Exec(command)
-
-'     Dim output As String
-'     Dim startTime As Single
-'     startTime = Timer
-
-'     Do While Not exec.StdErr.AtEndOfStream
-'         output = exec.StdErr.ReadLine
-'         Debug.Print "stderr: " & output
-
-'         If InStr(output, msg) > 0 Then
-'             MsgBox "Signal string received: " & msg
-'             Exit Do
-'         End If
-
-'         If Timer - startTime > timeoutSeconds Then
-'             MsgBox "Timeout waiting for signal string."
-'             Exit Do
-'         End If
-'     Loop
-
-'     ' Optional: Wait for process to exit
-'     Do While exec.Status = 0
-'         DoEvents
-'         If Timer - startTime > timeoutSeconds Then
-'             MsgBox "Timeout waiting for process to exit."
-'             Exit Do
-'         End If
-'     Loop
-
-'     MsgBox "Process exited with code: " & exec.ExitCode
-' End Sub
-
 
 Sub xlproStart(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
@@ -817,145 +780,4 @@ Public Function ptr(rng As Range)
     
     ptr = "*<" & Wb.FullName & "::" & ws.name & "::" & rng.Address & ">"
 End Function
-
-
-
-
-
-
-
-' Sub conditional_format_handler(workbook_name As String, sheet_name As String, range_names As Variant, colors As Variant, return_uid As String)
-'     'pass the areas and conditional formatting colours for each area
-'     Dim Workbook As Workbook
-'     Dim Worksheet As Worksheet
-    
-'     Dim area As Range
-'     Dim rng As Range
-'     Dim i As Long
-    
-'     If Not (LBound(range_names) = LBound(colors) And UBound(colors) = UBound(range_names)) Then
-'         Err.Raise 9999, "xlproError", "Array bounds do not match"
-'     End If
-    
-'     Set Workbook = Workbooks(workbook_name)
-'     Set Worksheet = Workbook.Sheets(sheet_name)
-
-'     Dim cell_color As Long
-
-'     ' create the range (which could have multi-areas)
-'     ' loop over the areas and set the interior color to the target color.
-'     For i = LBound(range_names) To UBound(range_names)
-'         Set rng = Worksheet.Range(range_names(i))
-'         cell_color = colors(i)
-'         For Each area In rng.areas
-'             area.Interior.Color = cell_color
-'         Next area
-'     Next i
-    
-'     Set rng = Nothing
-'     Set Workbook = Nothing
-'     Set Worksheet = Nothing
-'     Set area = Nothing
-    
-'     'Dim xlpro As Object
-'     'Set xlpro = GetObject("new: " & XLPRO_GUID)
-'     'xlpro.set_return_value(uid, "Success('" & uid & "')"
-    
-' End Sub
-
-' Function conditional_formatter(formula_str As String, rng As Range, root_cell As Range) As Variant
-
-'     Dim rng_name_arr As Variant
-'     Dim rng_vals As Variant
-    
-'     ' ReDim rng_name_arr(1 To rng.Count)
-'     Dim i As Integer
-    
-'     Dim rng_name As String
-'     Dim workbook_name As String
-'     Dim sheet_name As String
-'     Dim root_cell_addr As String
-'     Dim area_names_arr As Object
-
-    
-'     workbook_name = rng.Parent.Parent.Name
-'     sheet_name = rng.Parent.Name
-'     area_names_arr = get_range_name_per_area(rng)
-'     root_cell_addr = root_cell.Address
-    
-'     rng_vals = get_range_values(Join(area_names_arr, ","))
-    
-'     Dim xlpro As Object
-'     Set xlpro = GetObject("new: " & XLPRO_GUID)
-'     conditional_formatter = xlpro.execute_function_async(ActiveWorkbook, Application.Caller, "conditional_formatter_example", workbook_name, sheet_name, rng_name_arr, formula_str, root_cell_addr)
-' End Function
-
-' Private Function get_range_name_per_area(rng As Range) As Variant()
-
-' Dim cell As Range
-' Dim values() As Variant
-' Dim i As Long
-' Dim area As Range
-
-' ' rng.Interior.Color = 16744319
-' ReDim values(1 To rng.Cells.Count)
-
-' i = 1
-' For Each area In rng.areas
-'     values(i) = area.Address
-'     i = i + 1
-' Next area
-
-' get_range_name_per_area = values
-
-' End Function
-
-' Private Function get_range_name_per_cell(rng As Range) As Variant()
-
-' Dim cell As Range
-' Dim values() As Variant
-' Dim i As Long
-' Dim area As Range
-
-' ' rng.Interior.Color = 16744319
-' ReDim values(1 To rng.Cells.Count)
-
-' i = 1
-' For Each area In rng.areas
-'     For Each cell In area.Cells
-'         values(i) = cell.Address
-'         i = i + 1
-'     Next cell
-' Next area
-
-' get_range_name_per_cell = values
-
-' End Function
-
-' Private Function get_range_values(rng_name As String) As Variant()
-
-' Dim rng As Range
-' Dim cell As Range
-' Dim values() As Variant
-' Dim i As Long
-' Dim area As Range
-
-' Set rng = Range(rng_name)
-
-' rng.Interior.Color = 16744319
-' ReDim values(1 To rng.Cells.Count)
-
-' i = 1
-' For Each area In rng.areas
-'     For Each cell In area.Cells
-'         values(i) = cell.Value
-'         i = i + 1
-'     Next cell
-' Next area
-
-' get_range_values = values
-
-' End Function
-
-
 
