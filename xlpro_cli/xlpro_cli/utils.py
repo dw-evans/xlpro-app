@@ -19,10 +19,9 @@ from pathlib import Path
 import sys
 import textwrap
 import re
-import threading
 import stat
 
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -550,6 +549,8 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
                 for line in process.stderr:
                     print(line, end='', file=sys.stderr)  # Print stderr immediately
 
+            import threading
+
             t1 = threading.Thread(target=stdout_writer)
             t2 = threading.Thread(target=stderr_writer)
 
@@ -561,6 +562,11 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
 
             t1.join()
             t2.join()
+
+            if DEVELOPMENT_INSTALL:
+                print_warning("DEVELOPMENT BUILD: Overwriting requirements with ")
+                install_editable_default_reqs(py_interpreter_path=python_exe)
+
 
             print_success("Dependency updates completed successfully.")
         elif v == "no":
@@ -965,26 +971,41 @@ def get_venv_root_directory(venv_root_path:Path) -> Path:
     return ret
 
 
-def write_server_environment_settings(workbook_path:Path, active_venv:Path):
+def write_server_vscode_config_settings(workbook_path:Path, active_venv:Path):
     """Writes the following data to path/to/book.xlsx/../book.xlsx/
-        - writes requirements.txt
-        - writes .python-version
         - writes ./.vscode/settings.json
+        - writes ./.vscode/launch.json
     Server environment files are read to configure the environments used to execute python code for this workbook.
     """
 
     active_venv_standardized_fp = get_venv_root_directory_for_xlpro(active_venv)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
     initialize_and_get_workspace_xlpro_dir(workbook_path=workbook_path)
+    # write settings.json to server location for IDE integration
+    venv_exe_path = get_python_exe_from_xlpro_root_venv_path(active_venv_standardized_fp)
+    
+    write_settings_json_python_path(xlpro_server_dir, venv_exe_path)
+    # write launch.json for debug server support
+    write_launch_json(xlpro_server_dir)
+
+
+def write_server_environment_settings(workbook_path:Path, active_venv:Path):
+    """Writes the following data to path/to/book.xlsx/../book.xlsx/
+        - writes requirements.txt
+        - writes .python-version
+    Server environment files are read to configure the environments used to execute python code for this workbook.
+    """
+
+    active_venv_standardized_fp = get_venv_root_directory_for_xlpro(active_venv)
+    xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
+
+    # initialize_and_get_workspace_xlpro_dir(workbook_path=workbook_path)
+
     # write requirements.txt
     write_requirements_txt_to_folder(active_venv_standardized_fp, xlpro_server_dir)
     # write .python-version
     write_python_version_file_for_venv(get_python_exe_from_xlpro_root_venv_path(active_venv_standardized_fp), xlpro_server_dir)
-    # write settings.json to server location for IDE integration
-    venv_exe_path = get_python_exe_from_xlpro_root_venv_path(active_venv_standardized_fp)
-    write_settings_json_python_path(xlpro_server_dir, venv_exe_path)
-    # write launch.json for debug server support
-    write_launch_json(xlpro_server_dir)
+
 
 
 def write_local_environment_settings(active_venv:Path):
@@ -1181,86 +1202,88 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
     return (ret, rettype)
     
 
+def install_production_default_reqs_get_process(py_interpreter_path):
+    reqs = [
+        "pip",
+        "xlpro",
+        # f"{str(path_to_xlpro_whl)}",
+        # f"xlpro=={xlpro.__version__}",
+    ]
+    process = subprocess.Popen(
+        [
+            "uv",
+            "pip",
+            "install",
+            f"--find-links={XLPRO_ASSETS_DIR}",
+            "--python",
+            str(py_interpreter_path),
+        ] + reqs,
+        # check=True,
+        # capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    
+    return process
+
+def install_editable_default_reqs(py_interpreter_path):
+    """Install editable """
+    process = subprocess.Popen(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            str(py_interpreter_path),
+            "pip"
+        ],
+        # check=True,
+        # capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    for line in process.stdout:
+        print(line, end='')  # Print each line from stdout immediately
+    for line in process.stderr:
+        print(line, end='', file=sys.stderr)  # Print stderr immediately
+    # Wait for the subprocess to finish
+    process.wait()
+
+    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
+    path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro_module"
+    process = subprocess.Popen(
+        [
+            str(py_interpreter_path),
+            "-m"
+            "pip",
+            "install",
+            "-e",
+            f"{str(path_to_xlpro)}",
+        ],
+        # check=True,
+        # capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    for line in process.stdout:
+        print(line, end='')  # Print each line from stdout immediately
+    for line in process.stderr:
+        print(line, end='', file=sys.stderr)  # Print stderr immediately
+    # Wait for the subprocess to finish
+    process.wait()
+
+
 def install_requirements(py_interpreter_path:Path, requirements:list[str]):
     if not py_interpreter_path.is_absolute():
         raise Exception("path must be absolute")
     
     process = None
-
-    def install_editable_reqs():
-        nonlocal process
-        process = subprocess.Popen(
-            [
-                "uv",
-                "pip",
-                "install",
-                "--python",
-                str(py_interpreter_path),
-                "pip"
-            ],
-            # check=True,
-            # capture_output=True,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        for line in process.stdout:
-            print(line, end='')  # Print each line from stdout immediately
-        for line in process.stderr:
-            print(line, end='', file=sys.stderr)  # Print stderr immediately
-        # Wait for the subprocess to finish
-        process.wait()
-
-        # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
-        path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro_module"
-        process = subprocess.Popen(
-            [
-                str(py_interpreter_path),
-                "-m"
-                "pip",
-                "install",
-                "-e",
-                f"{str(path_to_xlpro)}",
-            ],
-            # check=True,
-            # capture_output=True,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-    def install_production_reqs():
-        nonlocal process
-        path_to_xlpro_whl = get_xlpro_whl_fp()
-        reqs = [
-            "pip",
-            "xlpro",
-            # f"{str(path_to_xlpro_whl)}",
-            # f"xlpro=={xlpro.__version__}",
-        ]
-        process = subprocess.Popen(
-            [
-                "uv",
-                "pip",
-                "install",
-                f"--find-links={XLPRO_ASSETS_DIR}",
-                "--python",
-                str(py_interpreter_path),
-            ] + reqs,
-            # check=True,
-            # capture_output=True,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        
-    if DEVELOPMENT_INSTALL:
-        install_editable_reqs()
-    else:
-        install_production_reqs()
 
     def stdout_writer():
         for line in process.stdout:
@@ -1270,17 +1293,27 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
         for line in process.stderr:
             print(line, end='', file=sys.stderr)  # Print stderr immediately
 
-    t1 = threading.Thread(target=stdout_writer)
-    t2 = threading.Thread(target=stderr_writer)
 
-    t1.start()
-    t2.start()
+    if DEVELOPMENT_INSTALL:
+        print_warning("DEVELOPMENT RELEASE development default requirements")
+        install_editable_default_reqs(py_interpreter_path=py_interpreter_path)
+        print_success("DEVELOPMENT RELEASE default requirements install complete.")
+    else:
+        import threading    
+        print_info("Installing default requirements")
+        process = install_production_default_reqs_get_process(py_interpreter_path=py_interpreter_path)
+        t1 = threading.Thread(target=stdout_writer)
+        t2 = threading.Thread(target=stderr_writer)
 
-    # Wait for the subprocess to finish
-    process.wait()
+        t1.start()
+        t2.start()
 
-    t1.join()
-    t2.join()
+        # Wait for the subprocess to finish
+        process.wait()
+
+        t1.join()
+        t2.join()
+        print_success("Default requirements install complete.")
 
     pass
 
@@ -1356,7 +1389,7 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
 
     is_xlpro = is_existing_xlpro_workbook_folder(workbook_path=workbook_path)
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path=workbook_path)
-
+    write_env_settings = False
     # if it is already an xlpro file, 
     # prompt the user to initialize their own environment if one does not already exist
     # the user has several options to create a new virtual environment from an intepreter, or map to an existing virtual environment.
@@ -1393,11 +1426,14 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
         #i install the default requirements
         py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(venv_root_path)
         install_default_requirements(py_interpreter_path=py_interpreter_path)
-        xlpro_on_save_to_server(workbook_path=workbook_path)
+        write_env_settings = True
 
 
     print_info(f"Updating local venv for {workbook_path} and {venv_root_path}...")
     write_local_venv_workbook_link_data(workbook_path=workbook_path, active_venv=venv_root_path)
+    write_server_vscode_config_settings(workbook_path=workbook_path, active_venv=venv_root_path)
+    if write_env_settings:
+        write_server_environment_settings(workbook_path=workbook_path, active_venv=venv_root_path)
     print_success(f"Updating local venv completed successfully.")
 
 
@@ -1418,7 +1454,8 @@ def xlpro_change_workbook_venv(workbook_path:Path):
     print_info(f"removing existing binding to {existing_xlpro_venv_root_path} for {workbook_path}")
     remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=existing_xlpro_venv_root_path)
     store_venv_to_workbook_mapping(workbook_path=workbook_path, xlpro_venv_parent_path=existing_xlpro_venv_root_path)
-    xlpro_on_save_to_server(workbook_path=workbook_path)
+    
+    write_server_vscode_config_settings(workbook_path=workbook_path, active_venv=existing_xlpro_venv_root_path)
 
 
 def get_free_port() -> int:
@@ -1724,6 +1761,9 @@ def check_envs_folder_size_prompt_delete():
         print_info("Deleting...")
         try:
             delete_folder(XLPRO_ENVS_DIR)
+            new_size_bytes = get_folder_size(XLPRO_ENVS_DIR)
+            new_size_mb = new_size_bytes / (1024 * 1024)
+            print_success(f"Deleting finished, {size_mb} MB to {new_size_mb} MB")
             print_success("Successfully deleted.")
         except Exception as e:
             print_error(f"Unable to delete the directory. {e}")
