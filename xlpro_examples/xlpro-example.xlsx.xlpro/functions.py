@@ -34,6 +34,11 @@ from xlpro import list1d, list2d, ndarray1d, ndarray2d
 import pandas as pd
 
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+
+
 xlpro.register()(xlpro.show)
 xlpro.register()(xlpro.show_image)
 

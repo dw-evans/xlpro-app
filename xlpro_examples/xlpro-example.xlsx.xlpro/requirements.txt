@@ -27,5 +27,5 @@ toml==0.10.2
 typer==0.16.0
 typing-extensions==4.14.0
 tzdata==2025.2
-xlpro==0.0.3
+xlpro
 yfinance

@@ -185,8 +185,15 @@ def _register(func, _mname, _type, _isactive, fname:str=None):
 def register(_type:None|int=None, isactive=True, fname:str=None):
     """Registers the function for xlpro. User can set function type or rely on PEP-484 type hints
     per the documentation"""
+
+
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
+        x = func.__name__
+        if func.__name__ == "function_from_another_module":
+            pass
+        if func.__name__ == "get_stock_prices":
+            pass
         _add_func_module(mname)
         _register(func=func, _mname=mname, _type=_type, _isactive=isactive, fname=fname)
         return func

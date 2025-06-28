@@ -22,6 +22,17 @@ logging.basicConfig(
 )
 logger =  logging.getLogger(__name__)
 
+
+
+XLPRO_INSTALL_DIR = (Path(os.environ.get("USERPROFILE")) / ".xlpro").resolve()
+
+XLPRO_XLAM_LOCALPATH = XLPRO_INSTALL_DIR / "src/xlpro.xlam"
+
+XLPRO_TEMP_DIR = XLPRO_INSTALL_DIR / "tmp"
+XLPRO_BIN_DIR = XLPRO_INSTALL_DIR / "bin"
+
+IS_FROZEN = getattr(sys, 'frozen', False)
+
 BASE_PATH = Path(__file__).parent
 if getattr(sys, 'frozen', False):
     # Running in a PyInstaller bundle
@@ -31,10 +42,8 @@ if getattr(sys, 'frozen', False):
 else:
     # Running in a normal Python interpreter
     BASE_PATH = Path(__file__).parent
-
-
-IS_FROZEN = getattr(sys, 'frozen', False)
-
+import pre_build
+PRE_BUILD_DIR = BASE_PATH / pre_build.PRE_BUILD_DIR.name
 
 def add_to_user_path(p:Path):
     # Ensure the path is absolute
@@ -96,16 +105,7 @@ def remove_from_user_path(p:Path):
             
     except Exception as e:
         logger.debug(f"Error removing key: {e}")
-
-# XLPRO_INSTALL_DIR = (Path(r"C:\Users\Daniel Evans") / ".xlpro").resolve()
-XLPRO_INSTALL_DIR = (Path(os.environ.get("USERPROFILE")) / ".xlpro").resolve()
-
-XLPRO_TEMP_DIR = XLPRO_INSTALL_DIR / "tmp"
-XLPRO_BIN_DIR = XLPRO_INSTALL_DIR / "bin"
-XLPRO_ENVS_DIR = XLPRO_INSTALL_DIR / "envs"
-XLPRO_ASSETS_DIR = XLPRO_INSTALL_DIR / "assets"
-
-XLPRO_INSTALLER_ASSETS_DIR = BASE_PATH / "assets"
+        raise e
 
 
 def get_preinstalled_uv_path():
@@ -157,6 +157,7 @@ def install_uv(download=True):
     if new_uv_path.exists():
         new_uv_path.unlink()
 
+    new_uv_path.parent.mkdir(exist_ok=True, parents=True)
     shutil.copy2(uv_exe_path, new_uv_path)
 
     if download:
@@ -181,90 +182,57 @@ def get_xlstart_path():
     else:
         raise FileNotFoundError(f"XLSTART folder not found at {xlstart_path}")
 
-
 def install():
 
-    # if XLPRO_INSTALL_DIR.exists():
-        # raise Exception
-    
+    errors = []
+
     logger.info("Installing xlpro")
     logger.info("Configuring installation directory")
+
     if XLPRO_INSTALL_DIR.exists():
         logger.critical(f"{XLPRO_INSTALL_DIR} already exists, please remove this folder if you wish to install.")
         raise FileExistsError()
 
-    logger.info("Creating subdirectories")
-    XLPRO_INSTALL_DIR.mkdir()
-    XLPRO_BIN_DIR.mkdir()
-    XLPRO_TEMP_DIR.mkdir()
-    XLPRO_ENVS_DIR.mkdir()
-    XLPRO_ASSETS_DIR.mkdir()
-    
-    logger.info("Creating file templates")
-    (XLPRO_ENVS_DIR / "venv-mappings.json").write_text("", "utf-8")
-    (XLPRO_INSTALL_DIR / "config.toml").write_text("", "utf-8")
+    logger.info("(0/4) Copying Folder Structure...")
+    shutil.copytree(PRE_BUILD_DIR, XLPRO_INSTALL_DIR)
 
-    if IS_FROZEN:
-        src_xlpro_cli = BASE_PATH / "assets/xlpro-cli.exe"
-        src_xlpro_xlam_path = BASE_PATH / "assets/xlpro.xlam"
-        src_config_path = BASE_PATH / "assets/config.toml"
-    else:
-        src_xlpro_cli = BASE_PATH / "assets/xlpro-cli.exe"
-        src_xlpro_xlam_path = BASE_PATH / "assets/xlpro.xlam"
-        src_config_path = BASE_PATH / "assets/config.toml"
-
-    logger.info("Fetching xlpro-cli binary")
-    dst_xlpro_cli = XLPRO_INSTALL_DIR / src_xlpro_cli.name
-    shutil.copy2(src_xlpro_cli, dst_xlpro_cli)
-
-    logger.info("Adding to user path")
-    # add xlpro to user path so they can call xlpro-cli
     add_to_user_path(XLPRO_INSTALL_DIR)
 
-    logger.info("Downloading uv")
+    logger.info("Downloading uv...")
     # install uv.exe in the /bin directory
     if DEVELOPMENT_BUILD:
-        logger.info("Fetching local uv (developer build)")
+        logger.info("Fetching local uv (DEVELOPMENT BUILD)")
         install_uv(download=False)
     else:
-        logger.info("Downloading uv (production build)")
+        logger.info("Downloading uv...")
         install_uv(download=True)
 
-    logger.info("copying xlam file")
-    dst_xlpro_xlam_path1 = XLPRO_ASSETS_DIR / src_xlpro_xlam_path.name
-    shutil.copy2(src_xlpro_xlam_path, dst_xlpro_xlam_path1)
 
     try:
-        logger.info("Attempting to install xlpro.xlam to XLSTART")
+        logger.info("Copying xlpro.xlam file to XLSTART...")
         xlstart_path = get_xlstart_path()
-        dst_xlpro_xlam_path2 = xlstart_path / src_xlpro_xlam_path.name
+        dst_xlpro_xlam_path2 = xlstart_path / XLPRO_XLAM_LOCALPATH.name
         if dst_xlpro_xlam_path2.exists():
-            logger.warning(f"warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
+            logger.warning(f"Warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
+            if prompt_yes_no_input("Do you want to delete the existing xlpro.xlam file?") == "yes":
+                os.remove(dst_xlpro_xlam_path2)
         else:
-            logger.info("Installing xlpro.xlam to XLSTART")
-            shutil.copy2(dst_xlpro_xlam_path1, dst_xlpro_xlam_path2)
+            logger.info("Copying xlpro.xlam to XLSTART")
+            shutil.copy2(XLPRO_XLAM_LOCALPATH, dst_xlpro_xlam_path2)
             logger.info("xlpro.xlam added successfully to XLSTART")
 
-    except FileNotFoundError:
-        logger.info(f"Could not locate XLSTART directory")
+    except FileNotFoundError as e:
+        logger.critical(f"Could not locate XLSTART directory")
+        msg = f"Could not locate XLSTART directory, {str(e)}"
+        e = Exception(msg)
+        logger.critical(e)
+        errors.append(e)
 
 
-    # copy config.toml
-    logger.info("Copying config")
-    shutil.copy2(src_config_path, XLPRO_INSTALL_DIR / src_config_path.name)
 
-    logger.info("Copying startfiles")
-    shutil.copytree(x:=(XLPRO_INSTALLER_ASSETS_DIR / "startfiles"), XLPRO_ASSETS_DIR / x.name)    
-
-    logger.info("Copying examples")
-    shutil.copytree(XLPRO_INSTALLER_ASSETS_DIR / "xlpro_examples", XLPRO_ASSETS_DIR / "examples")       
-
-    logger.info("Copying wheel")
-    shutil.copy2(x:=(list(XLPRO_INSTALLER_ASSETS_DIR.glob("*.whl"))[0]), XLPRO_ASSETS_DIR / x.name)       
-
-    # install xlpro.xlam
-    pass
     logger.info("Installation completed successfully.")
+
+    return errors
 
 
 from rich.console import Console
@@ -351,32 +319,73 @@ def can_delete_all(path):
     return all_ok
 
 
-def main():
-    if XLPRO_INSTALL_DIR.exists():
-        logger.warning(f"{XLPRO_INSTALL_DIR} already exists, promping user to uninstall")
-        check = prompt_yes_no_input("Would you like to uninstall xlpro?", default="no")
-        if check == "yes":
-            success_check = can_delete_all(str(XLPRO_INSTALL_DIR))
-            if not success_check:
-                logger.error(f"Could not uninstall xlpro at {XLPRO_INSTALL_DIR}, is it still being used?")
-                logger.critical("Uninstallation aborted")
-            try:
-                logger.info("Uninstallation starting")
-                shutil.rmtree(XLPRO_INSTALL_DIR)
-                # uninstall()
-                logger.info("Uninstallation completed successfully")
-            except Exception as e:
-                logger.error(f"error encountered during uninstall: '{e}'")
-                logger.critical("Uninstallation aborted")
-            finally:
-                input("Press enter to exit.")
-                sys.exit()
-        else:
-            logger.info("Ending")
+def uninstall():
+    errors = []
+    logger.warning(f"xlpro appears to be installed at {XLPRO_INSTALL_DIR}")
+    logger.warning(f"Prompting user to uninstall...")
+    check = prompt_yes_no_input("Would you like to uninstall xlpro?", default="no")
+    if check == "no":
+        logger.info("Uninstall aborted.")
+        return errors
+    logger.info("(0/3) Checking if xlpro folder can be deleted...")
+    success_check = can_delete_all(str(XLPRO_INSTALL_DIR))
+    if not success_check:
+        msg = f"Cannot delete xlpro folder at {XLPRO_INSTALL_DIR}, is it still being used?"
+        logger.error(msg)
+        e = Exception(msg)
+        errors.append(e)
+        logger.critical("Aborting uninstall")
+        return errors
     try:
-        install()
+        logger.info(f"(1/3) Removing folder at {XLPRO_INSTALL_DIR}...")
+        shutil.rmtree(XLPRO_INSTALL_DIR)
+        logger.info("Folder removed")
+    except Exception as e:
+        msg = f"Error encountered during uninstall: {str(e)}"
+        logger.error(msg)
+        e = Exception(msg)
+        errors.append(e)
+        logger.critical("Aborting uninstall")
+        return errors
+
+    logger.info("(2/3) Attempting to install xlpro.xlam to XLSTART...")
+    xlstart_path = get_xlstart_path()
+    dst_xlpro_xlam_path2 = xlstart_path / "xlpro.xlam"
+    if dst_xlpro_xlam_path2.exists():
+        try:
+            os.remove(dst_xlpro_xlam_path2)
+        except Exception as e:
+            msg = f"Unable to delete xlpro.xlam at {dst_xlpro_xlam_path2}. {str(e)}"
+            logger.error(msg)
+            e = Exception(msg)
+            errors.append(e)
+        
+    logger.info("(3/3) Clearing user path key...")
+    try:
+        remove_from_user_path(XLPRO_INSTALL_DIR)
+    except Exception as e:
+        logger.error(f"Unable to remove xlpro from user path at {XLPRO_INSTALL_DIR}")
+        errors.append(e)
+
+    # errors.append(Exception("NOTE, files downloaded by uv have not be removed. Please uninstall the uv cache yourself if desired."))
+
+    return errors
+
+def main():
+    errors = None
+    try:
+        if XLPRO_INSTALL_DIR.exists():
+            errors = uninstall()
+        else: 
+            errors = install()
     except Exception as e:
         logger.critical(f"Fatal error encountered during installation: '{e}'")
+    finally:
+        if errors:
+            logger.warning("Warning: Errors encountered:")
+            for e in errors:
+                logger.error(str(e))
+
         input("Press enter to exit.")
         sys.exit()
 

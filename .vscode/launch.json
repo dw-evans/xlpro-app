@@ -58,7 +58,24 @@
                 "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
             ],
         },
-
+        {
+            "name":"xlpro_cli.main clear-tmp",
+            "type":"debugpy",
+            "request":"launch",
+            "program":"xlpro_cli/main.py",
+            "args": [
+                "clear-tmp",
+            ],
+        },
+        {
+            "name":"xlpro_cli.main clear-venvs",
+            "type":"debugpy",
+            "request":"launch",
+            "program":"xlpro_cli/main.py",
+            "args": [
+                "clear-venvs",
+            ],
+        },
         {
             "name":"debugpy: remote port",
             "type":"debugpy",

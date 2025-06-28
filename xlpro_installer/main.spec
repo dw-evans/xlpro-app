@@ -41,9 +41,14 @@ def check_assets():
 
 check_assets()
 
+
+import pre_build
+pre_build_dirname = pre_build.PRE_BUILD_DIR.name
+
 datas += [
-    ("assets/", "assets/"),
+    (f"{pre_build_dirname}/", f"{pre_build_dirname}/"),
 ]
+
 
 sys.path.insert(0, os.getcwd())
 

@@ -21,7 +21,7 @@ def try_except_press_enter_to_exit_wrapper(func):
         try:
             func(*args, **kwargs)
         except Exception as e:
-            print("Error occurred.")
+            print(f"Error occurred. {e}")
             utils.press_enter_to_exit()
     return inner
 

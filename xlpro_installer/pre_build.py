@@ -12,43 +12,49 @@ wd = Path(__file__).parent
 import xlpro
 
 paths = [
-    "startfiles",
-    f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl",
-    f"../xlpro_module/config.toml",
-    f"../xlpro_addin/dist/xlpro.xlam",
-    f"../xlpro_cli/dist/xlpro-cli.exe",
-    f"../xlpro_examples",
+    (
+        "startfiles", 
+        "startfiles",
+    ),
+    (
+        f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl", 
+        f"src/xlpro-{xlpro.__version__}-py3-none-any.whl",
+    ),
+    (
+        f"../xlpro_module/config.toml",
+        "config.toml"
+    ),
+    (
+        f"../xlpro_addin/dist/xlpro.xlam",
+        f"src/xlpro.xlam",
+    ),
+    (
+        f"../xlpro_cli/dist/xlpro-cli.exe",
+        "xlpro-cli.exe",
+    ),
+    (
+        f"../xlpro_examples",
+        f"examples",
+    ),
 ]
 
 import os
 import shutil
 
-out_dir = wd / "assets"
-# os.rmdir(out_dir)
-shutil.rmtree(out_dir)
+PRE_BUILD_DIR = wd / "install"
 
-out_dir.mkdir(exist_ok=True)
+def main():
+    if PRE_BUILD_DIR.exists():
+        shutil.rmtree(PRE_BUILD_DIR)
+    PRE_BUILD_DIR.mkdir()
+    for p0, p1 in [((wd / p0), PRE_BUILD_DIR / p1) for p0, p1 in paths]:
+        if p0.is_dir():
+            shutil.copytree(p0, p1)
+        else:
+            if not p1.parent.exists():
+                p1.parent.mkdir(parents=True)
+            shutil.copy2(p0, p1)
 
-# if not list(x for x in out_dir.glob("*")):
-#     raise FileExistsError("Please clear out the assets directory")
 
-for p in [(wd / p) for p in paths]:
-    if p.is_dir():
-        shutil.copytree(p, out_dir / p.name)
-    else:
-        shutil.copy2(p, out_dir / p.name)
-
-pass
-# pass
-# res = subprocess.run(
-#     [
-#         ".venv\Scripts\pyinstaller.exe",
-#         "main.spec",
-#     ],
-#     cwd=wd,
-#     capture_output=True,
-#     # check=True,
-# )
-
-# print(res.stderr)
-# print(res.stdout)
+if __name__ == "__main__":
+    main()

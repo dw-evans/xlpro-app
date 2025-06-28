@@ -45,7 +45,7 @@ else:
 XLPRO_ROOT_PATH = XLPRO_WD
 XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
 XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ENVS_DIR / "venv-mappings.json"
-XLPRO_ASSETS_DIR = XLPRO_WD / "assets"
+XLPRO_SRC_DIR = XLPRO_WD / "src"
 XLPRO_TMP_FOLDER_PATH = XLPRO_ROOT_PATH / "tmp"
 
 def get_terminal_width() -> int:
@@ -283,7 +283,7 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = get_xlpro_workbook_directory(workbook_path)
     d.mkdir(exist_ok=True)
 
-    startfile_dir = XLPRO_ASSETS_DIR / "startfiles"
+    startfile_dir = XLPRO_SRC_DIR / "startfiles"
     startfile_contents = list(startfile_dir.glob("*"))
 
     for p in startfile_contents:
@@ -505,13 +505,13 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             "--python",
             str(python_exe.resolve()),
             f"{str(external_requirements_txt_fp.resolve())}",
-            f"--find-links={XLPRO_ASSETS_DIR}",
+            f"--find-links={XLPRO_SRC_DIR}",
         ], 
         cwd=str(environment_root_path),
         capture_output=True, 
         # shell=True,
         text=True,
-        check=True,
+        # check=True,
     )
 
     lines = result.stderr.split("\n")[:-1]
@@ -532,7 +532,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
                     "--python",
                     str(python_exe.resolve()),
                     f"{str(external_requirements_txt_fp.resolve())}",
-                    f"--find-links={XLPRO_ASSETS_DIR}",
+                    f"--find-links={XLPRO_SRC_DIR}",
                 ], 
                 cwd=str(environment_root_path),
                 text=True,
@@ -1214,7 +1214,7 @@ def install_production_default_reqs_get_process(py_interpreter_path):
             "uv",
             "pip",
             "install",
-            f"--find-links={XLPRO_ASSETS_DIR}",
+            f"--find-links={XLPRO_SRC_DIR}",
             "--python",
             str(py_interpreter_path),
         ] + reqs,
@@ -1318,7 +1318,7 @@ def install_requirements(py_interpreter_path:Path, requirements:list[str]):
     pass
 
 def get_xlpro_whl_fp():
-    fps = list(XLPRO_ASSETS_DIR.glob("*.whl"))
+    fps = list(XLPRO_SRC_DIR.glob("*.whl"))
     if len(fps)> 1:
         raise Exception("multiple wheels found, abandoning")
     if not fps:
