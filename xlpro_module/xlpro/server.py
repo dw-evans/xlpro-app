@@ -41,6 +41,7 @@ from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
+from functools import wraps
 
 SLEEP_DURATION = 0.01
 
@@ -151,6 +152,7 @@ class xlproServer:
         workspace.reset()
         pass
     
+    @_utils.traceback_log_raise
     def register_fnames_in_workbook(self, workspace:xlproWorkspace, wb_dispatch):
         """Registers fname_* in the workbook names so the user knows what names
         Are registered"""
@@ -199,6 +201,7 @@ class xlproServer:
         
         return
 
+    @_utils.traceback_log_raise
     def register_and_configure_wb_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
@@ -249,6 +252,7 @@ class xlproServer:
         # return utils.hash_str(wb_path)
 
 
+    @_utils.traceback_log_raise
     def force_refresh_area_calculation(self, wb_dispatch, rng):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         rng_dispatch = Dispatch(rng)
@@ -257,7 +261,6 @@ class xlproServer:
             for cell in area.Cells:
                 workspace.force_clear_addr(sheetaddr=shtname + cell.Address)
             _utils.comsafe(lambda: rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area))()
-
 
 
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
@@ -305,11 +308,14 @@ class xlproServer:
         logger.error(f"Unable to shutdown, {n_live_workspaces} are active. Please close these first.")
         pass
 
+    @_utils.traceback_log_raise
     def get_vba_sync_text(self, wb_dispatch):
         """Gets the vba code module contents to register the udfs"""
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.get_vba_sync_text()
+    
+    @_utils.traceback_log_raise
     def get_vba_sync_text_subs(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.get_vba_sync_text_subs()
@@ -1996,7 +2002,6 @@ class VBErrorConverter:
         return ((unsigned_hresult >> 16) & 0xFFFF, unsigned_hresult & 0xFFFF)
 
 
-from functools import wraps
 def exception_return_wrapper(func):
     @wraps(func)
     def wrapper(*args, **kwargs):

@@ -29,6 +29,14 @@ import psutil
 from xlpro import errors
 import debugpy
 
+import contextlib
+import io
+
+
+@contextlib.contextmanager
+def suppress_output():
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        yield
 
 wd = Path(__file__).parent
 
@@ -65,15 +73,17 @@ loop = asyncio.new_event_loop()
 
 SERVER:xlproServer = None
 
-def is_server_pending_close():
+def get_server():
     global SERVER
-    # TODO - XXX - Not sure why this loop is called so much...
     try:
-        return SERVER._is_pending_close
+        return SERVER
     except Exception as e:
-        logger.warning(f"Exception encountered while checking is_pending_close: {e}")
         SERVER = xlproServer()
-        return SERVER._is_pending_close
+        return SERVER
+
+
+def is_server_pending_close():
+    return get_server()._is_pending_close
 
 def is_parent_process_closed(pid):
     # Check if parent process still exists
@@ -213,12 +223,10 @@ def serve():
             )
             if rc == win32event.WAIT_OBJECT_0:
                 # message loop is mandatory
-                pwm = pythoncom.PumpWaitingMessages()
+                with suppress_output():
+                    pythoncom.PumpWaitingMessages()
             if is_server_pending_close():
                 raise errors.ServerClosedException
-            # if PARENT_PID is not None:
-            #     if is_parent_process_closed(PARENT_PID):
-            #         raise psutil.NoSuchProcess(PARENT_PID)
         except errors.ServerClosedException:
             logger.info("errors.ServerClosedException encountered. Closing the server...")
             break

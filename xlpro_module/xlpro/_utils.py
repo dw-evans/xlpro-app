@@ -44,6 +44,22 @@ logger = logging.getLogger(__name__)
 
 # VB_DYNAMIC_MODULE_NAME = "xlpro_async"
 
+import traceback
+from functools import wraps
+
+
+def traceback_log_raise(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"{func.__qualname__}, error: '{e}'")
+            logger.error(f"{traceback.format_exc()}")
+            raise
+    return inner
+
+
 def get_function_types_with_fallback(func:Callable):
     try:
         hints = typing.get_type_hints(func, globalns={}, localns={})

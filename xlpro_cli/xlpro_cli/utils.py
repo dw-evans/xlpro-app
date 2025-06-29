@@ -642,10 +642,24 @@ def write_python_version_file_for_workbook(workbook_path:Path):
     )
     pass
 
+import traceback
+from functools import wraps
+
+def traceback_log_raise(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"{func.__qualname__}, error: '{e}'")
+            logger.error(f"{traceback.format_exc()}")
+            raise
+    return inner
 
 def read_json_file_with_comments(fp:Path) -> dict:
     with open(fp, "r", encoding="utf-8") as f:
         txt = f.read()
+    # replace the comments with blanks
     txt_no_comments = re.sub(r"\s*(\/\/.*)$", "", txt, flags=re.MULTILINE)
     d = json.loads(txt_no_comments)
     return d
@@ -1600,8 +1614,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
 
     if py_interpreter_root_dir is None:
-        print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
-        raise Exception
+        print_error(msg:=f"Interpreter was not found for {workbook_path}, please initialize first.")
+        raise Exception(msg)
 
     py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
     # look for the current launch json configuration

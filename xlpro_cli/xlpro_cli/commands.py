@@ -26,6 +26,7 @@ def try_except_press_enter_to_exit_wrapper(func):
     return inner
 
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def handle_start_server(args):
     """Starts the server"""
     workbook_path = Path(args.workbook)
@@ -41,6 +42,7 @@ def handle_start_server(args):
 
 
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def handle_init(args):
     """initializes or re-initializes the workbook"""
 
@@ -55,6 +57,7 @@ def handle_init(args):
 
 import pythoncom
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def _handle_get_guid(args):
     workbook_path = Path(args.workbook)
     # py_interpreter_root_dir = utils.get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -64,6 +67,7 @@ def _handle_get_guid(args):
     pass
 
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def handle_write_requirements(args):
     """ Writes requirements txt, .python-version, .xlpro-version - pending...
     """
@@ -87,11 +91,13 @@ def handle_write_requirements(args):
     utils.press_enter_to_exit()
 
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def handle_clear_venv_data(args):
     utils.check_envs_folder_size_prompt_delete()
     utils.press_enter_to_exit()
 
 @try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
 def handle_clear_tmp_data(args):
     utils.check_tmp_folder_size_prompt_delete()
     utils.press_enter_to_exit()

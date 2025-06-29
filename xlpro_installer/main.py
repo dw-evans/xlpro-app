@@ -8,7 +8,7 @@ import sys
 import logging
 import version
 
-DEVELOPMENT_BUILD = False
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
@@ -200,7 +200,7 @@ def install():
 
     logger.info("Downloading uv...")
     # install uv.exe in the /bin directory
-    if DEVELOPMENT_BUILD:
+    if DEVELOPMENT_INSTALL:
         logger.info("Fetching local uv (DEVELOPMENT BUILD)")
         install_uv(download=False)
     else:
@@ -216,6 +216,9 @@ def install():
             logger.warning(f"Warning {dst_xlpro_xlam_path2} already exists, not copying to xlstart")
             if prompt_yes_no_input("Do you want to delete the existing xlpro.xlam file?") == "yes":
                 os.remove(dst_xlpro_xlam_path2)
+                logger.info("Copying xlpro.xlam to XLSTART")
+                shutil.copy2(XLPRO_XLAM_LOCALPATH, dst_xlpro_xlam_path2)
+                logger.info("xlpro.xlam added successfully to XLSTART")
         else:
             logger.info("Copying xlpro.xlam to XLSTART")
             shutil.copy2(XLPRO_XLAM_LOCALPATH, dst_xlpro_xlam_path2)
