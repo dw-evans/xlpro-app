@@ -1,42 +1,19 @@
 import matplotlib
-matplotlib.use('Agg')
-
-import matplotlib.axes
-import matplotlib.figure
+matplotlib.use('Agg') # Non-GUI mpl backend is required for xlpro
 
 import matplotlib.pyplot as plt
-import random
-
-plt.rcParams.update({
-    "font.family": "Consolas", 
-    "font.size": 10,              
-    "axes.titlesize": "large",    
-    "axes.labelsize": "medium",   
-    "xtick.labelsize": "small",   
-    "ytick.labelsize": "small",
-    "legend.fontsize": "small",
-    "figure.titlesize": "x-large"
-})
-
-# plt.style.use("seaborn-v0_8")  # For global Seaborn-like styling
-
 import numpy as np
-import matplotlib.figure
-
-# from win32typelibs import excel as xl
-
-import numpy as np
+import pandas as pd
 
 import xlpro
 import xlpro._utils as utils
 from xlpro import list1d, list2d, ndarray1d, ndarray2d
 
-import pandas as pd
-
-
+# Display methods
 xlpro.register()(xlpro.show)
 xlpro.register()(xlpro.show_image)
 
+# Python operators
 xlpro.register()(xlpro.pypow)
 xlpro.register()(xlpro.pymul)
 xlpro.register()(xlpro.pydiv)
@@ -51,18 +28,27 @@ xlpro.register()(xlpro.pyle)
 xlpro.register()(xlpro.pygt)
 xlpro.register()(xlpro.pyge)
 
+# Common Python functions
 xlpro.register()(xlpro.pyrepr)
 xlpro.register()(xlpro.pystr)
 xlpro.register()(xlpro.pylen)
 xlpro.register()(xlpro.pyshape)
 xlpro.register()(xlpro.pytype)
 
+# Object getters
 xlpro.register()(xlpro.pygetattr)
 xlpro.register()(xlpro.pygetitem)
 
+# Object copying
 xlpro.register()(xlpro.cpy)
 xlpro.register()(xlpro.deepcpy)
 
+# Hasher to create unique seeds
 xlpro.register()(xlpro.pyhash)
 
 xlpro.register()(xlpro.condense)
+
+
+def hello(name:str):
+    return f"hello {name}"
+
