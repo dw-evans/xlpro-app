@@ -216,7 +216,7 @@ Sub xlproRegisterWorkbook(Wb As Workbook)
     Exit Sub
     
 RegistrationErrorHandler:
-    MsgBox "Error: Error during registration. Please connect the debugger and retry.", _
+    MsgBox "Error: Error during registration. Check the logs and and/or connect the debugger with 'Uncaught Exceptions' enabled and retry.", _
            vbExclamation, "Warning"
     Err.Clear
     Exit Sub
@@ -595,12 +595,9 @@ Sub register_activeworkbook()
     register_workbook ActiveWorkbook
 End Sub
 
-Sub unregister_activeworkbook()
-    uninitialize ActiveWorkbook
-End Sub
-
-
-
+' Sub unregister_activeworkbook()
+'     uninitialize ActiveWorkbook
+' End Sub
 Private Sub register_workbook(ByRef Wb As Workbook)
     On Error GoTo 0
     initialize_workbook_guid_map
@@ -622,44 +619,39 @@ Private Sub register_workbook(ByRef Wb As Workbook)
 End Sub
 
 
+' Sub uninitialize(ByRef Wb As Workbook)
+' 'Uninitialize this workbook from the com server
+'     Dim xlpro_async As Object
+'     Dim guid As String
+'     guid = get_workbook_guid_map_value(Wb.name)
+'     Set xlpro_async = GetObject("new: " & guid)
+'     xlpro_async.shutdown_workspace Wb
+' End Sub
 
+' Private Sub shutdown_xlpro(ByRef Wb As Workbook)
+' 'Attempt to shutdown the xlpro server.
+'     Dim xlpro_async As Object
+'     Dim guid As String
+'     guid = get_workbook_guid_map_value(Wb.name)
+'     Set xlpro_async = GetObject("new: " & guid)
+'     xlpro_async.shutdown
+' End Sub
 
+' Private Sub getpid(ByRef Wb As Workbook)
+'     Dim xlpro_async As Object
+'     Dim guid As String
+'     guid = get_workbook_guid_map_value(Wb.name)
+'     Set xlpro_async = GetObject("new: " & guid)
+'     Debug.Print xlpro_async.getpid
+' End Sub
 
-
-
-Sub uninitialize(ByRef Wb As Workbook)
-'Uninitialize this workbook from the com server
-    Dim xlpro_async As Object
-    Dim guid As String
-    guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
-    xlpro_async.shutdown_workspace Wb
-End Sub
-
-Private Sub shutdown_xlpro(ByRef Wb As Workbook)
-'Attempt to shutdown the xlpro server.
-    Dim xlpro_async As Object
-    Dim guid As String
-    guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
-    xlpro_async.shutdown
-End Sub
-
-Private Sub getpid(ByRef Wb As Workbook)
-    Dim xlpro_async As Object
-    Dim guid As String
-    guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
-    Debug.Print xlpro_async.getpid
-End Sub
-
-Private Sub shutdown_workspace(ByRef Wb As Workbook)
-    Dim xlpro_async As Object
-    Dim guid As String
-    guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
-    xlpro_async.shutdown_workspace Wb
-End Sub
+' Private Sub shutdown_workspace(ByRef Wb As Workbook)
+'     Dim xlpro_async As Object
+'     Dim guid As String
+'     guid = get_workbook_guid_map_value(Wb.name)
+'     Set xlpro_async = GetObject("new: " & guid)
+'     xlpro_async.shutdown_workspace Wb
+' End Sub
 
 ' Sub reload_global_config(ByRef wb As Workbook)
 ' 'Use a workbook com server to reload the configuration
