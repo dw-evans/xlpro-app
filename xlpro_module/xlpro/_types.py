@@ -105,6 +105,10 @@ def compare_generic_aliases(t1, t2):
     if isinstance(t1, typing.GenericAlias) and isinstance(t2, typing.GenericAlias):
         checks = []
         checks.append(t1.__origin__ == t2.__origin__)
+        if not checks[0]:
+            return False
+        if len(t1.__args__) != len(t2.__args__):
+            return False
         for st1, st2 in zip(t1.__args__, t2.__args__):
             if isinstance(st1, typing.TypeVar) and isinstance(st2, typing.TypeVar):
                 checks.append(True)
