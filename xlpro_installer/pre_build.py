@@ -50,10 +50,19 @@ def main():
     for p0, p1 in [((wd / p0), PRE_BUILD_DIR / p1) for p0, p1 in paths]:
         if p0.is_dir():
             shutil.copytree(p0, p1)
+            for fp in p1.rglob("*"):
+                if not fp.is_dir() and fp.name.startswith("~$"):
+                    try:
+                        os.remove(fp)
+                    except Exception as e:
+                        print(e)  
+
         else:
             if not p1.parent.exists():
                 p1.parent.mkdir(parents=True)
             shutil.copy2(p0, p1)
+
+
 
 
 if __name__ == "__main__":
