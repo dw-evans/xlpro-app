@@ -32,7 +32,7 @@ def handle_start_server(args):
     workbook_path = Path(args.workbook)
 
     if not workbook_path.exists():
-        raise FileNotFoundError
+        raise FileNotFoundError(f"The provided workbook path does not exist {workbook_path}. Save the file and try again.")
     
     elif not utils.is_existing_xlpro_workbook_folder(workbook_path):
         raise Exception("workbook must be initialized for xlpro before launching")
@@ -49,7 +49,7 @@ def handle_init(args):
     workbook_path = Path(args.workbook)
 
     if not workbook_path.exists():
-        raise FileNotFoundError
+        raise FileNotFoundError(f"The provided workbook path does not exist {workbook_path}. Save the file and try again.")
     
     utils.dlg_xlpro_initialize_workbook(workbook_path)
     utils.press_enter_to_exit()
@@ -60,6 +60,7 @@ import pythoncom
 @utils.traceback_log_raise
 def _handle_get_guid(args):
     workbook_path = Path(args.workbook)
+    
     # py_interpreter_root_dir = utils.get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     # py_interpreter_path = utils.get_python_exe_from_xlpro_root_venv_path(py_interpreter_root_dir)
     guid = utils.get_interpreter_guid(workbook_path)
