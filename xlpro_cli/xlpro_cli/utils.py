@@ -208,7 +208,7 @@ def generate_xlpro_venv_dir_name(py_interpreter_path:Path):
 def create_xlpro_venv_from_interpreter_and_get_root_path(py_interpreter_path:Path) -> Path:
     """Creates a venv in the xlpro env folder and returns the path to the .venv parent directory"""
     xlpro_venv_path = XLPRO_ENVS_DIR / generate_xlpro_venv_dir_name(py_interpreter_path) /'.venv'
-    xlpro_venv_path.parent.mkdir(exist_ok=True)
+    xlpro_venv_path.parent.mkdir(exist_ok=True, parents=True)
 
     result = subprocess.run(
         args=[
@@ -283,11 +283,11 @@ def initialize_and_get_workspace_xlpro_dir(workbook_path:Path) -> Path:
     d = get_xlpro_workbook_directory(workbook_path)
     d.mkdir(exist_ok=True)
 
-    startfile_dir = XLPRO_SRC_DIR / "startfiles"
+    startfile_dir = XLPRO_ROOT_PATH / "startfiles"
     startfile_contents = list(startfile_dir.glob("*"))
 
     for p in startfile_contents:
-        if not  (dst:=d / p.name).exists():
+        if not (dst:=d / p.name).exists():
             shutil.copy2(p, dst)
         
 
@@ -342,8 +342,13 @@ def is_existing_xlpro_workbook_folder(workbook_path:Path) -> bool:
     """Check if the ...xlpro/ directory exists, validate and return true if so."""
     potential_dir = get_xlpro_workbook_directory(workbook_path)
     if potential_dir.exists():
+        # validate_xlpro_workbook_folder(potential_dir)
+        try:
+            validate_xlpro_folder(potential_dir)
+            return True
+        except Exception as e:
+            return False
         validate_xlpro_workbook_folder(potential_dir)
-        return True
     return False
 
 
@@ -576,6 +581,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
 
 def dlg_compare_venv_environment_to_required_environment(environment_root_path:Path, workbook_path:Path):
     xlpro_server_dir = get_xlpro_workbook_directory(workbook_path)
+    validate_xlpro_folder(xlpro_server_dir)
     required_py_version = read_python_version_file_within_dir(xlpro_server_dir)
     if not environment_root_path.exists():
         print_warning(f"Environment path does not exist '{environment_root_path}'")
@@ -612,7 +618,7 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
         ],
         # cwd=str(xlpro_venv_root_path.resolve()), # PATH EXISTS
         capture_output=True, 
-        # shell=True,
+        shell=True,
         check=True,
         # text=True,
     )
@@ -881,7 +887,8 @@ def write_launch_json(parent_dir:Path, debugpy_port:int=5678):
                     "localRoot": "${{workspaceFolder}}",
                     "remoteRoot": "${{workspaceFolder}}"
                 }}
-            ]
+            ],
+            "justMyCode": true
             // XLPRO DEBUG CONFIGURATION - END"""[1:].format(debugpy_port=debugpy_port)
         ),
         prefix=" " * 12
@@ -1408,6 +1415,7 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
     # prompt the user to initialize their own environment if one does not already exist
     # the user has several options to create a new virtual environment from an intepreter, or map to an existing virtual environment.
     if is_xlpro:
+        validate_xlpro_folder(xlpro_server_dir)
         print_warning("Workbook appears to already be configured for xlpro")
         venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
         xlpro_recommended_py_version = read_python_version_file_within_dir(xlpro_server_dir)
@@ -1450,6 +1458,42 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
         write_server_environment_settings(workbook_path=workbook_path, active_venv=venv_root_path)
     print_success(f"Updating local venv completed successfully.")
 
+
+def validate_xlpro_folder(fp:Path):
+    errors = []
+
+    # .python-version exists and is correctly formatted.
+    try:
+        read_python_version_file_within_dir(fp)
+    except Exception as e:
+        errors.append(e)
+
+    # requirements.txt
+    if not (v:=(fp / "requirements.txt")).exists():
+        e = FileNotFoundError(f"Requirements does not exist. {v}")
+        errors.append(e)
+
+    # functions.py
+    if not (v:=(fp / "functions.py")).exists():
+        e = FileNotFoundError(f"functions.py does not exist. {v}")
+        errors.append(e)
+    
+    # subroutines.py
+    if not (v:=(fp / "subroutines.py")).exists():
+        e = FileNotFoundError(f"subroutines.py does not exist. {v}")
+        errors.append(e)
+
+    for e in errors:
+        logger.error(e)
+
+    if errors:
+        raise Exception("xlpro folder is invalid, please rectify per the error messages")
+    
+
+    
+
+
+    
 
 
 def xlpro_on_save_to_server(workbook_path:Path):
