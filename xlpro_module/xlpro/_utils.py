@@ -1148,7 +1148,7 @@ def _show_image(val, name:str,
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
-def show_image(val, name:str, seed):
+def show_image(val, name:str, seed=None):
     return _show_image(val, name)
 
 
