@@ -5,7 +5,10 @@ max_worker_threads = 24
 
 logging_level = "DEBUG"
 
-xlpro_cli_path = "xlpro-cli.exe"
-vscode_path = "code.exe"
+# xlpro_cli_path = "xlpro-cli.exe"
+# vscode_path = "code.exe"
+# For custom paths, ensure backslashes are not escaped. Use double backslashes '\\' or single forward slashes '/'
+xlpro_cli_path = "C:/Users/Daniel Evans/projects/xlpro/.venv/Scripts/xlpro-cli.exe"
+vscode_path = "C:/Users/Daniel Evans/AppData/Local/Programs/Microsoft VS Code/Code.exe"
 
 undo_stack_depth = 12
