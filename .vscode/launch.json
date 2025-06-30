@@ -25,17 +25,18 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "init",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
             ],
         },
         {
+            // BE AWARE THAT START IS NOT ABLE TO TRIGGER SYNC ANYMORE
             "name":"xlpro_cli.main start",
             "type":"debugpy",
             "request":"launch",
             "program":"xlpro_cli/main.py",
             "args": [
                 "start",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
             ],
         },
         {
@@ -45,7 +46,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "guid",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
             ],
         },
         {
@@ -55,7 +56,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "write-reqs",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-example.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
             ],
         },
         {

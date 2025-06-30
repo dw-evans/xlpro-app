@@ -92,6 +92,27 @@
           }
         },
         
+
+        {
+          "label": "xlpro_installer pre_build and install",
+          "type": "shell",
+          "command": "${workspaceFolder}/.venv/scripts/python.exe",
+          "args": ["main.py"],
+          "group": {
+            "kind": "build",
+            "isDefault": false
+          },
+          "dependsOn": [
+            "xlpro_installer pre_build",
+          ],
+          "dependsOrder": "sequence",
+          "problemMatcher": [],
+          "options": {
+            "cwd": "${workspaceFolder}/xlpro_installer"
+          }
+        },
+        
+
         {
           "label": "xlpro_installer complete_build",
           "type": "shell",
