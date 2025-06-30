@@ -149,7 +149,7 @@ class ExcelArrayConverter:
     def __new__(cls, val:Any, tdst:type):
 
         # return the incoming value if not a 2d array needing conversion
-        if not isinstance(val, (tuple, list)):
+        if not isinstance(val, (tuple, list, np.ndarray)):
             return val
 
         # dissect the destination type
@@ -169,7 +169,7 @@ class ExcelArrayConverter:
             shape = intermediate.shape
             # implicitly the shape is 2d, convert it to the user chosen list or ndarray
             if (not len(shape) == 1) and (all([x > 1 for x in shape])):
-                raise TypeError("Provided value is not compatible with list1d")
+                raise TypeError("Provided value is not compatible with list1d or ndarray1d")
             if compare_generic_aliases(tdst, list1d):
                 return intermediate.flatten().tolist()
             elif compare_generic_aliases(tdst, ndarray1d):
@@ -178,6 +178,8 @@ class ExcelArrayConverter:
         # as above
         elif any([compare_generic_aliases(tdst, x) for x in [list2d, ndarray2d]]):
             intermediate = np.array(val)
+            if len(intermediate.shape) == 1:
+                intermediate = intermediate.reshape(-1, 1)
             if compare_generic_aliases(tdst, list2d):
                 return intermediate.tolist()
             return intermediate
