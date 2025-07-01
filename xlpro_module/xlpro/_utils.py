@@ -948,9 +948,11 @@ def show(val):
 
     elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
         # XXX - todo - fix tuple hack in excelarrayconverter class!
-        if tval == tuple:
-            val_adj = list(val)
-            tval = list
+        # if tval == tuple:
+        #     val_adj = list(val)
+        #     tval = list
+        if (tval == list) or (tval == tuple):
+            tval = list2d
         tdst = tval
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
@@ -1217,6 +1219,7 @@ def pyhash(vals:ndarray1d):
     return hash(s)
         
 def condense(iterable_val):
+    # XXX - TODO this function needs more thought...
     return _types.xlproCollapsedType(iterable_val)
 
 def uncondense(condensed_val):
@@ -1258,6 +1261,8 @@ def pygetattr(obj, attrname:str, default:Any=None):
     """Typed wrapper for getattr"""
     return getattr(obj, attrname, default)
     
+# XXX - TODO need to reinstate pyNone strings! when passing the arrays back to excel
+# Excel cannot show None!
 
 def _replace_pynone_strs(val, cast:bool=True):
     if isinstance(val, str):

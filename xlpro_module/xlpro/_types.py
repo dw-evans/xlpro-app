@@ -169,6 +169,7 @@ class ExcelArrayConverter:
             shape = intermediate.shape
             # implicitly the shape is 2d, convert it to the user chosen list or ndarray
             if (not len(shape) == 1) and (all([x > 1 for x in shape])):
+                # condense() seems to reach here
                 raise TypeError("Provided value is not compatible with list1d or ndarray1d")
             if compare_generic_aliases(tdst, list1d):
                 return intermediate.flatten().tolist()
@@ -176,6 +177,7 @@ class ExcelArrayConverter:
                 return intermediate.flatten()
         
         # as above
+        # convert any vector value with 2d type tdst into a n,1 array 
         elif any([compare_generic_aliases(tdst, x) for x in [list2d, ndarray2d]]):
             intermediate = np.array(val)
             if len(intermediate.shape) == 1:
@@ -291,14 +293,17 @@ class xlproExpandedType:
     """Class to signal that an array is to be expanded, overwrites xlproCollapsedType"""
     oned_direction_rowwise = True
     def __init__(self, arraydata):
-        self.data = arraydata
-        if isinstance(arraydata, xlproCollapsedType):
+        if isinstance(arraydata, xlproExpandedType):
             arraydata = arraydata.data
-        if xlproExpandedType.oned_direction_rowwise:
-            if len((npdata:=np.array(arraydata)).shape) == 1:
-                self.data = npdata.reshape(-1, 1)
-        else:
-            self.data = arraydata
+        self.data = arraydata
+        # self.data = arraydata
+        # if isinstance(arraydata, xlproCollapsedType):
+        #     arraydata = arraydata.data
+        # if xlproExpandedType.oned_direction_rowwise:
+        #     if len((npdata:=np.array(arraydata)).shape) == 1:
+        #         self.data = npdata.reshape(-1, 1)
+        # else:
+        #     self.data = arraydata
 
 class xlproCollapsedType:
     """Wrapper class that signals a result to forcibly be collapsed, overwrites xlproExpandedType"""

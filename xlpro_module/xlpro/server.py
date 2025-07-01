@@ -42,6 +42,7 @@ from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
 from win32com.client.dynamic import Dispatch
 from functools import wraps
+from xlpro._types import ExcelArrayConverter
 
 SLEEP_DURATION = 0.01
 
@@ -761,9 +762,14 @@ class xlproWorkspace:
         
 
     def _handle_default_result(self, _ret, _uid):
+        raise NotImplementedError
         """Default result handler, translated from client manager processing loop"""
         if type(_ret) == xlproExpandedType:
             val = _ret.data
+            if type(val) == list:
+                val = ExcelArrayConverter(val, list2d)
+            elif type(val) == np.ndarray:
+                val = ExcelArrayConverter(val, ndarray2d)
         else:
             val = _ret
         if isinstance(val, Exception):
@@ -775,6 +781,7 @@ class xlproWorkspace:
 
     # pyobj result
     def _handle_pyobject_result(self, _ret, _uid):
+        raise NotImplementedError
         """Pyobject result handler, translated from client manager processing loop"""
         if isinstance(_ret, xlproCollapsedType):
             val = _ret.data
@@ -789,6 +796,7 @@ class xlproWorkspace:
         
     # iterable result
     def _handle_iterable_result(self, _ret, _uid):
+        raise NotImplementedError
         """Iterable result handler, translated from client manager processing loop"""
         if isinstance(_ret, Exception):
             logger.warning(f"Value is an exception: '{_ret}', '{_uid}'")
@@ -811,6 +819,7 @@ class xlproWorkspace:
 
 
     def execute_function_sync(self, caller, fname, args):
+        raise NotImplementedError
         try:
             func = self._get_function_by_name(fname)
 
@@ -924,6 +933,8 @@ class xlproWorkspace:
         
 
     def create_worker_func_sync(self, uid, func, args, kwargs):
+        raise NotImplementedError
+
         if kwargs:
             raise Exception("kwargs should not be here!")
         pass
@@ -1714,6 +1725,12 @@ class ClientManager:
             val0 = self._get_value(uid)
             if type(val0) == xlproExpandedType:
                 val = val0.data
+                # val = _ret.data
+                # cast xlpro expanded types to the 2d data types
+                if type(val) == list:
+                    val = ExcelArrayConverter(val, list2d)
+                elif type(val) == np.ndarray:
+                    val = ExcelArrayConverter(val, ndarray2d)
             else:
                 val = val0
             if isinstance(val, Exception):
