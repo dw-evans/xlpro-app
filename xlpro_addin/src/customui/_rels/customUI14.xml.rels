@@ -1,17 +1,54 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+
+    <!-- <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/.png" Id="" /> -->
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/archive-24.png" Id="archive-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/bug-24.png" Id="bug-24" />    
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/cache-16.png" Id="cache-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/cache-24.png" Id="cache-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/code-square-16.png" Id="code-square-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/cpu-24.png" Id="cpu-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/database-16.png" Id="database-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-code-24.png" Id="file-code-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-16.png" Id="file-directory-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-24.png" Id="file-directory-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-fill-16.png" Id="file-directory-fill-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-fill-24.png" Id="file-directory-fill-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-open-fill-16.png" Id="file-directory-open-fill-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-open-fill-24.png" Id="file-directory-open-fill-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-symlink-16.png" Id="file-directory-symlink-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-directory-symlink-24.png" Id="file-directory-symlink-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/file-moved-16.png" Id="file-moved-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/flame-24.png" Id="flame-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/gear-16.png" Id="gear-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/gear-24.png" Id="gear-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/info-24.png" Id="info-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/mortar-board-16.png" Id="mortar-board-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/mortar-board-24.png" Id="mortar-board-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/play-24.png" Id="play-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/question-16.png" Id="question-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/question-24.png" Id="question-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/redo-16.png" Id="redo-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/redo-24.png" Id="redo-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/rel-file-path-16.png" Id="rel-file-path-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/rel-file-path-24.png" Id="rel-file-path-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/repo-delete-24.png" Id="repo-delete-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/repo-deleted-16.png" Id="repo-deleted-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/server-24.png" Id="server-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/sliders-16.png" Id="sliders-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/sliders-24.png" Id="sliders-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/squirrel-24.png" Id="squirrel-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/sync-16.png" Id="sync-16" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/sync-24.png" Id="sync-24" />
     <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/tools-24.png" Id="tools-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/undo-16.png" Id="undo-16" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/undo-24.png" Id="undo-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/xlpro-logo-24.png" Id="xlpro-logo-24" />
+    <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/xlpro-logo-32.png" Id="xlpro-logo-32" />
+
+
+
+
+
 </Relationships>
+

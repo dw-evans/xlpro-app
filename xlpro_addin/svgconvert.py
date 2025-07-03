@@ -76,3 +76,9 @@ if __name__ == "__main__":
                 str(fp.resolve()), 
                 str((d_out / f"{fp.stem}.png").resolve()), 
             )
+
+    for p in d_out.glob("*"):
+        t = """<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="images/{}.png" Id="{}" />"""
+        print("    " + t.format(p.stem, p.stem))
+
+    

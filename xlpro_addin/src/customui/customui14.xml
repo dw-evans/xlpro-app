@@ -3,105 +3,89 @@
     <tabs> 
       <tab id="CustomTab" label="xlpro"> 
         <group id="group1" label=" "> 
-          <button id="Button1" image="cpu-24" size="large" 
-                  label="Init" 
+          <button id="Button1" image="xlpro-logo-32" size="large" 
+                  label="Initialize" 
                   screentip="Initialize" 
                   onAction="xlproInit"/> 
+
         </group> 
         <group id="group2" label=" "> 
           <button id="Button2" image="play-24" size="large" 
-                  label="Serve" 
+                  label="Start" 
                   screentip="Start Server" 
                   onAction="xlproStart"/> 
+                  
           <button id="Button3" image="sync-24" size="large" 
                   label="Sync" 
                   screentip="Sync" 
                   onAction="xlproRegister"/> 
-        </group> 
-        <group id="group3" label=" "> 
+
           <button id="Button4" image="file-code-24" size="large" 
-                  label="Edit" 
-                  screentip="start vs code" 
+                  label="Develop" 
+                  screentip="Edit the xlpro project in VSCode" 
                   onAction="xlproStartIDE"/> 
+
         </group> 
-        <group id="group5" label="Undo/Redo Custom"> 
-          <button id="Button8a" image="gear-24" size="large" 
+        <group id="group5" label=" "> 
+          <button id="Button8a" image="undo-24" size="large" 
                   label="Undo" 
-                  screentip="x" 
+                  screentip="Backup Undo" 
                   onAction="ButtonPerformUndo"/> 
-          <button id="Button9" image="gear-24" size="large" 
+
+          <button id="Button9" image="redo-24" size="large" 
                   label="Redo" 
-                  screentip="x" 
+                  screentip="Backup Redo" 
                   onAction="ButtonPerformRedo"/> 
-        </group> 
-        <group id="group6" label="Tools"> 
-          <button id="Button10" image="gear-16" 
-                  label="Force Recalc Regions" 
-                  screentip="x" 
-                  onAction="force_refresh_area_calculationButton"/> 
-          <button id="Button11" image="gear-16" 
-                  label="Restart Undo Tracker" 
-                  screentip="x" 
-                  onAction="ResetUndoButton"/> 
-        </group> 
-        <group id="group4b" label="Develop"> 
-          <button id="Button6b" image="gear-16" 
-                  label="Push Reqs" 
-                  screentip="Push python requirements to server location" 
-                  onAction="PushRequirementsTxtButton"/> 
-          <button id="Button7" image="gear-16" 
-                  label="Show Working Directory" 
-                  screentip="Open the working directory of the workbook in explorer.exe" 
-                  onAction="OpenWorkingDirButton"/> 
-        </group> 
-        <group id="group4a" label="Global"> 
-          <button id="Button5a" image="gear-16" 
-                  label="Edit xlpro Config" 
-                  screentip="Edit xlpro configutation file" 
-                  onAction="EditConfigGlobalButton"/> 
-          <button id="Button7a" image="gear-16" 
-                  label="xlpro Install Directory" 
-                  screentip="Open the working directory of the workbook in explorer.exe" 
-                  onAction="OpenXlproInstallDirButton"/> 
-          <button id="ClearVenvDataButton" image="gear-16" 
-                  label="Clear all venvs" 
-                  screentip="Open the working directory of the workbook in explorer.exe" 
-                  onAction="ClearVenvDataButton"/> 
-          <button id="ClearTempDataButton" image="gear-16" 
-                  label="Clear Temp Files" 
-                  screentip="Open the working directory of the workbook in explorer.exe" 
-                  onAction="ClearTempDataButton"/> 
-        </group> 
-        <!-- <group id="group5" label="Excel Calcs"> 
-          <button id="Button7" image="gear-16" 
-                  label="Manual" 
-                  screentip="something" 
-                  onAction="xlproStartIDE"/> 
-        <button id="Button8" image="gear-16" 
-                  label="Automatic" 
-                  screentip="start vs code" 
-                  onAction="xlproStartIDE"/> 
+
         </group> 
         <group id="group6" label=" "> 
-          <button id="Button9" image="gear-16" 
-                  label="Asynchronous" 
-                  screentip="start vs code" 
-                  onAction="xlproStartIDE"/> 
-          <button id="Button10" image="gear-16" 
-                  label="Synchronous" 
-                  screentip="start vs code" 
-                  onAction="xlproStartIDE"/> 
+
+
+          <button id="Button10" image="sync-16" 
+                  label="Recalculate Selected" 
+                  screentip="Forces a full recalculations of the current selected range" 
+                  onAction="force_refresh_area_calculationButton"/> 
+
+          <!-- <button id="Button11" image="gear-16" 
+                  label="Restart Undo Tracker" 
+                  screentip="x" 
+                  onAction="ResetUndoButton"/>  -->
+
+          <button id="Button6b" image="database-16" 
+                  label="Push Requirements" 
+                  screentip="Push the Python requirements to the workspace folder" 
+                  onAction="PushRequirementsTxtButton"/> 
+
+          <button id="Button7" image="file-directory-16" 
+                  label="Show Working Directory" 
+                  screentip="Shows the working directory" 
+                  onAction="OpenWorkingDirButton"/> 
         </group> 
-        <group id="group4" label="Other"> 
-          <button id="Button5" image="gear-16" 
-                  label="Configure" 
-                  screentip="something" 
-                  onAction="xlproStartIDE"/> 
-          <button id="Button6" image="question-16" 
-                  label="Documentation" 
-                  screentip="start vs code" 
-                  onAction="xlproStartIDE"/> 
-        </group>  -->
+        <group id="group4a" label=" "> 
+                <menu id="manageDropDown" label="Manage xlpro Application" image="gear-24" size="large">
+
+                        <button id="Button5a" image="sliders-16" 
+                                label="Edit Global Config (toml)" 
+                                screentip="Edit the xlpro desktop application configuration" 
+                                onAction="EditConfigGlobalButton"/> 
+
+                        <button id="Button7a" image="file-directory-16" 
+                                label="Show /.xlpro" 
+                                screentip="Shows the xlpro installation folder" 
+                                onAction="OpenXlproInstallDirButton"/> 
+
+                        <button id="ClearVenvDataButton" image="repo-deleted-16" 
+                                label="Clear All Python Environments" 
+                                screentip="Deletes all xlpro virtual environments. Use to reduce installation folder size" 
+                                onAction="ClearVenvDataButton"/> 
+
+                        <button id="ClearTempDataButton" image="repo-deleted-16" 
+                                label="Clear All Temporary Files" 
+                                screentip="Deletes all temporary xlpro files. Use to reduce installation folder size" 
+                                onAction="ClearTempDataButton"/> 
+                                
+                </menu>       
+        </group> 
       </tab> 
     </tabs> 
   </ribbon> 
