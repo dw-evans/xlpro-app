@@ -36,6 +36,10 @@ paths = [
         f"../xlpro_examples",
         f"examples",
     ),
+    (
+        f"../LICENSE",
+        f"LICENSE",
+    ),
 ]
 
 import os

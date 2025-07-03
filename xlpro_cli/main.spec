@@ -58,4 +58,6 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     onefile=True,
+    icon="favicon.ico",
+    # icon=r"C:\Users\Daniel Evans\projects\xlpro\xlpro_installer\favicon.ico"
 )

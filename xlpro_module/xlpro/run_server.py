@@ -50,7 +50,7 @@ logging.basicConfig(
     # filename=config.logging_path,   # The file where logs will be saved
     stream=sys.stdout,
     # level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
-    level=getattr(logging, config.logging_level),          # The log level (DEBUG, INFO, WARNING, etc.)
+    level=getattr(logging, config.LOGGING_LEVEL),          # The log level (DEBUG, INFO, WARNING, etc.)
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )

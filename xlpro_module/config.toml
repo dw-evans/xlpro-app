@@ -1,14 +1,14 @@
 xlpro_functions_stem = "functions"
 xlpro_subroutines_stem = "subroutines"
 
-max_worker_threads = 24
+MAX_WORKERS = 24
 
-logging_level = "DEBUG"
+LOGGING_LEVEL = "DEBUG"
 
-# xlpro_cli_path = "xlpro-cli.exe"
-# vscode_path = "code.exe"
+# XLPRO_CLI_PATH = "xlpro-cli.exe"
+# VSCODE_PATH = "code.exe"
 # For custom paths, ensure backslashes are not escaped. Use double backslashes '\\' or single forward slashes '/'
-xlpro_cli_path = "C:/Users/Daniel Evans/projects/xlpro/.venv/Scripts/xlpro-cli.exe"
-vscode_path = "C:/Users/Daniel Evans/AppData/Local/Programs/Microsoft VS Code/Code.exe"
+XLPRO_CLI_PATH = "C:/Users/Daniel Evans/projects/xlpro/.venv/Scripts/xlpro-cli.exe"
+VSCODE_PATH = "C:/Users/Daniel Evans/AppData/Local/Programs/Microsoft VS Code/Code.exe"
 
-undo_stack_depth = 12
+UNDO_STACK_DEPTH = 12

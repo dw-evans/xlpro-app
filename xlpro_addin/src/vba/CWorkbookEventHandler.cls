@@ -42,6 +42,8 @@ Private cutRangeCacheSheet As Worksheet
 
 Private isCutPasteOperation As Boolean
 
+Private Const MAX_CELLS_TRACKED as Long = 10000
+
 Private Sub Wb_SheetChange(ByVal Sh As Object, ByVal Target As Range)
     
     ' Call undo tracking logic here
@@ -60,7 +62,6 @@ Private Sub Wb_SheetChange(ByVal Sh As Object, ByVal Target As Range)
     If rngAddressCache <> Target.Address(False, False) Then
         Debug.Print "Warning: Cached range mismatch. Undo may be invalid."
         ' Exit Sub
-
 
         If Not copyRngCache Is Nothing Then
             ' If the first address misses, check if the expanded range (per the copy/paste region)
@@ -115,15 +116,18 @@ Private Sub Wb_SheetChange(ByVal Sh As Object, ByVal Target As Range)
     Call GlobalUndoManager.TrackChange(Wb, Sh, endTarget, endFormulaCache, endTarget.Formula2)
 
 
-    
     Exit Sub
 
 ErrHandler:
-    Debug.Print ("Could not track the change, maybe a multi-area range")
+    Debug.Print "Unhandled Exception in SheetChange:"
+
+    Debug.Print "  Error Number: " & Err.Number
+    Debug.Print "  Error Description: " & Err.Description
+    Debug.Print "  Error Source: " & Err.Source
+
     Err.Clear
     On Error GoTo 0
     Exit Sub
-    
 
 End Sub
 
@@ -131,13 +135,21 @@ End Sub
 
 Private Sub Wb_SheetSelectionChange(ByVal Sh As Object, ByVal Target As Range)
 
-    If Target.Cells.CountLarge > 1000 Then
-        Debug.Print "Too many cells to track"
+    On Error GoTo ErrHandler
+
+    ' Skip if too many cells are selected
+    If Target.Cells.CountLarge > MAX_CELLS_TRACKED Then
+        Debug.Print "Number of cells exceeds threshold " & MAX_CELLS_TRACKED & ", skipping..."
+        Exit Sub
+    End If
+    ' Skip if the selection has multiple areas - not supported.
+    if Target.Areas.Count > 1 Then
+        Debug.Print "Multi-area selection enabled which is not supported, skipping..."
         Exit Sub
     End If
     
     Dim rngExpanded As Range
-    
+
     If Application.cutCopyMode <> False Then
         Debug.Print "User is preparing to paste or cut..."
         If Not hasCopyDropped Then
@@ -183,7 +195,19 @@ Private Sub Wb_SheetSelectionChange(ByVal Sh As Object, ByVal Target As Range)
     Set selectionPrev = Target
     selectionPrevAddress = selectionPrev.Address
     Set selectionPrevSheet = selectionPrev.Parent
+
+    Exit Sub
     
+ErrHandler:
+    Debug.Print "Unhandled Exception in SheetSelectionChange:"
+
+    Debug.Print "  Error Number: " & Err.Number
+    Debug.Print "  Error Description: " & Err.Description
+    Debug.Print "  Error Source: " & Err.Source
+    
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
 
 End Sub
 

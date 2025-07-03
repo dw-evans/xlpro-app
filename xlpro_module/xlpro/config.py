@@ -24,26 +24,27 @@ def load() -> Configuration:
     settings = Configuration(**kwargs)
     return settings
 
+import os
 
 @dataclass
 class Configuration:
-    xlpro_functions_stem:str
-    xlpro_subroutines_stem:str
-    max_worker_threads:int
-    logging_level:str
-    vscode_path:str
-    xlpro_cli_path:str
-    undo_stack_depth:int
+    VSCODE_PATH:str
+    XLPRO_CLI_PATH:str
+    LOGGING_LEVEL:str = field(default="INFO")
+    MAX_WORKERS:int = field(default=12)
+    UNDO_STACK_DEPTH:int = field(default=32)
+    xlpro_functions_stem:str = field(default="functions")
+    xlpro_subroutines_stem:str = field(default="subroutines")
 
     def to_dict(self):
         attrs = (
             "xlpro_functions_stem",
             "xlpro_subroutines_stem",
-            "max_worker_threads",
-            "logging_level",
-            "vscode_path",
-            "xlpro_cli_path",
-            "undo_stack_depth",
+            "MAX_WORKERS",
+            "LOGGING_LEVEL",
+            "VSCODE_PATH",
+            "XLPRO_CLI_PATH",
+            "UNDO_STACK_DEPTH",
         )
         ret = {attr: getattr(self, attr) for attr in attrs}
         return ret

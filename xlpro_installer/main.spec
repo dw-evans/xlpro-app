@@ -102,4 +102,5 @@ exe = EXE(
     entitlements_file=None,
     onefile=True,
     version=VERSIONFILE,
+    icon="favicon.ico",
 )

@@ -7,7 +7,7 @@ name = "xlpro"
 version = "0.0.4" # Placeholder will be auto-synced
 description = "xlpro internal python module"
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "MIT" }
 authors = [{ name = "Daniel Evans", email = "example@email.com" }]
 
 requires-python = ">=3.12"

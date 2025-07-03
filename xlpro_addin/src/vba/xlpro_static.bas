@@ -64,7 +64,7 @@ Public Sub LoadXlproConfigTOML()
     re.IgnoreCase = False
 
     ' Find a
-    re.Pattern = "(?:^|\n)\s*xlpro_cli_path\s*=\s*""([^""]+)"""
+    re.Pattern = "(?:^|\n)\s*XLPRO_CLI_PATH\s*=\s*""([^""]+)"""
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         XLPRO_CLI_PATH = matches(0).SubMatches(0)
@@ -72,14 +72,14 @@ Public Sub LoadXlproConfigTOML()
         GoTo RegistrationErrorHandler
     End If
     ' Find b
-    re.Pattern = "(?:^|\n)\s*vscode_path\s*=\s*""([^""]+)"""
+    re.Pattern = "(?:^|\n)\s*VSCODE_PATH\s*=\s*""([^""]+)"""
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         VSCODE_PATH = matches(0).SubMatches(0)
     Else:
         GoTo RegistrationErrorHandler
     End If
-    re.Pattern = "(?:^|\n)\s*undo_stack_depth\s*=\s*(\d+)"
+    re.Pattern = "(?:^|\n)\s*UNDO_STACK_DEPTH\s*=\s*(\d+)"
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         UNDOSTACKDEPTH = CLng(matches(0).SubMatches(0))
@@ -89,7 +89,7 @@ Public Sub LoadXlproConfigTOML()
     Exit Sub
     
 RegistrationErrorHandler:
-    MsgBox "Error: Error, could not load config.toml xlpro_cli_path or vscode_path", _
+    MsgBox "Error: Error, could not load config.toml XLPRO_CLI_PATH or VSCODE_PATH", _
            vbExclamation, "Warning"
     Err.Clear
     Exit Sub
@@ -661,8 +661,8 @@ End Sub
 '     Set xlpro_async = GetObject("new: " & guid)
 '     Dim dict as Object
 '     Set dict = xlpro_async.reload_and_get_config
-'     XLPRO_CLI_PATH = dict.Item("xlpro_cli_path")
-'     VSCODE_PATH = dict.Item("vscode_path")
+'     XLPRO_CLI_PATH = dict.Item("XLPRO_CLI_PATH")
+'     VSCODE_PATH = dict.Item("VSCODE_PATH")
 ' End Sub
 
 

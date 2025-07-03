@@ -72,10 +72,37 @@ def custom_adder_always_vector(vector:ndarray1d, constant:float):
     return vector + constant
 
 def create_matplotlib_figure(xdata:ndarray1d, ydata:ndarray1d, linelabel:str):
+    """Function which takes x and y data and generates a matplotlib figure, 
+    and labels the line in the legend."""
+
+    # Create the figure
     fig, ax = plt.subplots()
+
+    # Plot the data
     ln, = ax.plot(xdata, ydata)
+
+    # Add axes labels
     ax.set_xlabel("x-values")
     ax.set_ylabel("y-values")
+
+    # Add a legend
     ax.legend([ln], [linelabel], frameon=False)
+
+    # resize the figure to 170 by 100 mm.
     fig.set_size_inches(np.array((170, 100)) / 25.4)
-    return fig
+
+    return fig # type: matplotlib.figure.Figure
+
+def get_banana_price():
+    key = "Banana"
+    # Perhaps you would fetch your prices from an api call,
+    # for example
+    price_cents_per_kg = {
+        "Apple":     99,
+        "Orange":    140,
+        "banana":    87,
+        "Kiwi":      180,
+        "Mango":     204,
+        "Pineapple": 316,
+    }
+    return price_cents_per_kg[key]

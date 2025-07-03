@@ -1267,7 +1267,7 @@ class WorkerManager:
 
     @property
     def MAX_THREADS(self):
-        return CFG.max_worker_threads
+        return CFG.MAX_WORKERS
 
     def start(self):
         self._thread.start()
