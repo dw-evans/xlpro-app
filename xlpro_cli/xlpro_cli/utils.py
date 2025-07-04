@@ -20,6 +20,10 @@ import sys
 import textwrap
 import re
 import stat
+from . import config
+
+CONFIG = config.load()
+
 
 DEVELOPMENT_INSTALL = True
 
@@ -531,6 +535,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             print_info("Updating the environment dependencies...")
             process = subprocess.Popen(
                 [
+                    # "xlpro-server.exe"
                     "uv",
                     "pip",
                     "sync",
@@ -1168,7 +1173,7 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
                         return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
         
-        ret = py_path
+        # ret = py_path
         rettype = venv_types.REUSED_XLPRO_VENV
 
     # handle mapping to a local virtual environment.
@@ -1232,6 +1237,7 @@ def install_production_default_reqs_get_process(py_interpreter_path):
     ]
     process = subprocess.Popen(
         [
+            # "xlpro-server.exe"
             "uv",
             "pip",
             "install",
@@ -1253,6 +1259,7 @@ def install_editable_default_reqs(py_interpreter_path):
     """Install editable """
     process = subprocess.Popen(
         [
+            # "xlpro-server.exe"
             "uv",
             "pip",
             "install",
@@ -1278,6 +1285,7 @@ def install_editable_default_reqs(py_interpreter_path):
     path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro_module"
     process = subprocess.Popen(
         [
+            # "xlpro-server.exe",
             str(py_interpreter_path),
             "-m"
             "pip",
@@ -1706,6 +1714,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
     # if a python process already exists based on the lockfile, this will close itself!
     process = subprocess.Popen(
         [
+            CONFIG.XLPRO_SERVER_PATH,
             str(py_interpreter_path),
             # "-Xfrozen_modules=off"
             "-m",

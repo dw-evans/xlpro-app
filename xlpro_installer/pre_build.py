@@ -40,6 +40,10 @@ paths = [
         f"../LICENSE",
         f"LICENSE",
     ),
+    (
+        f"../xlpro_cli_shell_wrapper/xlpro-server.exe",
+        f"xlpro-server.exe",
+    )
 ]
 
 import os

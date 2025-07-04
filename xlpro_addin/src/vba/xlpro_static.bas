@@ -5,7 +5,9 @@ Option Explicit
 
 Public XLPRO_CLI_PATH As String
 Public VSCODE_PATH As String
+Public XLPRO_SERVER_PATH As String
 Public UNDOSTACKDEPTH As Long
+
 ' Public XLPRO_ADDIN_PATH As String
 
 Public WORKBOOK_GUID_MAP As Object
@@ -79,6 +81,13 @@ Public Sub LoadXlproConfigTOML()
     Else:
         GoTo RegistrationErrorHandler
     End If
+    re.Pattern = "(?:^|\n)\s*XLPRO_SERVER_PATH\s*=\s*""([^""]+)"""
+    Set matches = re.Execute(fileText)
+    If matches.Count > 0 Then
+        XLPRO_SERVER_PATH = matches(0).SubMatches(0)
+    Else:
+        GoTo RegistrationErrorHandler
+    End If
     re.Pattern = "(?:^|\n)\s*UNDO_STACK_DEPTH\s*=\s*(\d+)"
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
@@ -89,7 +98,7 @@ Public Sub LoadXlproConfigTOML()
     Exit Sub
     
 RegistrationErrorHandler:
-    MsgBox "Error: Error, could not load config.toml XLPRO_CLI_PATH or VSCODE_PATH", _
+    MsgBox "Error: Error, could not load config.toml XLPRO_CLI_PATH, VSCODE_PATH, XLPRO_SERVER_PATH, UNDO_STACK_DEPTH may not be defined correctly", _
            vbExclamation, "Warning"
     Err.Clear
     Exit Sub
@@ -164,7 +173,8 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     ' Use the Shell function to call the program
     command = """" & XLPRO_CLI_PATH & """" & " start " & """" & Wb.Path & "\" & Wb.name & """"
     Debug.Print command
-    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    ' taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    taskID = shell(command, vbNormalFocus)
 
     ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
@@ -183,9 +193,13 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
 
     ' Use the Shell function to call the program
     'taskID = Shell("cmd.exe /K xlpro", vbNormalFocus)
+    ' command = """" & XLPRO_CLI_PATH & """" & " init " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.name & """"
+    ' Debug.Print command
+    ' taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+
     command = """" & XLPRO_CLI_PATH & """" & " init " & """" & ActiveWorkbook.Path & "\" & ActiveWorkbook.name & """"
     Debug.Print command
-    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    taskID = shell(command, vbNormalFocus)
 
     ' Optionally, display the Task ID of the program
     Debug.Print "Program launched with Task ID: " & taskID
@@ -312,7 +326,7 @@ Sub PushRequirementsTxt()
     LoadXlproConfigTOML
     command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & Wb.Path & "\" & Wb.name & """"
     ' Debug.Print command
-    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    taskID = shell(command, vbNormalFocus)
 
 End Sub
 
@@ -321,7 +335,7 @@ Sub ClearVenvData()
     Dim taskID As Double
     LoadXlproConfigTOML
     command = """" & XLPRO_CLI_PATH & """" & " clear-venvs" 
-    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    taskID = shell(command, vbNormalFocus)
 End Sub
 
 Sub ClearTempData()
@@ -329,7 +343,7 @@ Sub ClearTempData()
     Dim taskID As Double
     LoadXlproConfigTOML
     command = """" & XLPRO_CLI_PATH & """" & " clear-tmp"
-    taskID = shell("cmd /c " & """" & command & """", vbNormalFocus)
+    taskID = shell(command, vbNormalFocus)
 End Sub
 
 Sub OpenWorkingDir()
