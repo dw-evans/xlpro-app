@@ -12,3 +12,5 @@ XLPRO_CLI_PATH = "C:/Users/Daniel Evans/projects/xlpro/.venv/Scripts/xlpro-cli.e
 VSCODE_PATH = "C:/Users/Daniel Evans/AppData/Local/Programs/Microsoft VS Code/Code.exe"
 
 UNDO_STACK_DEPTH = 12
+
+MULTI_SERVER_EXPERIEMENT = false

@@ -154,6 +154,7 @@ class xlproServer:
         pass
     
     @_utils.traceback_log_raise
+    # @_utils.comsafe
     def register_fnames_in_workbook(self, workspace:xlproWorkspace, wb_dispatch):
         """Registers fname_* in the workbook names so the user knows what names
         Are registered"""
@@ -196,13 +197,13 @@ class xlproServer:
                 wb_dispatch.Names.Add(a, b)
                 pass
 
+        # _xlinteract1()
         _utils.comsafe(_xlinteract1)()
-            
-        # _utils.comsafe(_xlinteract2)()
         
         return
 
     @_utils.traceback_log_raise
+    # @_utils.comsafe
     def register_and_configure_wb_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
@@ -237,6 +238,7 @@ class xlproServer:
             # self.register_and_configure_wb_workspace(wb_dispatch)
             # logger.info(f"Re-initialization complete")
 
+    # @_utils.comsafe
     def _get_workspace_from_wb(self, wb_dispatch):
         uid = self._get_workspace_pathuid_from_wb(wb_dispatch)
         if not uid in self._workspace_map.keys():
@@ -245,6 +247,7 @@ class xlproServer:
         _utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
         return self._workspace_map[uid]
     
+    # @_utils.comsafe
     def _get_workspace_pathuid_from_wb(self, wb_dispatch):
         wb:"xl._Workbook" = win32com.client.Dispatch(wb_dispatch)
         wb_path = str(Path(wb.FullName))
@@ -254,6 +257,7 @@ class xlproServer:
 
 
     @_utils.traceback_log_raise
+    # @_utils.comsafe
     def force_refresh_area_calculation(self, wb_dispatch, rng):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         rng_dispatch = Dispatch(rng)
@@ -262,8 +266,10 @@ class xlproServer:
             for cell in area.Cells:
                 workspace.force_clear_addr(sheetaddr=shtname + cell.Address)
             _utils.comsafe(lambda: rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area))()
+            # rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area)
 
 
+    # @_utils.comsafe
     def execute_function_async(self, wb_dispatch, caller, func_name, *args):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
@@ -271,12 +277,14 @@ class xlproServer:
         # ret = workspace.execute_function_sync(caller=caller, fname=func_name, args=args)
         return ret
 
+    # @_utils.comsafe
     def execute_sub_async(self, wb_dispatch, func_name):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.execute_sub_async(fname=func_name)
 
 
+    # @_utils.comsafe
     def register_functions_in_workspace(self, wb_dispatch):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
@@ -287,6 +295,7 @@ class xlproServer:
     def register_functions_in_vba(self, wb_dispatch):
         raise NotImplementedError("Obsoleted to remove combase.dll issue")
 
+    # @_utils.comsafe
     def shutdown_workspace_from_dispatch(self, wb_dispatch):
         # XXX - todo - check this actually does anything meaninfgul
         # marshalling ok afaik - excel vba interface
@@ -310,6 +319,7 @@ class xlproServer:
         pass
 
     @_utils.traceback_log_raise
+    # @_utils.comsafe
     def get_vba_sync_text(self, wb_dispatch):
         """Gets the vba code module contents to register the udfs"""
         # marshalling ok afaik - excel vba interface
@@ -317,11 +327,12 @@ class xlproServer:
         return workspace.get_vba_sync_text()
     
     @_utils.traceback_log_raise
+    # @_utils.comsafe
     def get_vba_sync_text_subs(self, wb_dispatch):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         return workspace.get_vba_sync_text_subs()
 
-    
+    # @_utils.comsafe
     def get_workspace_from_uid_thread_safe(self, uid) -> xlproWorkspace:
         with self._workspace_uid_to_workbook_path_lock:
             with self._workspace_map_lock:
@@ -1796,14 +1807,18 @@ class ClientManager:
                 except Exception as e:
                     shape.Delete()
                     raise e
+                self._set_result_display(uid, f"Image<{xl_name}>")
+                caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
                 return
-            _utils.comsafe(_xlinteract)()    
             
+            _utils.comsafe(_xlinteract)()
+            
+            # self._set_result_display(uid, f"Image<{xl_name}>")
+            # _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+
             # self._set_result_display(uid, f"Image<{fp}>")
-            self._set_result_display(uid, f"Image<{xl_name}>")
 
             # update by resetting the formula
-            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
             # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))

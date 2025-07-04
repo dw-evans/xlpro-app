@@ -34,6 +34,7 @@ class Configuration:
     LOGGING_LEVEL:str = field(default="INFO")
     MAX_WORKERS:int = field(default=12)
     UNDO_STACK_DEPTH:int = field(default=32)
+    MULTI_SERVER_EXPERIEMENT:bool = field(default=False)
     xlpro_functions_stem:str = field(default="functions")
     xlpro_subroutines_stem:str = field(default="subroutines")
 
@@ -46,6 +47,7 @@ class Configuration:
             "VSCODE_PATH",
             "XLPRO_CLI_PATH",
             "UNDO_STACK_DEPTH",
+            "MULTI_SERVER_EXPERIEMENT",
         )
         ret = {attr: getattr(self, attr) for attr in attrs}
         return ret
