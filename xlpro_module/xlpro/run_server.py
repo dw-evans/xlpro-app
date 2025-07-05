@@ -1,4 +1,29 @@
 from __future__ import annotations
+
+def disable_quickedit():
+    '''
+    Disable quickedit mode on Windows terminal. quickedit prevents script to
+    run without user pressing keys..'''
+    import os
+    if not os.name == 'posix':
+        try:
+            import msvcrt
+            import ctypes
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            device = r'\\.\CONIN$'
+            with open(device, 'r') as con:
+                hCon = msvcrt.get_osfhandle(con.fileno())
+                kernel32.SetConsoleMode(hCon, 0x0080)
+        except Exception as e:
+            print('Cannot disable QuickEdit mode! ' + str(e))
+            print('.. As a consequence the script might be automatically\
+            paused on Windows terminal')
+
+    pass
+
+disable_quickedit()
+
+
 from pathlib import Path
 
 import threading
@@ -31,6 +56,9 @@ import debugpy
 
 import contextlib
 import io
+import rich
+
+
 
 
 @contextlib.contextmanager
@@ -51,11 +79,27 @@ logging.basicConfig(
     stream=sys.stdout,
     # level=logging.DEBUG,          # The log level (DEBUG, INFO, WARNING, etc.)
     level=getattr(logging, config.LOGGING_LEVEL),          # The log level (DEBUG, INFO, WARNING, etc.)
-    format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
+    # format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
+    format='%(levelname)s - %(message)s',  # The format of log messages
+    # datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
-
 logger = logging.getLogger()
+
+# from rich.logging import RichHandler
+
+# # Basic configuration for logging
+# logging.basicConfig(
+#     level="DEBUG",  # or INFO, WARNING, etc.
+#     format="%(message)s",
+#     datefmt="[%X]",
+#     handlers=[RichHandler()]
+# )
+
+# logger = logging.getLogger("rich_logger")
+
+
+
 
 # # Create a handler to output logs to stdout
 # handler = logging.StreamHandler(sys.stdout)
@@ -124,18 +168,40 @@ def serve():
     global DEBUGPY_PORT
     global CLSID
     global WORKBOOK_NAME
-    logger.info(f"xlpro.run_server.main() being run with CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
 
-    logger.debug(f"serve() being run at root directory: {os.getcwd()}")
+    import xlpro
+    s = f"""
+
+        ██╗  ██╗██╗     ██████╗ ██████╗  ██████╗ 
+        ╚██╗██╔╝██║     ██╔══██╗██╔══██╗██╔═══██╗
+         ╚███╔╝ ██║     ██████╔╝██████╔╝██║   ██║
+         ██╔██╗ ██║     ██╔═══╝ ██╔══██╗██║   ██║
+        ██╔╝ ██╗███████╗██║     ██║  ██║╚██████╔╝
+        ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ 
+
+            xlpro-server v{xlpro.__version__}
+            Copyright (c) 2025 Daniel Evans
+            License: MIT. Free for commercial use.
+
+    """
+    print(f"{s}")
+    # from rich import print
+    # print(f"{s}", style="#526cfe")
+
+    logger.info(f"Starting xlpro server...")
+    logger.info(f"Server parameters: CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
+    logger.debug(f"xlpro.run_server.main() being run with CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
+
+    # logger.debug(f"serve() being run at root directory: {os.getcwd()}")
 
     debugpy.listen(('localhost', DEBUGPY_PORT))
 
-    logger.info(f"ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
+    logger.info(f"Ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
 
     xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent() / f"{WORKBOOK_NAME}.xlpro.lock"
 
     if not xlpro_lock_fp.parent.exists():
-        logger.warning(f"{xlpro_lock_fp.parent} does not exist, making parents")
+        logger.debug(f"{xlpro_lock_fp.parent} does not exist, making parents")
         xlpro_lock_fp.parent.mkdir()
 
     pass
@@ -144,12 +210,12 @@ def serve():
     try:
         lock_file_handle = file_lock.acquire_file_and_write_datas(str(xlpro_lock_fp), guid=CLSID, debugpy_port=DEBUGPY_PORT)
     except PermissionError as e:
-        print("Could not acquire lock on file. Checking validity")
+        logger.debug("Could not acquire lock on file. Checking validity")
         lockfile_contents_dict = file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
         if not lockfile_contents_dict:
-            print("The process with the lock file is not alive.")
+            logger.debug("The process with the lock file is not alive.")
             raise Exception(f"Error in lock file '{xlpro_lock_fp}' please correct manually.")
-        print("The process appears to be alive.")
+        logger.debug("The process appears to be alive.")
         pid, guid, debugpy_port = [lockfile_contents_dict.get(x) for x in ("pid", "guid", "debugpy_port")]
         _utils.show_warning(
             "xlpro",
@@ -158,7 +224,6 @@ def serve():
   - Delete {xlpro_lock_fp} if this issue persists.
   - This will not have affected your current session if xlpro was already running.""")
         sys.exit(1)
-
 
     pythoncom.CoInitialize()
 
@@ -199,20 +264,24 @@ def serve():
     pythoncom.CoResumeClassObjects() # I think this cancels the suspended operation
 
     # XXX fix the main loop exit seq
-    logger.info(f"xlpro server starting on PID: {os.getpid()}")
+    logger.debug(f"xlpro server starting on PID: {os.getpid()}")
     SERVER = xlproServer()
 
     # print("XLPROSTART_TRIGGER_OK")
+    logger.info("Startup OK, ready for synchronisation. Sending signal")
     sys.stderr.write("XLPROSTART_TRIGGER_OK\n")
     sys.stderr.flush()
     sys.stdout.write("XLPROSTART_TRIGGER_OK\n")
     sys.stdout.flush()
+    logger.info("Signal sent.")
 
     def tidy_up_lock_file():
-        logger.info(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
+        logger.info("Cleaning up lock file...")
+        logger.debug(f"Releasing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
         file_lock.close_file(handle=lock_file_handle)
-        logger.info(f"Removing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
+        logger.debug(f"Removing lock file '{xlpro_lock_fp}' handle: '{lock_file_handle}'...")
         os.remove(xlpro_lock_fp)
+        logger.info("Successfully cleaned up lockfile")
         pass
 
     while True:
@@ -228,56 +297,34 @@ def serve():
             if is_server_pending_close():
                 raise errors.ServerClosedException
         except errors.ServerClosedException:
-            logger.info("errors.ServerClosedException encountered. Closing the server...")
+            logger.critical("errors.ServerClosedException encountered. Closing the server...")
             break
         except psutil.NoSuchProcess:
-            logger.info("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
+            logger.critical("psutil.NoSuchProcess encountered. Parent process has closed. Closing the server...")
             break
         except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt encountered. Closing the server...")
+            logger.critical("KeyboardInterrupt encountered. Closing the server...")
             break
         except Exception as e:
-            logger.warning(f"uncaught exception: {e}")
+            logger.critical(f"Uncaught exception: {e}. Closing the server...")
             break
     
     try:
         tidy_up_lock_file()
     except:
-        logger.warning("Error during lockfile cleanup")
+        logger.warning("Error during lockfile cleanup, investigate if issues reloading persist.")
 
     pythoncom.CoRevokeClassObject(revokeId)
     pythoncom.CoUninitialize()
 
-    logger.info("Graceful exit")
+    logger.info("Graceful shutdown. Program exiting...")
     input("Press Enter to exit")
     sys.exit()
 
 
 def main():
-
-    def disable_quickedit():
-        '''
-        Disable quickedit mode on Windows terminal. quickedit prevents script to
-        run without user pressing keys..'''
-        if not os.name == 'posix':
-            try:
-                import msvcrt
-                import ctypes
-                kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-                device = r'\\.\CONIN$'
-                with open(device, 'r') as con:
-                    hCon = msvcrt.get_osfhandle(con.fileno())
-                    kernel32.SetConsoleMode(hCon, 0x0080)
-            except Exception as e:
-                print('Cannot disable QuickEdit mode! ' + str(e))
-                print('.. As a consequence the script might be automatically\
-                paused on Windows terminal')
-
-        pass
-
-    disable_quickedit()
-
     try:
+
         # global PARENT_PID
         global DEBUGPY_PORT
         global CLSID
@@ -300,8 +347,9 @@ def main():
     
         serve()
     except Exception as e:
-        print(f"Fatal Exception: {e}")
-        input("Fatal error encountered. Press enter to exit")
+        logger.critical(f"Fatal Exception encountered: {e}")
+        logger.critical(f"Closing down...")
+        input("Press enter to exit")
 
     finally:
         sys.exit()

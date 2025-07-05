@@ -1357,7 +1357,7 @@ if CONFIG.MULTI_SERVER_EXPERIEMENT:
     logger.warning("MULTI_SERVER_EXPERIMENT behaviour is experimental")
     from filelock import FileLock
     XLAPP_LOCK = FileLock((Path(sys.executable) / "../../../../../xlapp.lock").resolve())
-    def comsafe(_func=None, *, sleep=0.01, attempts=100):
+    def comsafe(_func=None, *, sleep=0.01, attempts=5000):
         def decorator(func):
             @wraps(func)
             def inner(*args, **kwargs):

@@ -22,6 +22,10 @@ import re
 import stat
 from . import config
 
+# import io
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 CONFIG = config.load()
 
 
@@ -75,22 +79,22 @@ pass
 
 console = Console(highlight=False)
 
-style_prompt = Style.parse("green")
+style_prompt = Style.parse("#526cfe")
 style_prompt_boldface = style_prompt + Style.parse("bold")
 
-style_generic_option = Style.parse("cyan")
+style_generic_option = Style.parse("#cccccc")
 style_selected_option = style_generic_option + Style.parse("bold") + Style.parse("reverse")
 
-style_plain = Style.parse("")
+style_plain = Style.parse("#cccccc")
 style_plain_boldface = style_plain + Style.parse("bold")
 
-style_success = Style.parse("green")
+style_success = Style.parse("#526cfe")
 style_success_boldface = style_success + Style.parse("bold")
 
-style_error = Style.parse("red")
+style_error = Style.parse("#e5342f")
 style_error_boldface = style_error + Style.parse("bold")
 
-style_warning = Style(color="#FFA500")
+style_warning = Style(color="#eeba56")
 style_warning_boldface = style_warning + Style.parse("bold")
 
 
@@ -475,7 +479,7 @@ def get_user_selection(prompt:str, selection_items:list[str], index:int=0) -> st
 
 
 def print_info(msg:str):
-    console.print("INFO: ", style=style_plain_boldface, end="")
+    console.print("INFO:    ", style=style_plain_boldface, end="")
     console.print(msg, style=style_plain)
 
 
@@ -490,7 +494,7 @@ def print_warning(msg:str):
 
 
 def print_error(msg:str):
-    console.print("ERROR: ", style=style_error_boldface, end="")
+    console.print("ERROR:   ", style=style_error_boldface, end="")
     console.print(msg, style=style_error)
 
 
@@ -1728,6 +1732,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         # stdout=subprocess.PIPE,
         stderr=subprocess.PIPE # if do_register_wb else None, # Pipe the stderr to read the triggers
     )
+
 
 
     def register_wb_on_signal(_process):

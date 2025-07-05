@@ -124,8 +124,15 @@ def _load_uv_help() -> str:
 
 
 def main():
+
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    with open(Path(__file__).parent.parent / "cli-header.txt", "r", encoding="utf-8") as f:
+        print(f.read())
+        # sys.stdout.flush()
+
     _configure_env()
-    _load_uv_help()
 
     parser = argparse.ArgumentParser(
         prog="xlpro-cli",

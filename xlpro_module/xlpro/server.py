@@ -158,33 +158,38 @@ class xlproServer:
     def register_fnames_in_workbook(self, workspace:xlproWorkspace, wb_dispatch):
         """Registers fname_* in the workbook names so the user knows what names
         Are registered"""
-        logger.info("Deleting Names beginning with reserved string `fname_`...")
+
 
         def _xlinteract1():
-            logger.info("Adding pyNone and pyEmpty to workbook names")
+            logger.info("Replacing workbook names beginning with reserved string `fname_`, `args_`...")
+            logger.info("Adding names to workbook Name Manager...")
+            logger.info("Adding pyNone and pyEmpty to workbook names...")
             wb_dispatch.Names.Add(_utils.XLPRO_EMPTY_STR, f"=\"{_utils.XLPRO_EMPTY_STR}\"")
             wb_dispatch.Names.Add(_utils.XLPRO_NONE_STR, f"=\"{_utils.XLPRO_NONE_STR}\"")
 
+            logger.info("Adding function names to workbook names...")
             count = 0
             for name in wb_dispatch.Names:
                 if name.Name.startswith("fname_"):
                     wb_dispatch.Names(name.Name).Delete()
                     count += 1
-            logger.info(f"Deleted {count} names")
+            logger.debug(f"Deleted {count} names")
             
-            logger.info("Adding fname names to workbook names")
+            logger.info("Adding function names...")
             count = 0
             for fname in workspace.get_active_registered_functon_map().keys():
                 wb_dispatch.Names.Add(f"fname_{fname}", f"=\"{fname}\"")
                 count += 1
-            logger.info(f"Added {count} names to workbook names")
+            logger.info(f"Added {count} function names")
 
             f_map = workspace.get_active_registered_functon_map()
 
+            logger.info("Adding argument arrays to workbook names...")
             for name in wb_dispatch.Names:
                 if name.Name.startswith("args_"):
                     wb_dispatch.Names(name.Name).Delete()
 
+            count = 0
             for k, v in f_map.items():
                 args:list[str] = _utils.get_excel_args_of_func(v)
                 if len(args) == 0:
@@ -195,7 +200,12 @@ class xlproServer:
                     s = "={{{}}}".format(";".join([f"\"{x}\"" for x in args]))
                 (a:=f"args_{k}", b:=f"{s}")
                 wb_dispatch.Names.Add(a, b)
+                count += 1
                 pass
+            logger.info(f"Added {count} argument array names")
+            logger.info("Workbook name registration complete")
+
+                
 
         # _xlinteract1()
         _utils.comsafe(_xlinteract1)()
@@ -209,7 +219,7 @@ class xlproServer:
         wb_path = self._get_workspace_pathuid_from_wb(wb_dispatch)
 
         if not wb_path in self._workspace_map.keys():
-            logger.info(f"Creating workspace '{wb_path}'...")
+            logger.info(f"Creating new workspace for '{Path(wb_path).name}'...")
             uid = _utils.hash_str(wb_path)
             workspace = xlproWorkspace(self, wb_uid=wb_path, uid=uid)
             workspace_wd = Path(wb_path).parent.resolve()
@@ -221,16 +231,16 @@ class xlproServer:
 
             self._workspace_map[wb_path] = workspace
             self._workspace_uid_to_workbook_path[uid] = wb_path
-            logger.info(f"Creation of workspace complete for '{wb_path}'.")
+            logger.info(f"Creation of workspace complete for '{wb_path}'")
 
             pass
         else:
-            logger.info(f"Workspace already exists, resetting workspace '{wb_path}'.")
+            logger.info(f"Workspace already exists. Resetting...")
+            logger.info(f"Resetting workspace '{Path(wb_path).name}'...")
             workspace = self._get_workspace_from_wb(wb_dispatch)
             workspace.reset()
             self.register_fnames_in_workbook(workspace=workspace, wb_dispatch=Dispatch(wb_dispatch))
-
-            logger.info(f"Workspace reset complete for '{wb_path}'.")
+            logger.info(f"Workspace reset complete for '{Path(wb_path).name}'")
             
             # logger.info(f"Workspace '{uid}' already exists. Shutting down and re-initializing workspace.")
             # self.shutdown_workspace_from_dispatch(wb_dispatch)
@@ -244,6 +254,7 @@ class xlproServer:
         if not uid in self._workspace_map.keys():
             logger.info("Workbook has not been registered, initializing...")
             self.register_and_configure_wb_workspace(wb_dispatch)
+            logger.info("Initialization complete.")
         _utils.comarshal_release_and_get_stream(wb_dispatch) # marshalling ok afaik
         return self._workspace_map[uid]
     
@@ -418,9 +429,10 @@ class xlproWorkspace:
         self.reset_workspace_cache()
 
     def set_xlpro_working_dir(self, wd:Path):
-        logger.info(f"Setting working directory for workspace to '{str(wd)}'")
+        logger.info(f"Setting working directory for workspace '{self._wb_path.name}'... ")
         # self._wd = initialize_and_get_workspace_xlpro_dir(self._wb_path)
         self._wd = get_workspace_xlpro_dir(self._wb_path)
+        logger.info(f"Working directory for '{self._wb_path.name}' set at '{str(wd)}'")
 
     # def _configure_xlpro_files(self):
     #     # configure_workspace_xlpro_files(self._wd.parent, cfg)
@@ -431,14 +443,14 @@ class xlproWorkspace:
         self._temp_module_name = f"{CFG.xlpro_functions_stem}_{self._uid}"
         _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{CFG.xlpro_functions_stem}.py")
         self.update_module_func_map_wrapper()
-        logger.info(f"Registration complete.")
+        logger.info(f"Workspace functions registered")
 
     def register_subs_in_self(self):
         logger.info(f"Registering workspace subroutines...")
         self._sub_module_name = f"{CFG.xlpro_subroutines_stem}_{self._uid}"
         _wrappers.import_module_subs_with_registration(self._sub_module_name, self._wd / f"{CFG.xlpro_subroutines_stem}.py")
         self.update_module_sub_map_wrapper()
-        logger.info(f"Registration complete.")
+        logger.info(f"Workspace subroutines registered")
 
     def get_active_registered_functon_map(self):
         return {k: v for k, v in self._module_function_maps_wrapper.fname_func_register.items() if self._module_function_maps_wrapper.fname_isactive_register[k]}
@@ -454,23 +466,23 @@ class xlproWorkspace:
         return [self._module_sub_maps_wrapper.subname_func_register[key] for key in keys]
     
     def deregister_functions_in_self(self):
-        logger.info(f"Deregistering workspace functions...")
+        logger.info(f"De-registering workspace functions...")
         # self._valid_function_names = []
         if self._temp_module_name is not None:
             try:
                 del sys.modules[self._temp_module_name]
             except KeyError:
                 pass
-        logger.info(f"Deregistration complete.")
+        logger.info(f"Workspace function de-registration complete")
     def deregister_subs_in_self(self):
-        logger.info(f"Deregistering workspace subs...")
+        logger.info(f"De-registering workspace subroutines...")
         # self._valid_function_names = []
         if self._temp_module_name is not None:
             try:
                 del sys.modules[self._temp_module_name]
             except KeyError:
                 pass
-        logger.info(f"Deregistration complete.")
+        logger.info(f"Workspace subroutine de-registration complete")
 
     def update_module_func_map_wrapper(self):
         self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
@@ -480,7 +492,7 @@ class xlproWorkspace:
 
     def reset(self):
         # self._configure_xlpro_files()
-        logger.info("Resetting workspace")
+        logger.info(f"Resetting workspace '{self._wb_path.name}'...")
         self.deregister_functions_in_self()
         self.register_functions_in_self()
 
@@ -488,6 +500,7 @@ class xlproWorkspace:
         self.register_subs_in_self()
 
         self.reset_workspace_cache()
+        logger.info("Workspace reset complete...")
 
     def _get_function_by_name(self, fname):
         try:
@@ -610,6 +623,7 @@ class xlproWorkspace:
             import uuid
             uid = SUB_CALLER_FLAG_STRING + str(uuid.uuid4())
 
+            logger.info(f"Calling subroutine '{fname}'...")
             logger.debug(f"Calling subroutine '{fname}', uid: '{uid}'")
 
             # xxx - todo - hack to signal the clientmanager to skip!
@@ -633,7 +647,7 @@ class xlproWorkspace:
         
         # Return the python exception string as a fallback
         except Exception as e:
-            logger.critical("error during execute_sub_async please rectify!")
+            logger.critical(f"Error encountered during subroutine execution '{fname}'")
             raise e
             # sys.exit()
             # return 
@@ -667,6 +681,8 @@ class xlproWorkspace:
             # calling_time = time.time_ns()
 
             uid = caller_sheetaddr + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
+
+            logger.info(f"Calling function '{fname}' from '{caller_sheetaddr}'...")
 
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
@@ -1126,7 +1142,7 @@ class xlproWorkspace:
             try:
                 ret = f(*args, **kwargs)
                 self._result_queue.put((uid, ret))
-                logger.info(f"Completed function '{uid}' successfully")
+                logger.debug(f"Completed function '{uid}' successfully")
             except Exception as e:
                 if isinstance(e, errors.ArugmentNotReadyException):
                     pass
@@ -1140,14 +1156,14 @@ class xlproWorkspace:
                     pass
                 elif isinstance(e, AttributeError):
                     if re.match(r"^<unknown>\..*$", str(e)):
-                        logger.debug(f"error looks like a COM access error, modifying it from e={repr(e)}")
+                        logger.debug(f"Error looks like a COM access error, modifying it from e={repr(e)}")
                         e = errors.xlproLikelyCOMAccessError(str(e))
                 elif isinstance(e, pythoncom.com_error):
                     pass
                 elif isinstance(e, Exception):
                     pass
                 self._result_queue.put((uid, e))
-                logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
+                logger.warning(f"Completed function '{uid}' unsuccessfully. Error: '{e}'")
             logger.debug("Waking results manager from worker thread...")
             self._results_manager_thread.wake()
         
@@ -1158,10 +1174,12 @@ class xlproWorkspace:
             try:
                 ret = func(*args, **kwargs)
                 self._result_queue.put((uid, ret))
-                logger.info(f"Completed function '{uid}' successfully")
+                logger.debug(f"Completed subroutine '{uid}' successfully")
             except Exception as e:
                 self._result_queue.put((uid, e))
-                logger.info(f"Completed function '{uid}' unsuccessfully with error {e}")
+                # logger.debug(f"Completed function '{uid}' unsuccessfully with error {e}")
+                logger.warning(f"Completed subroutine '{uid}' unsuccessfully. Error: '{e}'")
+
             logger.debug("Waking results manager from worker thread...")
             self._results_manager_thread.wake()
         
@@ -1283,7 +1301,8 @@ class WorkerManager:
     def start(self):
         self._thread.start()
         self._thread
-        logger.info(f"WorkerManager thread started: tid: {threading.get_native_id()}")
+        logger.info("Worker Manager initialized")
+        logger.debug(f"WorkerManager thread started: tid: {threading.get_native_id()}")
 
     def stop(self):
         self._stop_event.set()
@@ -1331,7 +1350,7 @@ class WorkerManager:
                     # func = self.sleep_wrapper(self._wrap_with_cleanup(uid, self._server._uid_pending_function_map[uid]))
                     func = self._wrap_with_cleanup(uid, self._server._uid_pending_function_map[uid])
             except KeyError:
-                logger.warning(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
+                logger.debug(f"Pending function queue uid not available, ignoring calculation request for uid '{uid}'")
                 return
             
             with self._threadpool_dict_lock:
@@ -1351,7 +1370,7 @@ class WorkerManager:
             t.start()
             return
 
-        logger.info(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
+        logger.debug(f"Reached maximum worker thread cap - MAX_THREADS: {self.MAX_THREADS}")
 
 
     def _clear_completed_threads(self):
@@ -1369,7 +1388,7 @@ class WorkerManager:
             self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
-                logger.info("WorkerManager thread woke up for an event!")
+                logger.debug("WorkerManager thread woke up for an event!")
             while True:
                 try:
                     self._process_function_queue()
@@ -1389,11 +1408,12 @@ class ResultsManager:
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._server = server
+        logger.info("Results Manager initialized")
 
     def start(self):
         self._thread.start()
         self._thread
-        logger.info(f"ResultsManager thread started: tid: {threading.get_native_id()}")
+        logger.debug(f"ResultsManager thread started: tid: {threading.get_native_id()}")
 
     def stop(self):
         self._stop_event.set()
@@ -1455,7 +1475,7 @@ class ResultsManager:
             elif isinstance(val, TypeError):
                 # There is a bug of some kind where .Address on a range raises a Type error. This case deals with it
                 if val.args[0] == 'This object does not support enumeration':
-                    logger.info(f"Assuming OBJREF invalid '{uid}', recycling function...")
+                    logger.debug(f"Assuming OBJREF invalid '{uid}', recycling function...")
                     # self.signal_worker_manager_to_recalculate(uid)
                     self._set_results_value(uid, ret)
                     self._server._client_recalculate_queue.put(uid)
@@ -1466,11 +1486,11 @@ class ResultsManager:
             elif isinstance(val, pythoncom.com_error):
                 # recycle if excel is not accessible
                 if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
-                    logger.info(f"Call rejected by callee for '{uid}', recycling function...")
+                    logger.debug(f"Call rejected by callee for '{uid}', recycling function...")
                     self.signal_worker_manager_to_recalculate(uid)
                     return
                 elif VBErrorConverter(val) == 285: # The marshaled interface data packet (OBJREF) has an invalid or unknown format.
-                    logger.info(f"OBJREF invalid '{uid}', recycling function...")
+                    logger.debug(f"OBJREF invalid '{uid}', recycling function...")
                     # self.signal_worker_manager_to_recalculate(uid)
                     self._set_results_value(uid, ret)
                     self._server._client_recalculate_queue.put(uid)
@@ -1478,7 +1498,7 @@ class ResultsManager:
                     self._server._client_manager_thread.wake()
                     return
                 elif VBErrorConverter(val) == 30: # A disk error occurred during a read operation.
-                    logger.info(f"disk read failed '{uid}', recycling function...")
+                    logger.debug(f"disk read failed '{uid}', recycling function...")
                     # self.signal_worker_manager_to_recalculate(uid)
 
                     # with self._server._uid_pending_function_map_lock:
@@ -1492,23 +1512,23 @@ class ResultsManager:
                     self._server._client_manager_thread.wake()
                     return
                 else:
-                    logger.info(f"Other COM error for '{uid}', recycling function...")
-                    logger.info(f"'{repr(val)}'")
+                    logger.debug(f"Other COM error for '{uid}', recycling function...")
+                    logger.debug(f"'{repr(val)}'")
                     self.signal_worker_manager_to_recalculate(uid)
                     return
 
 
             elif isinstance(val, errors.xlproLikelyCOMAccessError):
-                logger.warning(f"Likely COM access error for {uid}, recycling.")
+                logger.debug(f"Likely COM access error for {uid}, recycling.")
                 self.signal_worker_manager_to_recalculate(uid)
                 return
             
             elif isinstance(val, UnboundLocalError):
-                logger.warning(f"UnboundLocalError {uid}, recycling... (TODO fix this)")
+                logger.debug(f"UnboundLocalError {uid}, recycling... (TODO fix this)")
                 self.signal_worker_manager_to_recalculate(uid)
                 pass
 
-            logger.warning(f"Returned value is a generic exception: {uid}, {val}")
+            logger.debug(f"Returned value is a generic exception: {uid}, {val}")
             # ret = repr(val) # convert exception to string for it to show in excel.
 
 
@@ -1545,7 +1565,7 @@ class ResultsManager:
             self._wake_event.wait(timeout=0.1)
             if self._wake_event.is_set():
                 self._wake_event.clear()
-                logger.info("ResultsManager thread woke up for an event!")
+                logger.debug("ResultsManager thread woke up for an event!")
             # Process the whole queue once woken up
             # XXX - could replace while trye with while not stop event.
             while True:
@@ -1628,11 +1648,12 @@ class ClientManager:
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._server = server
+        logger.info("Client Manager initialized")
 
     def start(self):
         self._thread.start()
         self._thread
-        logger.info(f"ClientManager thread started: tid: {threading.get_native_id()}")
+        logger.debug(f"ClientManager thread started: tid: {threading.get_native_id()}")
 
     def stop(self):
         self._stop_event.set()
@@ -1663,7 +1684,7 @@ class ClientManager:
             iterable_val = self._get_value(uid)
 
             if isinstance(iterable_val, Exception):
-                logger.warning(f"Value is an exception: '{iterable_val}', '{uid}'")
+                logger.debug(f"Value is an exception: '{iterable_val}', '{uid}'")
                 self._set_result_display(uid, repr(iterable_val))
 
             # construct a list off the iterable value
@@ -1686,7 +1707,7 @@ class ClientManager:
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
-            logger.error(f"Error during client update: '{uid}', {e}")
+            logger.debug(f"Error during client update: '{uid}', {e}")
         finally:
             try:
                 self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
@@ -1705,7 +1726,8 @@ class ClientManager:
             else:
                 val = val0
             if isinstance(val, Exception):
-                logger.warning(f"Value is an exception: '{val}', '{uid}'")
+                # TODO investigate need to show these as user warnings
+                logger.debug(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
             else:
                 if type(val) in SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION_KEYS:
@@ -1721,7 +1743,7 @@ class ClientManager:
             # self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
-            logger.error(f"Error during client update: '{uid}', {e}")
+            logger.debug(f"Error during client update: '{uid}', {e}")
         finally:
             try:
                 self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
@@ -1745,7 +1767,7 @@ class ClientManager:
             else:
                 val = val0
             if isinstance(val, Exception):
-                logger.warning(f"Value is an exception: '{val}', '{uid}'")
+                logger.debug(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
             else:
                 self._set_result_display(uid, val)
@@ -1759,7 +1781,7 @@ class ClientManager:
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
-            logger.error(f"Error during client update: '{uid}', {e}")
+            logger.debug(f"Error during client update: '{uid}', {e}")
         
         except Exception as e:
             try:
@@ -1791,6 +1813,7 @@ class ClientManager:
                 ws = caller_adjacent.Parent
                 # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
 
+                logger.info(f"Adding image to Excel: '{xl_name}'")
                 # look for an existing shape with the same name
                 ws:'xl._Worksheet'
                 try:
@@ -1798,7 +1821,7 @@ class ClientManager:
                     xpos, ypos = shape.Left, shape.Top
                     shape.Delete()
                 except pythoncom.com_error as e:
-                    logger.warning(f"could not find object with name: {xl_name} to delete")
+                    logger.debug(f"Could not find object with name: {xl_name} to delete")
 
                 try:
                     shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
@@ -1807,6 +1830,7 @@ class ClientManager:
                 except Exception as e:
                     shape.Delete()
                     raise e
+                logger.info(f"Image '{xl_name}' added successfully")
                 self._set_result_display(uid, f"Image<{xl_name}>")
                 caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
                 return
@@ -1904,33 +1928,35 @@ class ClientManager:
                         self._update_client_pyobject_result(uid)
 
                 else:
-                    raise Exception("Result type invalid")
+                    msg = "Internal Server Error: Result type not valid"
+                    logger.critical(msg)
+                    raise Exception(msg)
                 
                 
                 # if successful we don't need to replace#
-                logger.debug(f"Client manager successfully processed uid '{uid}'. Not replacing")
+                logger.info(f"Client manager successfully processed uid '{uid}'.")
                 replace_in_queue = False
                 # XXX - todo - consider removing the uid after this call
             except pywintypes.com_error as e:
                 if VBErrorConverter(e) == VBError.xlObjectRequired:
                     # Range has been deleted
                     replace_in_queue = False
-                    logger.error("VB Error - Object Required. Cell has been deleted. Removing from queue.")
+                    logger.warning("VB Error - Object Required. Cell has been deleted. Removing from queue.")
                     # XXX - todo - if this is dropped from the queue the uid definitely needs to be marked for delete.
                 elif VBErrorConverter(e) == VBError.xlCallRejectedByCallee:
                     # Call rejected - excel might be in a dialogue 
-                    logger.debug("VB Error - Call rejected, recycling in queue")
+                    logger.warning("VB Error - Call rejected, recycling in queue")
                 else:
-                    logger.debug(f"Other COM Error occurred, {e}, recycling in queue")
+                    logger.warning(f"Other COM Error occurred, {e}, recycling in queue")
 
                 logger.info(f"Could not recalculate caller_dispatch for uid: '{uid}'")
 
             except AttributeError as e:
                 logger.warning("AttributeError during cell update, Application may be in dialogue")
             except KeyError as e:
-                logger.critical(f"Error during client queue processing1! {e}")
+                logger.warning(f"Error during client queue processing 1! {e}")
             except Exception as e:
-                logger.critical(f"Error during client queue processing2! {e}")
+                logger.warning(f"Error during client queue processing 2! {e}")
             finally:
                 # XXX - Marshalling the caller back to the pool in case
                 logger.debug("Releasing caller dispatch during ClientManager._process_queue()")

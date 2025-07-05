@@ -5,7 +5,7 @@ from pathlib import Path
 
 setup(
     name="xlpro_cli",
-    version='0.1.0',
+    version="0.0.0",
     packages=find_packages(),
     entry_points={
         'console_scripts': [
@@ -14,7 +14,7 @@ setup(
     },
     author='Daniel Evans',
     description='xlpro command line interface package',
-    url='tbc',
+    url='N/A',
     install_requires=[],
 )
 

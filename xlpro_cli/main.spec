@@ -8,9 +8,14 @@ PyInstaller.config.CONF['distpath'] = "./dist"
 
 datas = []
 datas += copy_metadata('readchar', recursive=True)
+datas += [("cli-header.txt", "cli-header.txt")]
 
 import sys
 sys.path.insert(0, os.getcwd())
+
+import pre_build
+pre_build.main()
+
 import version
 
 EXE_NAME = version.VersionInfo.EXE_NAME
@@ -27,7 +32,6 @@ a = Analysis(
         'rich',
         'regex',
         'uuid',
-
     ],
     hookspath=[],
     hooksconfig={},
