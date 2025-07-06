@@ -392,9 +392,14 @@ def uninstall():
 
 def main():
     errors = None
+    uninstalled = False
     try:
         if XLPRO_INSTALL_DIR.exists():
             errors = uninstall()
+            if not errors:
+                logger.info("Successful uninstall.")
+                if prompt_yes_no_input("Would you like to install", default="no") == "yes":
+                    errors = install()
         else: 
             errors = install()
     except Exception as e:
