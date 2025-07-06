@@ -9,7 +9,6 @@ from typing import Any, get_type_hints
 
 logger = logging.getLogger(__name__)
 
-
 def is_pyinstaller():
     return hasattr(sys, '_MEIPASS')
 
