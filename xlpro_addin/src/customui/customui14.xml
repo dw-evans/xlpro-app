@@ -37,19 +37,17 @@
                   screentip="Backup Redo" 
                   onAction="ButtonPerformRedo"/> 
 
+          <button id="Button11" image="bug-24"  size="large"
+                  label="Restart Undo Tracker" 
+                  screentip="x" 
+                  onAction="ResetUndoButton"/> 
         </group> 
         <group id="group6" label=" "> 
-
 
           <button id="Button10" image="sync-16" 
                   label="Recalculate Selected" 
                   screentip="Forces a full recalculations of the current selected range" 
                   onAction="force_refresh_area_calculationButton"/> 
-
-          <!-- <button id="Button11" image="gear-16" 
-                  label="Restart Undo Tracker" 
-                  screentip="x" 
-                  onAction="ResetUndoButton"/>  -->
 
           <button id="Button6b" image="database-16" 
                   label="Push Requirements" 

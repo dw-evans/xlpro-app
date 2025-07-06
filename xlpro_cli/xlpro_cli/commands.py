@@ -1,7 +1,22 @@
 
+import os
+import ctypes
+
+def enable_ansi_escape_codes_in_console():
+    # Enable ANSI escape codes (24-bit color)
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetStdHandle(-11)
+    mode = ctypes.c_uint32()
+    kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+    kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+
+enable_ansi_escape_codes_in_console()
+
 from pathlib import Path
 import subprocess
 from . import utils
+from .utils import try_except_press_enter_to_exit_wrapper
+
 import sys
 import argparse
 
@@ -10,20 +25,12 @@ from rich import print
 from rich.style import Style
 
 import os
+import traceback
 
 # change the os working directory... Not sure why.....
 os.chdir(Path(__file__).parent.parent.parent)
 
 from functools import wraps
-def try_except_press_enter_to_exit_wrapper(func):
-    @wraps(func)
-    def inner(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception as e:
-            print(f"Error occurred. {e}")
-            utils.press_enter_to_exit()
-    return inner
 
 @try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
@@ -52,7 +59,8 @@ def handle_init(args):
         raise FileNotFoundError(f"The provided workbook path does not exist {workbook_path}. Save the file and try again.")
     
     utils.dlg_xlpro_initialize_workbook(workbook_path)
-    utils.press_enter_to_exit()
+    utils.press_enter_or_timeout_exit(timeout=30.0)
+    # utils.press_enter_to_exit()
 
 
 import pythoncom
@@ -89,19 +97,22 @@ def handle_write_requirements(args):
         print(f"Exception occured when attempting to write workbook requirements data: {e}")
         raise e
     print(f"Requirements written successfully for {workbook_path}")
-    utils.press_enter_to_exit()
+    # utils.press_enter_to_exit()
+    utils.press_enter_or_timeout_exit(timeout=30.0)
 
 @try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_venv_data(args):
     utils.check_envs_folder_size_prompt_delete()
-    utils.press_enter_to_exit()
+    # utils.press_enter_to_exit()
+    utils.press_enter_or_timeout_exit(timeout=5.0)
 
 @try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_tmp_data(args):
     utils.check_tmp_folder_size_prompt_delete()
-    utils.press_enter_to_exit()
+    # utils.press_enter_to_exit()
+    utils.press_enter_or_timeout_exit(timeout=5.0)
 
 XLPRO_INSTALL_DIR = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
 XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
@@ -123,14 +134,50 @@ def _load_uv_help() -> str:
     return ret
 
 
+# def get_cli_header_path():
+#     if getattr(sys, 'frozen', False):
+#         print("running in meipass")
+#         # Running in PyInstaller bundle
+#         base_path = Path(sys._MEIPASS)
+
+#         import pkgutil
+#         header = pkgutil.get_data(__name__, "cli-header.txt").decode("utf-8")
+
+#     else:
+#         print("running in default mode")
+#         # Running in development
+#         base_path = Path(__file__).parent.parent
+
+#     ret = base_path / "cli-header.txt"
+#     print(ret, ret.exists())
+#     return ret
+
+import tempfile
+
 def main():
 
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    with open(Path(__file__).parent.parent / "cli-header.txt", "r", encoding="utf-8") as f:
-        print(f.read())
-        # sys.stdout.flush()
+    # with open(get_cli_header_path(), "r", encoding="utf-8") as f:
+    #     print(f.read())
+    try:
+        if getattr(sys, 'frozen', False):
+            base_path = Path(sys._MEIPASS)
+            fp = base_path / "cli-header.txt"
+            # print(fp, fp.exists())
+            with open(fp, "r", encoding="utf-8") as f:
+                print(f.read())
+        
+        else:
+            # print("running in default mode")
+            # Running in development
+            base_path = Path(__file__).parent.parent
+            with open(base_path / "cli-header.txt", "r", encoding="utf-8") as f:
+                print(f.read())
+    except Exception as e:
+        print("Could not load cli-header.txt")
+
 
     _configure_env()
 
@@ -174,7 +221,8 @@ def main():
         args = parser.parse_args()
     except Exception as e:
         print("Exception occurred")
-        utils.press_enter_to_exit()
+        utils.press_enter_or_timeout_exit(timeout=30.0)
+        # utils.press_enter_to_exit()
         sys.exit()
     args.func(args)
 

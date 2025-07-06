@@ -7,8 +7,8 @@ import subprocess
 import time
 from pathlib import Path
 # import regex as re
-import logging
 import json
+import logging
 import os
 import uuid
 import shutil
@@ -25,11 +25,11 @@ from . import config
 # import io
 # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+from functools import wraps
+import traceback
 
-CONFIG = config.load()
-
-
-DEVELOPMENT_INSTALL = True
+# DEVELOPMENT_INSTALL = True
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -37,7 +37,26 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',  # The format of log messages
     datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
+
 logger = logging.getLogger(__name__)
+
+def press_enter_to_exit():
+    input("Press enter to exit")
+
+def try_except_press_enter_to_exit_wrapper(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f"Error occurred. {e}")
+            traceback.print_exc()
+            # utils.press_enter_or_timeout_exit(timeout=)
+            press_enter_to_exit()
+    return inner
+
+
+
 
 def is_pyinstaller():
     return hasattr(sys, '_MEIPASS')
@@ -55,6 +74,30 @@ XLPRO_ENVS_DIR = XLPRO_ROOT_PATH / 'envs'
 XLPRO_VENV_WORKBOOKS_MAP_JSON_FP = XLPRO_ENVS_DIR / "venv-mappings.json"
 XLPRO_SRC_DIR = XLPRO_WD / "src"
 XLPRO_TMP_FOLDER_PATH = XLPRO_ROOT_PATH / "tmp"
+
+
+def sleep_then_close(timeout_sec=1.0):
+    console.print(f"Closing in {timeout_sec}...")
+    time.sleep(timeout_sec)
+    sys.exit()
+
+
+def press_enter_or_timeout_exit(timeout=5):
+    import threading
+    def force_exit_after_timeout():
+        time.sleep(timeout)
+        print(f"\nTimeout reached after {timeout} seconds. Exiting.")
+        sys.exit()  # non-zero exit code for timeout
+
+    # Start the timeout thread
+    timeout_thread = threading.Thread(target=force_exit_after_timeout, daemon=True)
+    timeout_thread.start()
+
+    # Prompt user on main thread
+    input(f"Press Enter to exit (timeout in {timeout} sec)...\n")
+    print("Closing...")
+    timeout_thread.join()
+    sys.exit()
 
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
@@ -395,15 +438,17 @@ def prompt_user_valid_file_path(prompt) -> str:
 
 
 def prompt_yes_no_input(prompt:str, default:str = "yes") -> str:
+    default = default.lower()
+
     if not default in ["yes", "no"]:
         raise Exception
-    
+
     lookup = {
         "yes": "yes",
         "y": "yes",
         "no": "no",
         "n": "no",
-        "": default
+        "": default.lower()
     }
     def print_prompt():
         console.print(f"{prompt} ", style=style_prompt_boldface, end="")
@@ -411,11 +456,14 @@ def prompt_yes_no_input(prompt:str, default:str = "yes") -> str:
         sys.stdout.flush()
 
     print_prompt()
-    inp = input()
-    while not (v:=inp.lower()) in lookup.keys():
-        console.print(f"{v} not recognized", style=style_error)
-        print_prompt()
-        inp = input()
+    inp = input().lower()
+    if not (v:=inp.lower()) in lookup.keys():
+        if v == "q":
+            console.print("User requested to quit. Exiting...", style=style_plain)
+            time.sleep(0.5)
+            sys.exit()
+        console.print(f"{v.lower()} not recognized", style=style_error)
+        return prompt_yes_no_input(prompt, default)
     
     ret = lookup[inp]
     if ret == "":
@@ -578,7 +626,7 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             t2.join()
 
             if DEVELOPMENT_INSTALL:
-                print_warning("DEVELOPMENT BUILD: Overwriting requirements with ")
+                print_warning("DEVELOPMENT BUILD: Overwriting requirements with editable xlpro version")
                 install_editable_default_reqs(py_interpreter_path=python_exe)
 
 
@@ -1435,15 +1483,15 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
         # if the virtual environment does not exist on the user's machine, we must create a new one.
         if venv_root_path is None:
             print_warning(f"Could not locate environment a user environment registered with this workbook")
-            if prompt_yes_no_input("Would you like to initialise a new python environment for this workbook?"):
+            if prompt_yes_no_input("Would you like to initialise a new python environment for this workbook?") == "yes":
                 # We should do the following
                 # 1. install the correct python version (let the user choose)
                 # 2. this is an xlpro file, read the requirements, try and compare the environments and fall back to the default requirements.
                 print_warning(f"Please select a Python version matching: '{re.search(r'(\d\.\d+)', xlpro_recommended_py_version).group(1)}.*'")
                 venv_root_path = dlg_user_selects_or_creates_valid_interpreter(version_required=get_t2_version_str(xlpro_recommended_py_version))
             else:
-                print_warning("no further actions could be taken")
-                return
+                print_warning("No further actions to take. Exiting...")
+                sleep_then_close()
 
         # walk the user through comparing the venv environment to the required.
         # do not push anything to the server requirements! Let the user do this manually.
@@ -1615,12 +1663,12 @@ def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
     return xlpro_dir / "xlpro.lock"
 
 
+import xlpro.file_lock
 def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str, int]|None:
     # get the interpreter from the workbook to determine the lockfile name
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     interpreter_path = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
 
-    import xlpro.file_lock
     # the lockfile path will be set adjacent to the interpreter running the xlpro_module
     # however when running using the debug venv interpreter, there will be a mismatch between the interpreter within xlpro-cli.exe and
     # the one which generated the lockfile. 
@@ -1716,6 +1764,9 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
     update_workbook_debugpy_port(workbook_path=workbook_path, port=port)
     print_info(f"spinning up xlpro server for {py_interpreter_path} with debugpy port {port}")
     # if a python process already exists based on the lockfile, this will close itself!
+
+    CONFIG = try_except_press_enter_to_exit_wrapper(config.load)()
+
     process = subprocess.Popen(
         [
             CONFIG.XLPRO_SERVER_PATH,
@@ -1733,8 +1784,6 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         stderr=subprocess.PIPE # if do_register_wb else None, # Pipe the stderr to read the triggers
     )
 
-
-
     def register_wb_on_signal(_process):
         """Registers the workbook once the server is ready."""
         exit_message = "XLPROSTART_TRIGGER_OK"
@@ -1749,7 +1798,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
                 if time.time() - start_time > timeout_seconds:
                     raise TimeoutError("Timeout waiting for startup signal")
         except TimeoutError as e:
-            print_error(f"startup timedout after {timeout_seconds} sec. You will need to manually register (sync) the workbook.")
+            print_error(f"Startup timed-out after {timeout_seconds} sec. You will need to manually register (sync) the workbook.")
 
         
         # Ready to link the workbook to the server.
@@ -1765,7 +1814,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
     if do_register_wb:
         register_wb_on_signal(process)
 
-    pass
+    press_enter_or_timeout_exit(5.0)
+
 
 def get_folder_size(path: str | Path) -> int:
     path = Path(path)
@@ -1840,8 +1890,6 @@ def check_envs_folder_size_prompt_delete():
         except Exception as e:
             print_error(f"Unable to delete the directory. {e}")
 
-def press_enter_to_exit():
-    input("Press enter to exit")
 
 
 # def close_venv_xlpro_server_for_workbook(workbook_path:Path):

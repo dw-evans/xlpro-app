@@ -7,8 +7,8 @@
         ██╔╝ ██╗███████╗██║     ██║  ██║╚██████╔╝
         ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ 
 
-            xlpro-cli v0.0.4
-            Copyright (c) 2025 Daniel Evans
-            License: MIT. Free for commercial use.
+          xlpro v0.0.4
+          Copyright (c) 2025 Daniel Evans
+          License: MIT. Free for commercial use.
 
     

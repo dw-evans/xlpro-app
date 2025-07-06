@@ -5,11 +5,10 @@ from pathlib import Path
 import subprocess
 import shutil
 
-# import xlpro.version
+import xlpro
 
 wd = Path(__file__).parent
 
-import xlpro
 
 paths = [
     (
@@ -21,7 +20,7 @@ paths = [
         f"src/xlpro-{xlpro.__version__}-py3-none-any.whl",
     ),
     (
-        f"../xlpro_module/config.toml",
+        f"../xlpro_module/config_production.toml",
         "config.toml"
     ),
     (
@@ -38,7 +37,7 @@ paths = [
     ),
     (
         f"../LICENSE",
-        f"LICENSE",
+        f"LICENSE.txt",
     ),
     (
         f"../xlpro_cli_shell_wrapper/xlpro-server.exe",
@@ -48,6 +47,8 @@ paths = [
 
 import os
 import shutil
+
+import xlpro
 
 PRE_BUILD_DIR = wd / "install"
 

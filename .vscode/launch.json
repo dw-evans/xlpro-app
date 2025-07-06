@@ -26,7 +26,9 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "init",
+                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
                 "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
+
             ],
         },
         {
@@ -37,6 +39,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "start",
+                
                 "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
             ],
         },

@@ -39,6 +39,11 @@ from xlpro import errors
 import json
 from xlpro._types import list1d, list2d, ndarray1d, ndarray2d
 
+import time
+
+from filelock import FileLock
+import filelock
+
 
 logger = logging.getLogger(__name__)
 
@@ -1347,17 +1352,18 @@ def nd_replace_pynone_strs(arr: np.ndarray, cast:bool) -> np.ndarray:
 #                     pass  # keep original if it can't be cast
 #     return df
 
-import xlpro.config
-import time
 
+XLAPP_LOCK = None
+
+import xlpro.config
 CONFIG = xlpro.config.load()
 
 if CONFIG.MULTI_SERVER_EXPERIEMENT:
     logger.info("User has selected MULTI_SERVER_EXPERIMENT")
     logger.warning("MULTI_SERVER_EXPERIMENT behaviour is experimental")
-    from filelock import FileLock
     XLAPP_LOCK = FileLock((Path(sys.executable) / "../../../../../xlapp.lock").resolve())
     def comsafe(_func=None, *, sleep=0.01, attempts=5000):
+        global XLAPP_LOCK
         def decorator(func):
             @wraps(func)
             def inner(*args, **kwargs):
@@ -1387,9 +1393,7 @@ if CONFIG.MULTI_SERVER_EXPERIEMENT:
             return decorator  # used with arguments
         else:
             return decorator(_func)  # used without arguments
-
 else:
-    logger.info("User has not selected MULTI_SERVER_EXPERIMENT")
     XLAPP_LOCK = threading.Lock()
     def comsafe(_func=None, *, sleep=None, attempts=None):
         def decorator(func):
@@ -1403,12 +1407,6 @@ else:
             return decorator  # used with arguments
         else:
             return decorator(_func)  # used without arguments
-
-
-# No idea if this actually helps
-
-# XXX - TODO convert this to a filelock-style lock?
-
 
 
 

@@ -108,6 +108,7 @@
           "xlpro_addin compile and push",
           "xlpro_module build wheel",
           "xlpro_cli build",
+          "xlpro_shell_wrapper go build xlpro-server",
           "xlpro_installer pre_build"
         ],
         "dependsOrder": "sequence",
@@ -200,9 +201,7 @@
           "$go"
         ],
         "dependsOn": [
-          "xlpro_shell_wrapper rsrc"
-          // "xlpro_shell_wrapper pre_build",
-          // "xlpro_shell_wrapper go winres make"
+          "xlpro_shell_wrapper rsrc",
         ],
         "dependsOrder": "sequence",
         "group": {

@@ -1,12 +1,24 @@
+import os
+import ctypes
+def enable_ansi_escape_codes_in_console():
+    # Enable ANSI escape codes (24-bit color)
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetStdHandle(-11)
+    mode = ctypes.c_uint32()
+    kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+    kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+
+enable_ansi_escape_codes_in_console()
+
+
 from pathlib import Path
 import winreg
 import logging
 import subprocess
 import shutil
-import os
 import sys
 import logging
-import version
+import time
 
 DEVELOPMENT_INSTALL = False
 
@@ -21,7 +33,6 @@ logging.basicConfig(
     # datefmt='%Y-%m-%d %H:%M:%S'    # The format of the date in log messages
 )
 logger =  logging.getLogger(__name__)
-
 
 
 XLPRO_INSTALL_DIR = (Path(os.environ.get("USERPROFILE")) / ".xlpro").resolve()
@@ -42,8 +53,8 @@ if getattr(sys, 'frozen', False):
 else:
     # Running in a normal Python interpreter
     BASE_PATH = Path(__file__).parent
-import pre_build
-PRE_BUILD_DIR = BASE_PATH / pre_build.PRE_BUILD_DIR.name
+
+PRE_BUILD_DIR = BASE_PATH / "install"
 
 def add_to_user_path(p:Path):
     # Ensure the path is absolute
@@ -243,34 +254,36 @@ from rich.style import Style
 
 console = Console(highlight=False)
 
-style_prompt = Style.parse("green")
+style_prompt = Style.parse("#526cfe")
 style_prompt_boldface = style_prompt + Style.parse("bold")
 
-style_generic_option = Style.parse("cyan")
+style_generic_option = Style.parse("#cccccc")
 style_selected_option = style_generic_option + Style.parse("bold") + Style.parse("reverse")
 
-style_plain = Style.parse("")
+style_plain = Style.parse("#cccccc")
 style_plain_boldface = style_plain + Style.parse("bold")
 
-style_success = Style.parse("green")
+style_success = Style.parse("#526cfe")
 style_success_boldface = style_success + Style.parse("bold")
 
-style_error = Style.parse("red")
+style_error = Style.parse("#e5342f")
 style_error_boldface = style_error + Style.parse("bold")
 
-style_warning = Style(color="#FFA500")
+style_warning = Style(color="#eeba56")
 style_warning_boldface = style_warning + Style.parse("bold")
 
 def prompt_yes_no_input(prompt:str, default:str = "yes") -> str:
+    default = default.lower()
+
     if not default in ["yes", "no"]:
         raise Exception
-    
+
     lookup = {
         "yes": "yes",
         "y": "yes",
         "no": "no",
         "n": "no",
-        "": default
+        "": default.lower()
     }
     def print_prompt():
         console.print(f"{prompt} ", style=style_prompt_boldface, end="")
@@ -278,11 +291,14 @@ def prompt_yes_no_input(prompt:str, default:str = "yes") -> str:
         sys.stdout.flush()
 
     print_prompt()
-    inp = input()
-    while not (v:=inp.lower()) in lookup.keys():
-        console.print(f"{v} not recognized", style=style_error)
-        print_prompt()
-        inp = input()
+    inp = input().lower()
+    if not (v:=inp.lower()) in lookup.keys():
+        if v == "q":
+            console.print("User requested to quit. Exiting...", style=style_plain)
+            time.sleep(0.5)
+            sys.exit()
+        console.print(f"{v.lower()} not recognized", style=style_error)
+        return prompt_yes_no_input(prompt, default)
     
     ret = lookup[inp]
     if ret == "":

@@ -1,32 +1,24 @@
 [project]
 name = "xlpro"
-version = "0.1.0.0"
+version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "bs4>=0.0.2",
     "build>=1.2.2.post1",
-    "comtypes>=1.4.11",
-    "debugpy>=1.8.13",
-    "matplotlib>=3.10.1",
+    "debugpy>=1.8.14",
+    "filelock>=3.18.0",
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.1",
+    "olefile>=0.47",
     "oletools>=0.60.2",
-    "pandas>=2.2.3",
+    "pandas>=2.3.0",
     "psutil>=7.0.0",
-    "pyinstaller>=6.12.0",
+    "pyinstaller>=6.14.2",
     "pyinstaller-versionfile>=3.0.1",
-    "pywin32>=309",
+    "pywin32>=310",
     "readchar>=4.2.1",
     "regex>=2024.11.6",
-    "rich>=13.9.4",
-    "setuptools>=77.0.3",
-    "toml>=0.10.2",
-    "typer>=0.15.2",
-    "win32typelibs",
+    "rich>=14.0.0",
+    "setuptools>=80.9.0",
 ]
-
-[tool.uv.sources]
-win32typelibs = { path = "../win32typelibs" }
-
-[tool.uv.workspace]
-members = ["xlpro_install/envs/cbbaf652-2b79-46aa-aa6c-0e8838722d2c_3.14.0"]

@@ -3,28 +3,56 @@ package main
 import (
 	"os"
 	"os/exec"
+	"syscall"
+	"unsafe"
+	// "syscall"
+	// "unsafe"
 )
 
+func enableVirtualTerminalProcessing() {
+	const (
+		STD_OUTPUT_HANDLE                 = -11
+		ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+	)
 
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	getStdHandle := kernel32.NewProc("GetStdHandle")
+	getConsoleMode := kernel32.NewProc("GetConsoleMode")
+	setConsoleMode := kernel32.NewProc("SetConsoleMode")
 
+    tmp:=int32(STD_OUTPUT_HANDLE)
+	hOut, _, _ := getStdHandle.Call(uintptr(tmp))
+
+	var mode uint32
+	getConsoleMode.Call(hOut, uintptr(unsafe.Pointer(&mode)))
+	setConsoleMode.Call(hOut, uintptr(mode|ENABLE_VIRTUAL_TERMINAL_PROCESSING))
+}
+
+// func setConsoleTitle(title string) {
+// 	cmd := exec.Command("cmd", "/C", "title", title)
+// 	cmd.Run()
+// }
 
 func main() {
 	// os.Args = []string{
-	// 	"xlpro-server.exe",
-	// 	"C:\\Users\\Daniel Evans\\.xlpro\\envs\\910a7684-8979-4d80-9add-88e23a63365a_3.13.2\\.venv\\scripts\\python.exe",
-	// 	"-m",
-	// 	"xlpro.run_server",
-	// 	"--debugpy_port=5679",
-	// 	"--workbook_path=C:\\Users\\Daniel Evans\\projects\\xlpro\\xlpro_examples\\xlpro-ex01-basics.xlsx",
+    //     "xlpro-server.exe",
+    //     "C:/Users/Daniel Evans/projects/xlpro/.venv/Scripts/xlpro-cli.exe",
+    //     "init",
+    //     "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx",
 	// }
+    
+    enableVirtualTerminalProcessing()
 
+    // // conHostPath := "C:/Program Files/WindowsApps/Microsoft.WindowsTerminal_1.22.11141.0_x64__8wekyb3d8bbwe/wt.exe"
+    // conHostPath := "conhost.exe"
 
-    if len(os.Args) < 2 {
-        println("Usage: wrapper <command>")
-        os.Exit(1)
-    }
+    
+    // if len(os.Args) < 2 {
+    //     println("Usage: wrapper <command>")
+    //     os.Exit(1)
+    // }
 
-
+    
 	// First arg is the command; rest are arguments
     cmd := exec.Command(os.Args[1], os.Args[2:]...)
 
@@ -32,17 +60,6 @@ func main() {
     cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr
     cmd.Stdin = os.Stdin
-
-
-    // // Join all args as a single command
-    // cmdLine := strings.Join(os.Args[1:], " ")
-
-    // // Run the command via shell
-    // cmd := exec.Command("cmd", "/K", cmdLine) // Windows-specific
-
-    // // Optional: inherit stdout/stderr
-    // cmd.Stdout = os.Stdout
-    // cmd.Stderr = os.Stderr
 
     err := cmd.Run()
     if err != nil {

@@ -23,6 +23,18 @@ def disable_quickedit():
 
 disable_quickedit()
 
+import os
+import ctypes
+def enable_ansi_escape_codes_in_console():
+    # Enable ANSI escape codes (24-bit color)
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetStdHandle(-11)
+    mode = ctypes.c_uint32()
+    kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+    kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+
+enable_ansi_escape_codes_in_console()
+
 
 from pathlib import Path
 
@@ -179,9 +191,9 @@ def serve():
         ██╔╝ ██╗███████╗██║     ██║  ██║╚██████╔╝
         ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ 
 
-            xlpro-server v{xlpro.__version__}
-            Copyright (c) 2025 Daniel Evans
-            License: MIT. Free for commercial use.
+          xlpro v{xlpro.__version__}
+          Copyright (c) 2025 Daniel Evans
+          License: MIT. Free for commercial use.
 
     """
     print(f"{s}")
@@ -195,6 +207,8 @@ def serve():
     # logger.debug(f"serve() being run at root directory: {os.getcwd()}")
 
     debugpy.listen(('localhost', DEBUGPY_PORT))
+    # import time
+    # time.sleep(20)
 
     logger.info(f"Ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
 
@@ -271,8 +285,8 @@ def serve():
     logger.info("Startup OK, ready for synchronisation. Sending signal")
     sys.stderr.write("XLPROSTART_TRIGGER_OK\n")
     sys.stderr.flush()
-    sys.stdout.write("XLPROSTART_TRIGGER_OK\n")
-    sys.stdout.flush()
+    # sys.stdout.write("XLPROSTART_TRIGGER_OK\n")
+    # sys.stdout.flush()
     logger.info("Signal sent.")
 
     def tidy_up_lock_file():
@@ -314,12 +328,20 @@ def serve():
     except:
         logger.warning("Error during lockfile cleanup, investigate if issues reloading persist.")
 
-    pythoncom.CoRevokeClassObject(revokeId)
+    try:
+        pythoncom.CoRevokeClassObject(revokeId)
+    except:
+        pass
     pythoncom.CoUninitialize()
 
     logger.info("Graceful shutdown. Program exiting...")
     input("Press Enter to exit")
-    sys.exit()
+    sys.exit(1)
+
+
+# def press_enter_to_exit_timeout(timeout_sec=60):
+#     def wait_and_close():
+#         logger.info("Timing out in")
 
 
 def main():
@@ -346,14 +368,15 @@ def main():
         WORKBOOK_NAME = Path(args.workbook_path).name
     
         serve()
+
     except Exception as e:
         logger.critical(f"Fatal Exception encountered: {e}")
         logger.critical(f"Closing down...")
         input("Press enter to exit")
 
     finally:
-        sys.exit()
+        sys.exit(1)
 
 if __name__ == "__main__":
-    # sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\test.xlsx", "--debugpy_port", "5678"]
+    sys.argv = ["run_server.py", "--workbook_path", r"C:\Users\Daniel Evans\projects\xlpro\xlpro_examples\xlpro-ex01-basics.xlsx", "--debugpy_port", "5678"]
     main()

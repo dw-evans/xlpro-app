@@ -8,7 +8,8 @@ PyInstaller.config.CONF['distpath'] = "./dist"
 
 datas = []
 datas += copy_metadata('readchar', recursive=True)
-datas += [("cli-header.txt", "cli-header.txt")]
+datas += [("cli-header.txt", "xlpro_cli")]
+datas += [("cli-header.txt", ".")]
 
 import sys
 sys.path.insert(0, os.getcwd())

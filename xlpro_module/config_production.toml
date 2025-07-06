@@ -1,0 +1,13 @@
+# xlpro application configuration file
+
+# Note: for custom paths, ensure backslashes are not escaped. Use double backslashes '\\' or single forward slashes '/'
+VSCODE_PATH = "code"
+
+XLPRO_CLI_PATH = "xlpro-cli.exe"
+XLPRO_SERVER_PATH = "xlpro-server.exe"
+
+UNDO_STACK_DEPTH = 12
+
+LOGGING_LEVEL = "INFO"
+MAX_WORKERS = 24
+MULTI_SERVER_EXPERIEMENT = false
