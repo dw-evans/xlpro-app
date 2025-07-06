@@ -9,9 +9,6 @@ from typing import Any, get_type_hints
 
 logger = logging.getLogger(__name__)
 
-
-from xlpro.config import load, Configuration
-
 def is_pyinstaller():
     return hasattr(sys, '_MEIPASS')
 
@@ -32,7 +29,7 @@ def load() -> Configuration:
         err =  Configuration.validate_file(config_path)
         if err:
             logger.error(f"TOML Decode error: {err}")
-            raise
+            raise err
             
         with open(config_path, "rb") as f:
             kwargs = tomllib.load(f)

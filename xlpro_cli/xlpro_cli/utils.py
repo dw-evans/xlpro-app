@@ -86,6 +86,23 @@ def sleep_then_close(timeout_sec=1.0):
 
 def press_enter_or_timeout_exit(timeout=5):
     import threading
+
+    enter_event = threading.Event()
+
+    def wait_for_input():
+        input(f"Press Enter to exit (timeout in {timeout} sec)...")
+        enter_event.set()
+
+    t1 = threading.Thread(target=wait_for_input)
+    t1.start()
+
+    if enter_event.wait(timeout=timeout):
+        print("Enter Pressed. Closing...")
+        sys.exit()
+
+    print(f"Timeout reached. Closing...")
+    sys.exit()
+
     def force_exit_after_timeout():
         time.sleep(timeout)
         print(f"\nTimeout reached after {timeout} seconds. Exiting.")
