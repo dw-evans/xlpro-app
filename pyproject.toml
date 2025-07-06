@@ -18,7 +18,7 @@ dependencies = [
     "pyinstaller-versionfile>=3.0.1",
     "pywin32>=310",
     "readchar>=4.2.1",
-    "regex>=2024.11.6",
     "rich>=14.0.0",
     "setuptools>=80.9.0",
+    "typer>=0.16.0",
 ]
