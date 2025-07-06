@@ -132,7 +132,7 @@ def close_file(handle):
 #         pass
 #     return False
 
-import regex as re
+import re
 
 # from dataclasses import dataclass
 # @dataclass

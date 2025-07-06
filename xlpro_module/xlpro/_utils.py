@@ -32,7 +32,7 @@ import pythoncom
 import importlib
 import types
 import sys
-import regex as re
+import re
 
 from xlpro._types import xlproptr, ExcelArrayConverter
 from xlpro import errors

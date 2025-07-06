@@ -7,7 +7,7 @@ import numpy as np
 from typing import Any
 import pythoncom
 from win32com.client import VARIANT
-import regex as re
+import re
 
 def binned_color_func(a, b):
     def wrapper():

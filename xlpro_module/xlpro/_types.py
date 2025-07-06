@@ -13,7 +13,7 @@ list2d = list[list[T]]
 ndarray1d = np.ndarray[T]
 ndarray2d = np.ndarray[T, T]
 
-import regex as re
+import re
 from dataclasses import dataclass, field
 from win32com.client import GetActiveObject, Dispatch
 import pythoncom

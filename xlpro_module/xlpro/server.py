@@ -34,7 +34,7 @@ from xlpro import _utils
 from xlpro._wrappers import ModuleFunctionMapsWrapper, ModuleSubMapsWrapper
 from xlpro._enums import FunctionTypes
 from xlpro import _wrappers
-import regex as re
+import re
 from copy import deepcopy
 
 from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
