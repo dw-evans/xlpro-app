@@ -3,8 +3,6 @@
 import datetime
 import xlpro
 
-xlpro.__version__
-
 __version__ = f"{xlpro.__version__}.0"
 
 class VersionInfo:
@@ -13,7 +11,7 @@ class VersionInfo:
     EXE_NAME = f"{NAME}.exe"
     AUTHOR = "D. Evans"
     DATE = datetime.datetime.now().strftime("%Y-%m-%d")
-    DESCRIPTION_SHORT = "xlpro Windows Installer"
+    DESCRIPTION_SHORT = "xlpro Command Line Interface"
     COMPANY_NAME="D. Evans"
 
 import pyinstaller_versionfile

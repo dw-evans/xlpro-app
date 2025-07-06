@@ -8,7 +8,6 @@ PyInstaller.config.CONF['distpath'] = "./dist"
 
 datas = []
 datas += copy_metadata('readchar', recursive=True)
-datas += [("cli-header.txt", "xlpro_cli")]
 datas += [("cli-header.txt", ".")]
 
 import sys
@@ -18,7 +17,6 @@ import pre_build
 pre_build.main()
 
 import version
-
 EXE_NAME = version.VersionInfo.EXE_NAME
 VERSIONFILE = version.create_version_file_get_path()
 
@@ -31,7 +29,6 @@ a = Analysis(
         'xlpro_cli',
         'readchar',
         'rich',
-        'regex',
         'uuid',
     ],
     hookspath=[],
@@ -64,5 +61,5 @@ exe = EXE(
     entitlements_file=None,
     onefile=True,
     icon="favicon.ico",
-    # icon=r"C:\Users\Daniel Evans\projects\xlpro\xlpro_installer\favicon.ico"
+    version=VERSIONFILE
 )

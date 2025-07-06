@@ -21,6 +21,8 @@ import textwrap
 import re
 import stat
 from . import config
+from . import file_lock
+
 
 # import io
 # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -1663,7 +1665,6 @@ def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
     return xlpro_dir / "xlpro.lock"
 
 
-import xlpro.file_lock
 def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str, int]|None:
     # get the interpreter from the workbook to determine the lockfile name
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
@@ -1675,10 +1676,10 @@ def get_running_pid_guid_port_for_workbook(workbook_path:Path) -> tuple[int, str
     # manual run_server calls are therefore now non-functional, until xlpro-cli.exe and the xlpro create the lockfile at a consistent location.
     # without the lockfile, there is no way for xlpro-cli to return the guid
 
-    xlpro_lock_fp = xlpro.file_lock.get_xlpro_lockfile_path_parent(interpreter_path=interpreter_path) / f"{workbook_path.name}.xlpro.lock"
+    xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent(interpreter_path=interpreter_path) / f"{workbook_path.name}.xlpro.lock"
     # xlpro_lock_fp = xlpro.file_lock.get_xlpro_lockfile_path_parent() / f"{workbook_path.name}.xlpro.lock"
     
-    lockfile_contents_dict = xlpro.file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
+    lockfile_contents_dict = file_lock.check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
     # xlpro_lock_fp = get_xlpro_lockfile_path(interpreter_path=interpreter_path)
     # lockfile_contents_dict = check_lockfile_get_contents_as_dict_if_alive(xlpro_lock_fp)
 
