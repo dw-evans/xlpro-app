@@ -32,7 +32,7 @@
             ],
         },
         {
-            // BE AWARE THAT START IS NOT ABLE TO TRIGGER SYNC ANYMORE
+            // BE AWARE THAT START IS NOT ABLE TO TRIGGER SYNC ANYMORE - CAUSED BY UNABLE TO FIND CORRECT TEMPFILE LOCATION FROM VENV
             "name":"xlpro_cli.main start",
             "type":"debugpy",
             "request":"launch",
