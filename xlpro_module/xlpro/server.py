@@ -1080,6 +1080,7 @@ class xlproWorkspace:
                                 args[i] = e
                             except Exception as e:
                                 raise errors.xlproUnhandledException
+                            pass
             return args
             
         # check for py object request
@@ -1605,6 +1606,8 @@ SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION = {
     np.float32: lambda x: float(x),
     np.float64: lambda x: float(x),
 
+    np.datetime64: lambda x: _utils.datetime_to_excel(x),
+
     # Complex numbers
     # np.complex64: lambda x: complex(x),
     # np.complex128: lambda x: complex(x),
@@ -1759,7 +1762,6 @@ class ClientManager:
             val0 = self._get_value(uid)
             if type(val0) == xlproExpandedType:
                 val = val0.data
-                # val = _ret.data
                 # cast xlpro expanded types to the 2d data types
                 if type(val) == list:
                     val = ExcelArrayConverter(val, list2d)
@@ -1767,13 +1769,12 @@ class ClientManager:
                     val = ExcelArrayConverter(val, ndarray2d)
             else:
                 val = val0
+
             if isinstance(val, Exception):
                 logger.debug(f"Value is an exception: '{val}', '{uid}'")
                 self._set_result_display(uid, repr(val))
             else:
                 self._set_result_display(uid, val)
-
-
 
             # update by resetting the formula
             _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()

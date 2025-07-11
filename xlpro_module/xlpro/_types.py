@@ -55,12 +55,13 @@ def _get_list2d_annotated_dtype(_t):
     return _dtype
 
 
-def _get_ndarray_dtype(_t):
+def _get_generic_dtype(_t):
     _args = typing.get_args(_t)
     if len(_args) > 1:
-        raise TypeError(f"Type annotation is too complicated for {_t}")
+        raise TypeError(f"GenericAlias type annotation is too complicated: {_t}")
     _ret = _args[0]
     return _ret
+
 
 def _is_annotated_type(tp) -> bool:
     return typing.get_origin(tp) is typing.Annotated
@@ -191,7 +192,7 @@ class ExcelArrayConverter:
             args = typing.get_args(tdst)
             if len(args) > 1:
                 raise TypeError(f"GenericAlias type {tdst} is too complex to coerce")
-            dtype = args[0]
+            # dtype = args[0]
             if origin == list:
                 tdstnew = list
             elif origin == np.ndarray:
@@ -215,17 +216,22 @@ class ExcelArrayConverter:
         # get the dtype of tdst
         if tdstnew in [ndarray1d, ndarray2d]:
             dtype = _get_ndarray_annotated_dtype(tdst)
-        elif tdstnew == np.ndarray:
-            dtype = _get_ndarray_dtype(tdst)
         elif tdstnew == list1d:
             dtype = _get_list1d_annotated_dtype(tdst)
         elif tdstnew == list2d:
             dtype = _get_list2d_annotated_dtype(tdst)
+            
         # handle the list/ndarray GenericAlias casees
         elif tdstnew == list:
-            dtype = dtype if dtype is not None else None
+            if _is_generic_alias_type(tdst):
+                dtype = _get_generic_dtype(tdst)
+            elif tdst == list:
+                dtype = None
         elif tdstnew == np.ndarray:
-            dtype = dtype if dtype is not None else None
+            if _is_generic_alias_type(tdst):
+                dtype = _get_generic_dtype(tdst)
+            elif tdst == np.ndarray:
+                dtype = None
         
         def handle_ndarray1d(val, dtype):
             intermediate = np.array(val, dtype=dtype)
@@ -243,6 +249,18 @@ class ExcelArrayConverter:
                 raise TypeError(f"Provided value is not compatible with {tdstnew}")
             return intermediate.flatten().tolist()
         
+        def handle_ndarray2d(val, dtype):
+            intermediate = np.array(val, dtype=dtype)
+            # convert to a 2d
+            shape = intermediate.shape
+            if len(shape) == 1:
+                ret = intermediate.reshape(-1, 1)
+            elif len(shape) == 2:
+                ret = intermediate
+            else:
+                raise TypeError(f"Cannot convert shape {shape} to ndarray2d")
+            return ret
+        
         def handle_ndarray(val, dtype):
             intermediate = np.array(val, dtype=dtype)
             return intermediate
@@ -254,12 +272,14 @@ class ExcelArrayConverter:
         if tdstnew == ndarray1d:
             newval = handle_ndarray1d(val=val, dtype=dtype)
 
+        # Note: also used to send data back to Excel
         elif tdstnew == ndarray2d:
-            newval = handle_ndarray(val=val, dtype=dtype)
+            newval = handle_ndarray2d(val=val, dtype=dtype)
 
         elif tdstnew == list1d:
             newval = handle_list1d(val=val, dtype=dtype)
 
+        # Note: also used to send data back to Excel
         elif tdstnew == list2d:
             newval = handle_list(val=val, dtype=dtype)
 
@@ -292,7 +312,6 @@ class ExcelArrayConverter:
 
         return val
     
-
 
 class xlproExpandedType:
     """Class to signal that an array is to be expanded, overwrites xlproCollapsedType"""

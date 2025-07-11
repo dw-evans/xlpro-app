@@ -910,7 +910,14 @@ def deepcpy(val):
 from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 
 def show(val):
-    """converts a value to excel-ready representation"""
+    """Converts a value to an Excel-ready representation to return to the formula.
+        Supported types: `pd.Dataframe`, `pd.Series`, `np.ndarray`
+        Falls back to `np.array(val)`
+
+        Also Supports:
+            `DataFrame` `Series` with column `datetime` dtypes
+            `ndarray` with full `datetime` dtypes
+    """
     if val is None:
         raise Exception("cannot show(None)")
     tval = type(val)
@@ -935,13 +942,13 @@ def show(val):
     if tval == pd.DataFrame:
         tdst = ndarray2d
         # when showing a dataframe, we must convert the dataframe datetime columns to excel serial dates
-        val_adj = pd_df_convert_dt_to_excel_serial(df=val_adj, colname=None, inplace=False)
+        val_adj = dataframe_with_dates_to_excel_serial(df=val_adj, colname=None, inplace=False)
         val_adj = val_adj.to_numpy()
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
     elif tval == pd.Series:
-        tdst = ndarray1d
+        tdst = ndarray2d
         # when showing a pd.series, we should convert the dataframe datetime columns to excel serial dates
         val_adj = pd_series_convert_dt_to_excel_serial(val)
         val_adj = val_adj.to_numpy()
@@ -949,7 +956,7 @@ def show(val):
         calc_success = True
 
 
-    elif tval in [list, tuple, list1d, list2d, ndarray1d, ndarray2d]:
+    elif tval in [list, tuple]: #, list1d, list2d, ndarray1d, ndarray2d]:
         # XXX - todo - fix tuple hack in excelarrayconverter class!
         # if tval == tuple:
         #     val_adj = list(val)
@@ -961,6 +968,8 @@ def show(val):
         calc_success = True
     
     elif tval == np.ndarray:
+        if np.issubdtype(val_adj.dtype, np.datetime64):
+            val_adj = datetime_array_to_excel_serial(val_adj)
         tdst = ndarray2d
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
@@ -969,13 +978,13 @@ def show(val):
     elif isinstance(val, Exception):
         raise val
     
-    elif tval == str:
+    elif tval in [str, int, float, bool]:
         ret = val
         calc_success = True
 
     else:
         try:
-            ret = ExcelArrayConverter(np.array(tuple(val)), tdst=ndarray2d)
+            ret = ExcelArrayConverter(np.array(val), tdst=ndarray2d)
             calc_success = True
         except Exception as e:
             raise Exception(f"unable to convert value using ndarray2d as last resort: {tval}")
@@ -1011,12 +1020,26 @@ def datetime_to_excel(dt: datetime.datetime) -> float:
     delta = dt - excel_epoch
     return delta.days + (delta.seconds + delta.microseconds / 1e6) / 86400
 
+
 def excel_to_datetime(serial: float) -> datetime.datetime:
     excel_epoch = datetime.datetime(1899, 12, 30)
     return excel_epoch + datetime.timedelta(days=serial)
 
 
-def datetime_to_excel_vectorized(dt_array):
+def datetime_array_to_excel_serial(dt_array):
+    # Ensure the array is datetime64[us] for microsecond precision
+    # dt_array = dt_array.astype('datetime64[us]')
+    
+    # Excel epoch: 1899-12-30 (note: Excel wrongly considers 1900 a leap year)
+    excel_epoch = np.datetime64('1899-12-30T00:00:00', 'us')
+
+    # Compute timedelta64 in microseconds
+    delta_us = (dt_array - excel_epoch).astype('timedelta64[us]').astype(np.int64)
+
+    ret = delta_us / (1e6 * 86400)
+
+    return ret
+
     excel_epoch = datetime.datetime(1899, 12, 30)
     # Convert to pandas datetime if needed
     dt_series = pd.to_datetime(dt_array)
@@ -1024,6 +1047,7 @@ def datetime_to_excel_vectorized(dt_array):
     # Calculate difference
     delta = dt_series - pd.Timestamp(excel_epoch)
     return delta.dt.days + delta.dt.seconds / 86400 + delta.dt.microseconds / (86400 * 1e6)
+
 
 def excel_to_datetime_vectorized(serial_array):
     excel_epoch = datetime.datetime(1899, 12, 30)
@@ -1051,7 +1075,7 @@ def pd_series_convert_dt_to_excel_serial(s: pd.Series) -> pd.Series:
         )
     return s
 
-def pd_df_convert_dt_to_excel_serial(df: pd.DataFrame, colname: str = None, inplace: bool = False) -> pd.DataFrame:
+def dataframe_with_dates_to_excel_serial(df: pd.DataFrame, colname: str = None, inplace: bool = False) -> pd.DataFrame:
     """
     Converts a datetime column in a DataFrame to Excel serial number format if it is datetime-like.
     
@@ -1070,7 +1094,7 @@ def pd_df_convert_dt_to_excel_serial(df: pd.DataFrame, colname: str = None, inpl
         df[colname] = pd_series_convert_dt_to_excel_serial(df[colname])
     else:
         for colname in df.columns:
-            df = pd_df_convert_dt_to_excel_serial(df, colname, inplace=True)
+            df = dataframe_with_dates_to_excel_serial(df, colname, inplace=True)
 
     return df
 

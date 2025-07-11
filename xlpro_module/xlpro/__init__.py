@@ -49,9 +49,9 @@ from xlpro._utils import (
 
     datetime_to_excel,
     excel_to_datetime,
-    datetime_to_excel_vectorized,
+    datetime_array_to_excel_serial,
     excel_to_datetime_vectorized,
-    pd_df_convert_dt_to_excel_serial,
+    dataframe_with_dates_to_excel_serial,
     pd_series_convert_dt_to_excel_serial,
 
 )
