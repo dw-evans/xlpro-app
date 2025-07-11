@@ -67,7 +67,8 @@ def traceback_log_raise(func):
 
 def get_function_types_with_fallback(func:Callable):
     try:
-        hints = typing.get_type_hints(func, globalns={}, localns={})
+        # use include_extras = True to preserve typing.Annotated types
+        hints = typing.get_type_hints(func, globalns={}, localns={}, include_extras=True)
     except NameError as e:
         # Fallback: manually replace forward references with Any
         annotations = func.__annotations__
@@ -201,9 +202,6 @@ VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
     str: lambda x: "\"{}\"".format(x),
     Any: lambda x: f"\"{XLPRO_EMPTY_STR}\"",
 }
-
-
-
 
 
 # Optional {argname} As {vbtype} = "XLPRO_DEFAULT"
@@ -1020,13 +1018,11 @@ def excel_to_datetime(serial: float) -> datetime.datetime:
 
 def datetime_to_excel_vectorized(dt_array):
     excel_epoch = datetime.datetime(1899, 12, 30)
-
     # Convert to pandas datetime if needed
     dt_series = pd.to_datetime(dt_array)
 
     # Calculate difference
     delta = dt_series - pd.Timestamp(excel_epoch)
-    
     return delta.dt.days + delta.dt.seconds / 86400 + delta.dt.microseconds / (86400 * 1e6)
 
 def excel_to_datetime_vectorized(serial_array):
@@ -1271,8 +1267,8 @@ def pygetattr(obj, attrname:str, default:Any=None):
 
 def _replace_pynone_strs(val, cast:bool=True):
     if isinstance(val, str):
-        ret =  None if val == XLPRO_NONE_STR else val
-    if isinstance(val, np.ndarray):
+        ret = None if val == XLPRO_NONE_STR else val
+    elif isinstance(val, np.ndarray):
         ret = nd_replace_pynone_strs(val, cast=cast)
     # elif isinstance(val, (pd.DataFrame, pd.Series)):
     #     ret = pd_replace_pynone_strs(val, cast=cast)

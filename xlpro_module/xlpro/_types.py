@@ -2,17 +2,8 @@ import typing
 from typing import TypeVar, Generic, Any
 import numpy as np
 from xlpro import errors
-
-T = TypeVar('T') # arbitrary
-
-# this preserves all of the methods for type hinting and code completion for the user
-# 1d options will force attempt reduction to a 1d vector and except if the input dimensionality is wrong.
-list1d = list[T]
-list2d = list[list[T]]
-
-ndarray1d = np.ndarray[T]
-ndarray2d = np.ndarray[T, T]
-
+from typing import Iterable
+import numpy.typing as npt
 import re
 from dataclasses import dataclass, field
 from win32com.client import GetActiveObject, Dispatch
@@ -20,6 +11,63 @@ import pythoncom
 # from win32typelibs import excel as xl
 from pathlib import Path
 import pandas as pd
+
+T = TypeVar('T')
+
+class TypeStrEnums:
+    LIST1D = "list1d"
+    LIST2D = "list2d"
+    NDARRAY1D = "ndarray1d"
+    NDARRAY2D = "ndarray2d"
+
+list1d = typing.Annotated[list[T], TypeStrEnums.LIST1D]
+list2d = typing.Annotated[list[list[T]], TypeStrEnums.LIST2D]
+
+ndarray1d = typing.Annotated[npt.NDArray[T], TypeStrEnums.NDARRAY1D]
+ndarray2d = typing.Annotated[npt.NDArray[T], TypeStrEnums.NDARRAY2D]
+
+STR_TO_TYPE_MAP = {
+    TypeStrEnums.LIST1D: list1d,
+    TypeStrEnums.LIST2D: list2d,
+    TypeStrEnums.NDARRAY1D: ndarray1d,
+    TypeStrEnums.NDARRAY2D: ndarray2d,
+}
+
+
+def _get_ndarray_annotated_dtype(_t):
+    _args = typing.get_args(_t)[0]
+    _dtype_alias = typing.get_args(_args)[1]
+    _dtype = typing.get_args(_dtype_alias)[0]
+    _dtype = None if _dtype == T else _dtype
+    return _dtype
+
+def _get_list1d_annotated_dtype(_t):
+    _args = typing.get_args(_t)[0]
+    _dtype = typing.get_args(_args)[0]
+    _dtype = None if _dtype == T else _dtype
+    return _dtype
+
+def _get_list2d_annotated_dtype(_t):
+    _args = typing.get_args(_t)[0]
+    _dtype_alias = typing.get_args(_args)[0]
+    _dtype = typing.get_args(_dtype_alias)[0]
+    _dtype = None if _dtype == T else _dtype
+    return _dtype
+
+
+def _get_ndarray_dtype(_t):
+    _args = typing.get_args(_t)
+    if len(_args) > 1:
+        raise TypeError(f"Type annotation is too complicated for {_t}")
+    _ret = _args[0]
+    return _ret
+
+def _is_annotated_type(tp) -> bool:
+    return typing.get_origin(tp) is typing.Annotated
+
+def _is_generic_alias_type(tp) -> bool:
+    return isinstance(tp, typing.GenericAlias)
+
 
 @dataclass
 class xlproptr:
@@ -101,41 +149,14 @@ class xlproptr:
     # if any array argument arrives as a string, a pre-process step should be used
     # to evaluate the range.
 
-def compare_generic_aliases(t1, t2):
-    if isinstance(t1, typing.GenericAlias) and isinstance(t2, typing.GenericAlias):
-        checks = []
-        checks.append(t1.__origin__ == t2.__origin__)
-        if not checks[0]:
-            return False
-        if len(t1.__args__) != len(t2.__args__):
-            return False
-        for st1, st2 in zip(t1.__args__, t2.__args__):
-            if isinstance(st1, typing.TypeVar) and isinstance(st2, typing.TypeVar):
-                checks.append(True)
-                continue
-            if isinstance(st1, typing.GenericAlias) and isinstance(st1, typing.GenericAlias):
-                checks.append(compare_generic_aliases(st1, st2))
-                continue
-            checks.append(st1 == st2)
-        return all(checks)
-    t_generic = None
-    t_other = None
-    if isinstance(t1, typing.GenericAlias):
-        t_generic = t1
-        t_other = t2
-    elif isinstance(t2, typing.GenericAlias):
-        t_generic = t2
-        t_other = t1
-    else:
-        raise TypeError("Incompatible types being checked")
-    return t_generic.__origin__ == t_other
 
-from typing import Iterable
 @dataclass
 class xlproImage:
     fp:Path
     size_pt:Iterable[float]
     xl_name:str
+
+import pywintypes
 
 # XXX - todo - apparently this is sensitive to imports...
 # type checking broke when I refactored, presumably changed the origin of some of the objects?
@@ -146,130 +167,114 @@ class ExcelArrayConverter:
     The user should only require up to 2d data with float, int, str and maybe
     boolean types so we can implement this custom logic confidently.
     """
+
     def __new__(cls, val:Any, tdst:type):
 
+        
+        dtype = None
+        # if annotated type is provided, get the base type
+        if _is_annotated_type(tdst):
+            args = typing.get_args(tdst)
+            tstr = args[1]
+            if tstr == TypeStrEnums.NDARRAY1D:
+                tdstnew = ndarray1d
+            elif tstr == TypeStrEnums.NDARRAY2D:
+                tdstnew = ndarray2d
+            elif tstr == TypeStrEnums.LIST1D:
+                tdstnew = list1d
+            elif tstr == TypeStrEnums.LIST2D:
+                tdstnew = list2d
+            else:
+                raise TypeError(f"Annotated type {tdst} not supported")
+        elif _is_generic_alias_type(tdst):
+            origin = typing.get_origin(tdst)
+            args = typing.get_args(tdst)
+            if len(args) > 1:
+                raise TypeError(f"GenericAlias type {tdst} is too complex to coerce")
+            dtype = args[0]
+            if origin == list:
+                tdstnew = list
+            elif origin == np.ndarray:
+                tdstnew = np.ndarray
+            else:
+                raise TypeError(f"GenericAlias type {tdst} not supported. Origin {origin} not supported.")
+        else:
+            tdstnew = tdst
+
+        # 1 by 1 ranges are passed as a single value, cast these back to an array tuple
+        # so it is cast to the right type
+        if tdstnew in [list1d, list2d, ndarray1d, ndarray2d, list, np.ndarray]:
+            if isinstance(val, (float, int, str, bool, pywintypes.TimeType)):
+                val = ((val,),)
         # return the incoming value if not a 2d array needing conversion
-        if not isinstance(val, (tuple, list, np.ndarray)):
+        elif not isinstance(val, (tuple, list, np.ndarray)):
             return val
 
-        # dissect the destination type
-        origin = typing.get_origin(tdst)
-        args = typing.get_args(tdst)
+        pass
 
-        # The user can specify a type if they want - e.g. np.float64, np.int32, np.bool
-        # extract the final or intermediate dtype to use.
-        dtype = cls._convert_alias_args_to_np_dtype(args)
-
-        if compare_generic_aliases(tdst, list1d):
-            pass
-            
-        # map the input value to list1d or array1d
-        if any([compare_generic_aliases(tdst, x) for x in [list1d, ndarray1d]]):
-            intermediate = np.array(val)
+        # get the dtype of tdst
+        if tdstnew in [ndarray1d, ndarray2d]:
+            dtype = _get_ndarray_annotated_dtype(tdst)
+        elif tdstnew == np.ndarray:
+            dtype = _get_ndarray_dtype(tdst)
+        elif tdstnew == list1d:
+            dtype = _get_list1d_annotated_dtype(tdst)
+        elif tdstnew == list2d:
+            dtype = _get_list2d_annotated_dtype(tdst)
+        # handle the list/ndarray GenericAlias casees
+        elif tdstnew == list:
+            dtype = dtype if dtype is not None else None
+        elif tdstnew == np.ndarray:
+            dtype = dtype if dtype is not None else None
+        
+        def handle_ndarray1d(val, dtype):
+            intermediate = np.array(val, dtype=dtype)
             shape = intermediate.shape
             # implicitly the shape is 2d, convert it to the user chosen list or ndarray
             if (not len(shape) == 1) and (all([x > 1 for x in shape])):
-                # condense() seems to reach here
-                raise TypeError("Provided value is not compatible with list1d or ndarray1d")
-            if compare_generic_aliases(tdst, list1d):
-                return intermediate.flatten().tolist()
-            elif compare_generic_aliases(tdst, ndarray1d):
-                return intermediate.flatten()
-        
-        # as above
-        # convert any vector value with 2d type tdst into a n,1 array 
-        elif any([compare_generic_aliases(tdst, x) for x in [list2d, ndarray2d]]):
-            intermediate = np.array(val)
-            if len(intermediate.shape) == 1:
-                intermediate = intermediate.reshape(-1, 1)
-            if compare_generic_aliases(tdst, list2d):
-                return intermediate.tolist()
-            return intermediate
+                raise TypeError(f"Provided value is not compatible with {tdstnew}")
+            return intermediate.flatten()
 
-        # handle generic lists and arrays
-        elif tdst in [list, np.ndarray]:
-            intermediate = np.array(val)
-            if tdst == list:
-                return intermediate.tolist()
+        def handle_list1d(val, dtype):
+            intermediate = np.array(val, dtype=dtype)
+            shape = intermediate.shape
+            # implicitly the shape is 2d, convert it to the user chosen list or ndarray
+            if (not len(shape) == 1) and (all([x > 1 for x in shape])):
+                raise TypeError(f"Provided value is not compatible with {tdstnew}")
+            return intermediate.flatten().tolist()
+        
+        def handle_ndarray(val, dtype):
+            intermediate = np.array(val, dtype=dtype)
             return intermediate
         
-        # elif tdst in [tuple,]:
-        #     # XXX - todo - for some reason Excel doesn't accept a tuple of tuples as a return type. 
-        #     # Needs to be a numpy array. maybe because it needs to be contigious memory?
-        #     return np.array(val)
+        def handle_list(val, dtype):
+            intermediate = np.array(val, dtype=dtype)
+            return intermediate.tolist()
 
-        # handle things such as list[float], i.e. <origin>[<dtype>]
-        else:
-            intermediate = np.array(val)
+        if tdstnew == ndarray1d:
+            newval = handle_ndarray1d(val=val, dtype=dtype)
 
-            if origin == list:
-                intermediate = np.array(val, dtype=dtype)
-                return intermediate.tolist()
+        elif tdstnew == ndarray2d:
+            newval = handle_ndarray(val=val, dtype=dtype)
+
+        elif tdstnew == list1d:
+            newval = handle_list1d(val=val, dtype=dtype)
+
+        elif tdstnew == list2d:
+            newval = handle_list(val=val, dtype=dtype)
+
+        elif tdstnew == list:
+            newval = handle_list(val=val, dtype=dtype)
             
-            elif origin == np.ndarray:
-                intermediate = np.array(val, dtype=dtype)
-                return intermediate
-            
-        if not tdst in [typing.Any]:
-            raise Exception(f"Type {tdst} is too complicated or not supported for conversion attempt")
+        elif tdstnew == np.ndarray:
+            newval = handle_ndarray(val=val, dtype=dtype)
     
-        return val
-
-    @classmethod
-    def _convert_alias_args_to_np_dtype(cls, args:tuple[type]):
-        """Converts the args of a generic alias into a single dtype for numpy conversion
-        A return of None will implicitly resort to numpy's conversion handling."""
-
-        # XXX - todo - we may want to support strings in a fancy way...
-        # For string arrays we probably want to fetch the .Text property of 
-        # a range and not the .Value property (specifically concerned with 
-        # 0 != "" (blank cells))
-        # XXX - todo - this is a job for the vba string generator!
-
-        if len(args) == 0:
-            return None
-        
-        a0 = args[0]
-
-        # list[float, int, ...] using different types is not supported
-        if not all([x == a0 for x in args]):
-            raise TypeError(f"Type arguments {a0} are too complicated to convert")
-        
-        
-        # if the type has not been given for the list1d or list2d case return no type
-        if a0 in [T, list[T]]:
-            return None
-        
-        # recursively handle generic alias
-        if isinstance(a0, typing.GenericAlias):
-            if not typing.get_origin(a0) == list:
-                raise TypeError(f"Type {a0} cannot be processed, origin must be list")
-            return cls._convert_alias_args_to_np_dtype(typing.get_args(a0))
-        
-        # convert python types to numpy types for convenience.
-        elif a0 == float:
-            return np.float64
-        elif a0 == int:
-            return np.int64
-        elif a0 == bool:
-            return np.bool
-        elif a0 == str:
-            return str
-        
-        # unsure what this is for.
-        elif isinstance(a0, TypeVar):
-            return None
-        
-        # if the user specifies a specific dtype, resort to that
-        # numpy should catch any conversion errors when attempting to convert
-        elif any([np.issubdtype(a0, x) for x in (np.floating, np.integer, np.bool)]):
-            return a0
-        
-        
+        elif tdstnew == typing.Any:
+            newval = val
         else:
-            # Let the numpy default behaviour run
-            # XXX - todo - check how this behaves
-            return None 
+            raise TypeError(f"Type {tdstnew} is too complicated or not supported for coersion.")
+
+        return newval
 
 
     @classmethod
@@ -293,57 +298,115 @@ class xlproExpandedType:
     """Class to signal that an array is to be expanded, overwrites xlproCollapsedType"""
     oned_direction_rowwise = True
     def __init__(self, arraydata):
-        if isinstance(arraydata, xlproExpandedType):
+        if isinstance(arraydata, (xlproCollapsedType, xlproExpandedType)):
             arraydata = arraydata.data
         self.data = arraydata
-        # self.data = arraydata
-        # if isinstance(arraydata, xlproCollapsedType):
-        #     arraydata = arraydata.data
-        # if xlproExpandedType.oned_direction_rowwise:
-        #     if len((npdata:=np.array(arraydata)).shape) == 1:
-        #         self.data = npdata.reshape(-1, 1)
-        # else:
-        #     self.data = arraydata
+
 
 class xlproCollapsedType:
     """Wrapper class that signals a result to forcibly be collapsed, overwrites xlproExpandedType"""
     def __init__(self, arraydata):
-        if isinstance(arraydata, xlproExpandedType):
+        if isinstance(arraydata, (xlproCollapsedType, xlproExpandedType)):
             arraydata = arraydata.data
         self.data = arraydata
 
 
 
 if __name__ == "__main__":
-    r1  = ExcelArrayConverter(((1, 2,),), list1d)
-    print(f"r1={r1}")
-    r2  = ExcelArrayConverter(((1, 2,),), list2d)
-    print(f"r2={r2}")
-    r5  = ExcelArrayConverter(((1, 2,),), list)
-    print(f"r5={r5}")
-    r6  = ExcelArrayConverter(((1, 2,),), list[float])
-    print(f"r6={r6}")
-    r7  = ExcelArrayConverter(((1, 2,),), list[int])
-    print(f"r7={r7}")
-    r8  = ExcelArrayConverter(((0, 1,),), list[bool])
-    print(f"r8={r8}")
-    r3  = ExcelArrayConverter(((1, 2,),), ndarray1d)
-    print(f"r3={r3}, dtype={r3.dtype}")
-    r4  = ExcelArrayConverter(((1, 2,),), ndarray2d)
-    print(f"r4={r4}, dtype={r4.dtype}")
-    r10 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float16])
-    print(f"r10={r10}, dtype={r10.dtype}")
-    r11 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float32])
-    print(f"r11={r11}, dtype={r11.dtype}")
-    r12 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float64])
-    print(f"r12={r12}, dtype={r12.dtype}")
-    r13 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int16])
-    print(f"r13={r13}, dtype={r13.dtype}")
-    r14 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int32])
-    print(f"r14={r14}, dtype={r14.dtype}")
-    r15 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int64])
-    print(f"r15={r15}, dtype={r15.dtype}")
+    # r1  = ExcelArrayConverter(((1, 2,),), list1d)
+    # print(f"r1={r1}")
+    # r2  = ExcelArrayConverter(((1, 2,),), list2d)
+    # print(f"r2={r2}")
+    # r5  = ExcelArrayConverter(((1, 2,),), list)
+    # print(f"r5={r5}")
+    # r6  = ExcelArrayConverter(((1, 2,),), list[float])
+    # print(f"r6={r6}")
+    # r7  = ExcelArrayConverter(((1, 2,),), list[int])
+    # print(f"r7={r7}")
+    # r8  = ExcelArrayConverter(((0, 1,),), list[bool])
+    # print(f"r8={r8}")
+    # r3  = ExcelArrayConverter(((1, 2,),), ndarray1d)
+    # print(f"r3={r3}, dtype={r3.dtype}")
+    # r4  = ExcelArrayConverter(((1, 2,),), ndarray2d)
+    # print(f"r4={r4}, dtype={r4.dtype}")
+    # r10 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float16])
+    # print(f"r10={r10}, dtype={r10.dtype}")
+    # r11 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float32])
+    # print(f"r11={r11}, dtype={r11.dtype}")
+    # r12 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.float64])
+    # print(f"r12={r12}, dtype={r12.dtype}")
+    # r13 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int16])
+    # print(f"r13={r13}, dtype={r13.dtype}")
+    # r14 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int32])
+    # print(f"r14={r14}, dtype={r14.dtype}")
+    # r15 = ExcelArrayConverter(((0, 1,),), np.ndarray[np.int64])
+    # print(f"r15={r15}, dtype={r15.dtype}")
+    i = 0
+    results = []
+    val = ((1.5, 2.5,),)
+
+    # t = ndarray1d
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = ndarray2d
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = ndarray1d[np.int32]
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = ndarray2d[np.int32]
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = list1d
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = list2d
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = list1d[int]
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    # t = list2d[int]
+    # r = ExcelArrayConverter(val, t)
+    # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    # results.append(r)
+    # i += 1
+    
+    t = np.ndarray[np.int32]
+    r = ExcelArrayConverter(val, t)
+    print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    results.append(r)
+    i += 1
+
+    t = list[int]
+    r = ExcelArrayConverter(val, t)
+    print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
+    results.append(r)
+    i += 1
+
     pass
+
 
 pass
 

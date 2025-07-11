@@ -1052,17 +1052,18 @@ class xlproWorkspace:
             raise Exception("kwargs should not be here!")
         pass
 
-        def modify_args_list(args:list):
+        def replace_pyobjects_in_args(args:list):
             for i, arg in enumerate(args):
                 if isinstance(arg, str):
                     if not arg.startswith("PyObj"):
                         continue
+
                     # handle the basic pyobject case
                     if m:=re.match(r"^PyObj<(.*)>$", arg):
                         with self._uid_results_map_lock:
                             temp_uid = m.group(1)
                             args[i] = self._uid_results_map[temp_uid]
-                            if isinstance(args[i], xlproCollapsedType):
+                            if isinstance(args[i], (xlproCollapsedType, xlproExpandedType)):
                                 args[i] = args[i].data 
 
                     # handle the case for an address request for expanded values
@@ -1073,7 +1074,7 @@ class xlproWorkspace:
                             # try and look it up, pass the error through to the function if we encounter one.
                             try:
                                 args[i] = self._uid_results_map[temp_uid][temp_addr]
-                                if isinstance(args[i], xlproCollapsedType):
+                                if isinstance(args[i], (xlproCollapsedType, xlproExpandedType)):
                                     args[i] = args[i].data 
                             except IndexError as e:
                                 args[i] = e
@@ -1087,16 +1088,16 @@ class xlproWorkspace:
         # args_original = copy.deepcopy(args)
         args = list(args)
         # modify level 0 of the args
-        modify_args_list(args)
+        replace_pyobjects_in_args(args)
         # check if level 1 needs to be modified
         try:
             for i, arg in enumerate(args):
                 # a tuple nested arg may contain pyobject strings
                 if isinstance(arg, (tuple, list)):
-                    args[i] = modify_args_list(list(arg))
+                    args[i] = replace_pyobjects_in_args(list(arg))
                     for i0, arg0 in enumerate(args[i]):
                         if isinstance(arg0, (list, tuple)):
-                            args[i][i0] = modify_args_list(list(arg0))
+                            args[i][i0] = replace_pyobjects_in_args(list(arg0))
             pass
         except Exception as e:
             raise e
