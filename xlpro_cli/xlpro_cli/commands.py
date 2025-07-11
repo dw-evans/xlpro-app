@@ -60,10 +60,23 @@ def handle_init(args):
     
     utils.dlg_xlpro_initialize_workbook(workbook_path)
     utils.press_enter_or_timeout_exit(timeout=30.0)
-    # utils.press_enter_to_exit()
 
 
-import pythoncom
+@try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
+def handle_clear_local_mapping_for_workbook(args):
+    """Removes the venv mapping for the workbook"""
+
+    workbook_path = Path(args.workbook)
+
+    if not workbook_path.exists():
+        raise FileNotFoundError(f"The provided workbook path does not exist {workbook_path}. Save the file and try again.")
+    
+    utils.remove_venv_mapping_for_workbook(workbook_path, dialogue=True)
+
+    utils.press_enter_or_timeout_exit(timeout=30.0)
+
+
 @try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def _handle_get_guid(args):
@@ -110,15 +123,33 @@ def handle_clear_venv_data(args):
 @try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_tmp_data(args):
-    utils.check_tmp_folder_size_prompt_delete()
-    # utils.press_enter_to_exit()
+    utils.check_folder_size_prompt_delete(utils.XLPRO_TMP_FOLDER_PATH)
     utils.press_enter_or_timeout_exit(timeout=5.0)
+
+@try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
+def handle_clear_uv_cache_data(args):
+    utils.check_folder_size_prompt_delete(Path(os.environ["UV_CACHE_DIR"]))
+    utils.press_enter_or_timeout_exit(timeout=5.0)
+
+@try_except_press_enter_to_exit_wrapper
+@utils.traceback_log_raise
+def handle_clear_uv_pythons_data(args):
+    utils.check_folder_size_prompt_delete(Path(os.environ["UV_PYTHON_INSTALL_DIR"]))
+    utils.press_enter_or_timeout_exit(timeout=5.0)
+
 
 XLPRO_INSTALL_DIR = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
 XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
 
 def _configure_env():
     os.environ["PATH"] = f"{XLPRO_BIN_DIR};" + os.environ["PATH"]
+    uv_cache_dir = XLPRO_INSTALL_DIR / "uv/cache"
+    uv_cache_dir.mkdir(exist_ok=True, parents=True)
+    os.environ["UV_CACHE_DIR"] = str(uv_cache_dir.resolve())
+    uv_python_dir = XLPRO_INSTALL_DIR / "uv/python"
+    uv_python_dir.mkdir(exist_ok=True)
+    os.environ["UV_PYTHON_INSTALL_DIR"] = str(uv_python_dir.resolve())
 
 def _load_uv_help() -> str:
     result = subprocess.run(
@@ -181,6 +212,10 @@ def main():
 
     _configure_env()
 
+    pass
+
+    # subprocess.run("uv python dir", capture_output=True, text=True, shell=True)
+
     parser = argparse.ArgumentParser(
         prog="xlpro-cli",
         description="xlpro command-line utility",
@@ -194,27 +229,31 @@ def main():
 
     parser_start = subparsers.add_parser("start", help="run the xlpro server")
     parser_init = subparsers.add_parser("init", help="initialize a workbook for xlpro")
-    # parser_uninit = subparsers.add_parser("uninit", help="uninitialize a workbook for xlpro")
     parser_get_guid = subparsers.add_parser("guid", help="get the guid for a workbook (if the process is active)")
     parser_write_reqs = subparsers.add_parser("write-reqs", help="write the requirements to the sever location")
+    parser_clear_wb_venv = subparsers.add_parser("clear-venv-link", help="Remove the venv link for the workbook")
+    
     parser_delete_venv_dir = subparsers.add_parser("clear-venvs", help="Remove all virtual environment data")
     parser_delete_tmp_dir = subparsers.add_parser("clear-tmp", help="Remove all temporary data")
+    parser_delete_uv_cache = subparsers.add_parser("clear-uv-cache", help="Remove cached uv data")
+    parser_delete_uv_pythons = subparsers.add_parser("clear-uv-pythons", help="Remove cached python installations")
 
     parser_start.add_argument("workbook", type=str, help="workbook to start xlpro server for")
     parser_init.add_argument("workbook", type=str, help="workbook to initialize xlpro for (writes adjacent folder structure)")
-    # parser_uninit.add_argument("workbook", type=str, help="workbook to uninitialize xlpro for (removes adjacent folder structure)")
     parser_get_guid.add_argument("workbook", type=str, help="workbook to get running server for")
-    
     parser_write_reqs.add_argument("workbook", type=str, help="workbook to write requirements for.")
+    parser_clear_wb_venv.add_argument("workbook", type=str, help="workbook to write requirements for.")
     parser_write_reqs.add_argument("--force", action="store_true", help="force the update", required=False)
 
     parser_start.set_defaults(func=handle_start_server)
     parser_init.set_defaults(func=handle_init)
-    # parser_uninit.set_defaults(func=_handle_uninit)
     parser_get_guid.set_defaults(func=_handle_get_guid)
     parser_write_reqs.set_defaults(func=handle_write_requirements)
     parser_delete_venv_dir.set_defaults(func=handle_clear_venv_data)
     parser_delete_tmp_dir.set_defaults(func=handle_clear_tmp_data)
+    parser_delete_uv_cache.set_defaults(func=handle_clear_uv_cache_data)
+    parser_delete_uv_pythons.set_defaults(func=handle_clear_uv_pythons_data)
+    parser_clear_wb_venv.set_defaults(func=handle_clear_local_mapping_for_workbook)
 
 
     try:

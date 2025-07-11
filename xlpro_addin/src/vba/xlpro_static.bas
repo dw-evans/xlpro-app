@@ -261,6 +261,8 @@ Sub EditConfigGlobal()
     ' shell """" & configPath & """", vbNormalFocus
 End Sub
 
+
+
 Sub EditConfigGlobalButton(ByRef control As Office.IRibbonControl)
     EditConfigGlobal
 End Sub
@@ -284,6 +286,21 @@ End Sub
 Sub ClearTempDataButton(ByRef control As Office.IRibbonControl)
     ClearTempData
 End Sub
+
+
+Sub ClearUvPythonsButton(Byref control as Office.IRibbonControl)
+    ClearUvPythons
+End Sub
+
+Sub ClearUvCacheButton(Byref control as Office.IRibbonControl)
+    ClearUvCache
+End Sub
+
+Sub RemoveLinkForThisWorkbookButton(Byref control as Office.IRibbonControl)
+    RemoveLink ActiveWorkbook
+End Sub
+
+
 
 Private Sub force_refresh_area_calculation(ByRef Wb As Workbook, rng as Range)
 
@@ -345,6 +362,35 @@ Sub ClearTempData()
     command = """" & XLPRO_CLI_PATH & """" & " clear-tmp"
     taskID = shell(command, vbNormalFocus)
 End Sub
+
+Sub ClearUvPythons()
+    Dim command As String
+    Dim taskID As Double
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " clear-uv-pythons"
+    taskID = shell(command, vbNormalFocus)
+End Sub
+
+Sub ClearUvCache()
+    Dim command As String
+    Dim taskID As Double
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " clear-uv-cache"
+    taskID = shell(command, vbNormalFocus)
+End Sub
+
+Sub RemoveLink(wb as Workbook)
+    Dim command As String
+    Dim taskID As Double
+    Dim Wb As Workbook
+    Set Wb = ActiveWorkbook
+
+    LoadXlproConfigTOML
+    command = """" & XLPRO_CLI_PATH & """" & " clear-venv-link " & """" & Wb.Path & "\" & Wb.name & """"
+    taskID = shell(command, vbNormalFocus)
+End Sub
+
+
 
 Sub OpenWorkingDir()
     Dim command As String

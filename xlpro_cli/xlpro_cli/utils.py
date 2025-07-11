@@ -30,8 +30,8 @@ from . import file_lock
 from functools import wraps
 import traceback
 
-# DEVELOPMENT_INSTALL = True
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
+# DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -81,7 +81,7 @@ XLPRO_TMP_FOLDER_PATH = XLPRO_ROOT_PATH / "tmp"
 def sleep_then_close(timeout_sec=1.0):
     console.print(f"Closing in {timeout_sec}...")
     time.sleep(timeout_sec)
-    sys.exit()
+    sys.exit(0)
 
 
 def press_enter_or_timeout_exit(timeout=5):
@@ -98,25 +98,26 @@ def press_enter_or_timeout_exit(timeout=5):
 
     if enter_event.wait(timeout=timeout):
         print("Enter Pressed. Closing...")
-        sys.exit()
+        sys.exit(0)
 
     print(f"Timeout reached. Closing...")
-    sys.exit()
+    sys.exit(0)
 
-    def force_exit_after_timeout():
-        time.sleep(timeout)
-        print(f"\nTimeout reached after {timeout} seconds. Exiting.")
-        sys.exit()  # non-zero exit code for timeout
+    return
+    # def force_exit_after_timeout():
+    #     time.sleep(timeout)
+    #     print(f"\nTimeout reached after {timeout} seconds. Exiting.")
+    #     sys.exit()  # non-zero exit code for timeout
 
-    # Start the timeout thread
-    timeout_thread = threading.Thread(target=force_exit_after_timeout, daemon=True)
-    timeout_thread.start()
+    # # Start the timeout thread
+    # timeout_thread = threading.Thread(target=force_exit_after_timeout, daemon=True)
+    # timeout_thread.start()
 
-    # Prompt user on main thread
-    input(f"Press Enter to exit (timeout in {timeout} sec)...\n")
-    print("Closing...")
-    timeout_thread.join()
-    sys.exit()
+    # # Prompt user on main thread
+    # input(f"Press Enter to exit (timeout in {timeout} sec)...\n")
+    # print("Closing...")
+    # timeout_thread.join()
+    # sys.exit()
 
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
@@ -179,6 +180,7 @@ def create_uuid_str():
 
 def get_xlpro_python_interpreters() -> list[Path]:
     xlpro_venv_interepreters = [str(v.resolve()) for x in XLPRO_ENVS_DIR.glob("*") if x.is_dir() and (v:=(x / ".venv/scripts/python.exe")).exists()]
+    xlpro_venv_interepreters.sort()
     return xlpro_venv_interepreters
 
 
@@ -187,6 +189,7 @@ def get_uv_python_interpreters() -> list[Path]:
     result = subprocess.run(["uv", "python", "dir"], capture_output=True, text=True, check=True)
     uv_py_dir = Path(result.stdout.split("\n")[0])
     uv_py_exes = [x for x in uv_py_dir.glob("*/python.exe")]
+    uv_py_exes.sort()
     return uv_py_exes
 
 
@@ -194,22 +197,25 @@ def get_global_python_interpreters():
     # result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
     result = subprocess.run(["where.exe", "python"], capture_output=True, text=True, check=True)
     ret = result.stdout.split("\n")[:-1]
+    ret.sort()
     return ret
 
 
 def uv_download_python_version(version_str:str) -> Path:
-
     result = subprocess.run(
         [
             "uv", 
             "python", 
             "install",
             version_str,
+            "--verbose"
         ],
         capture_output=True, 
         text=True, 
         check=True,
     )
+
+
     def uninstall():
         result = subprocess.run(
             [
@@ -230,7 +236,7 @@ def uv_download_python_version(version_str:str) -> Path:
     if len(found_path_list) > 1:
         raise Exception("multiple files found")
     if not found_path_list:
-        raise FileNotFoundError
+        raise FileNotFoundError("could not find the just-installed uv interpreter.")
     
     return found_path_list[0]
     
@@ -435,10 +441,11 @@ def reinitialize_workbook_for_xlpro(workbook_path:Path) -> Path:
     # handle venv does not exist
     if not Path(found_venv).exists():
         logger.warning(f"the cached venv '{found_venv}' does not exist")
-        remove_venv_to_workbook_mapping()
+        remove_venv_to_workbook_mapping(workbook_path)
         raise Exception
 
     return Path(found_venv)
+
 
 
 def prompt_user_input(prompt:str) -> str:
@@ -606,7 +613,6 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             print_info("Updating the environment dependencies...")
             process = subprocess.Popen(
                 [
-                    # "xlpro-server.exe"
                     "uv",
                     "pip",
                     "sync",
@@ -631,27 +637,23 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
                     print(line, end='', file=sys.stderr)  # Print stderr immediately
 
             import threading
-
             t1 = threading.Thread(target=stdout_writer)
             t2 = threading.Thread(target=stderr_writer)
-
             t1.start()
             t2.start()
-
-            # Wait for the subprocess to finish
             process.wait()
-
             t1.join()
             t2.join()
-
-            if DEVELOPMENT_INSTALL:
-                print_warning("DEVELOPMENT BUILD: Overwriting requirements with editable xlpro version")
-                install_editable_default_reqs(py_interpreter_path=python_exe)
-
-
             print_success("Dependency updates completed successfully.")
+
+
         elif v == "no":
             print_warning("Updates skipped due to error, you may be missing requirements for your environment and may need to rectify this manually!")
+
+    if DEVELOPMENT_INSTALL:
+        print_warning("DEVELOPMENT BUILD: Overwriting requirements with editable xlpro version")
+        install_editable_default_reqs(py_interpreter_path=python_exe)
+
     return
 
 
@@ -868,6 +870,23 @@ def get_valid_venv_root_path_used_for_workbook_from_map(workbook_path:str|Path) 
         return
 
     return venv_root_path
+
+def remove_venv_mapping_for_workbook(workbook_path:Path, dialogue=False):
+    venv_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path=workbook_path)
+    if venv_path is None:
+        print_info(f"No venv is currently mapped to {workbook_path.name}. No further actions required.")
+        return
+    if dialogue:
+        if prompt_yes_no_input(f"Are you sure you want to remove venv link for '{workbook_path.name}'", default="yes") == "no":
+            print_info("User requested to not proceeed.")
+            return
+    print_info(f"Removing venv-workbook link '{venv_path.name}'-'{workbook_path.name}'")
+    remove_venv_to_workbook_mapping(workbook_path=workbook_path, venv_path=venv_path)
+
+
+def delete_stale_environments():
+    """Deletes all venvs not currently tied to workbooks"""
+    raise NotImplementedError
 
 
 def write_settings_json_python_path(parent_dir:Path, absolute_python_exe_path:Path) -> Path:
@@ -1869,16 +1888,16 @@ def delete_folder(path):
     else:
         print(f"Folder does not exist: {path}")
 
-def check_tmp_folder_size_prompt_delete():
-    print_info(f"Calculating temporary folder size at {XLPRO_TMP_FOLDER_PATH}...")
-    if not XLPRO_TMP_FOLDER_PATH.exists():
-        print_info("Temporary folder does not exist. No actions required")
+def check_folder_size_prompt_delete(fp:Path):
+    print_info(f"Calculating folder size at {fp}...")
+    if not fp.exists():
+        print_info(f"Path not found at {fp}. No actions required")
         return
-    size_bytes = get_folder_size(XLPRO_TMP_FOLDER_PATH)
+    size_bytes = get_folder_size(fp)
     # size_bytes = get_folder_size_fast(XLPRO_TMP_FOLDER_PATH)
     size_mb = size_bytes / (1024 * 1024)
-    print_info(f"Temporary folder size is {size_mb:.2f} MB")
-    if prompt_yes_no_input("Do you want to clear temporary files?") == "yes":
+    print_info(f"Folder size is {size_mb:.2f} MB")
+    if prompt_yes_no_input("Do you want to remove this folder") == "yes":
         print_info("Deleting...")
         try:
             delete_folder(XLPRO_TMP_FOLDER_PATH)
@@ -1887,54 +1906,6 @@ def check_tmp_folder_size_prompt_delete():
             print_success(f"Deleting finished, {size_mb} MB to {new_size_mb} MB")
         except Exception as e:
             print_error(f"Unable to delete the directory. {e}")
-
-def check_envs_folder_size_prompt_delete():
-    print_info(f"Calculating virtual environment folder size at {XLPRO_ENVS_DIR}...")
-    if not XLPRO_ENVS_DIR.exists():
-        print_info("Venvs folder does not exist. No actions required")
-        return
-    size_bytes = get_folder_size(XLPRO_ENVS_DIR)
-    # size_bytes = get_folder_size_fast(XLPRO_TMP_FOLDER_PATH)
-    size_mb = size_bytes / (1024 * 1024)
-    print_info(f"Virtual environment folder size is {size_mb:.2f} MB")
-    if prompt_yes_no_input("Do you want to delete the folder?") == "yes":
-        print_info("Deleting...")
-        try:
-            delete_folder(XLPRO_ENVS_DIR)
-            new_size_bytes = get_folder_size(XLPRO_ENVS_DIR)
-            new_size_mb = new_size_bytes / (1024 * 1024)
-            print_success(f"Deleting finished, {size_mb} MB to {new_size_mb} MB")
-            print_success("Successfully deleted.")
-        except Exception as e:
-            print_error(f"Unable to delete the directory. {e}")
-
-
-
-# def close_venv_xlpro_server_for_workbook(workbook_path:Path):
-#     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
-
-#     if py_interpreter_root_dir is None:
-#         print_error(f"Interpreter was not found for {workbook_path}, please initialize first.")
-#         input("Press enter to exit")
-#         sys.exit()
-
-#     pid, guid, port = get_running_pid_guid_port_for_workbook(workbook_path=workbook_path)
-
-#     os.kill(pid, signal.SIGTERM)
-
-#     try:
-#         print_info(f"Attempting to close pid: {pid} for workbook: {workbook_path}...")
-#         process = psutil.Process(pid)
-#         process.terminate()  # Graceful
-#         process.wait(timeout=3)
-#         print_success(f"Process closed, pid: {pid}")
-#     except psutil.NoSuchProcess:
-#         print_warning("Process does not exist, no further actions required")
-#     except psutil.TimeoutExpired:
-#         print_warning("terminate() call timed out, forcing closure")
-#         process.kill()  # Force kill if it didn't terminate in time
-
-
 
 
 

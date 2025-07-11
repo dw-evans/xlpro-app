@@ -81,6 +81,26 @@
                                 label="Clear All Temporary Files" 
                                 screentip="Deletes all temporary xlpro files. Use to reduce installation folder size" 
                                 onAction="ClearTempDataButton"/> 
+
+                        <button id="ClearUvPythonsButton" image="repo-deleted-16" 
+                                label="uv: Clear Python" 
+                                screentip="Clears the python cache" 
+                                onAction="ClearUvPythonsButton"/> 
+
+                        <button id="ClearUvCacheButton" image="repo-deleted-16" 
+                                label="uv: Clear Cache" 
+                                screentip="Clears the uv cache" 
+                                onAction="ClearUvCacheButton"/> 
+
+                        <button id="RemoveLinkForThisWorkbookButton" image="repo-deleted-16" 
+                                label="Break Workbook Venv Link" 
+                                screentip="Clears the uv cache" 
+                                onAction="RemoveLinkForThisWorkbookButton"/> 
+
+                        <!-- <button id="ClearUnusedVenvsButton" image="repo-deleted-16" 
+                                label="Clear All Temporary Files" 
+                                screentip="Clears the uv cache" 
+                                onAction="ClearUnusedVenvsButton"/>  -->
                                 
                 </menu>       
         </group> 
