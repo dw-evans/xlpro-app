@@ -50,6 +50,10 @@ def try_except_press_enter_to_exit_wrapper(func):
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except SystemExit as e:
+            raise
+        except KeyboardInterrupt as e:
+            raise
         except Exception as e:
             print(f"Error occurred. {e}")
             traceback.print_exc()
@@ -93,7 +97,7 @@ def press_enter_or_timeout_exit(timeout=5):
         input(f"Press Enter to exit (timeout in {timeout} sec)...")
         enter_event.set()
 
-    t1 = threading.Thread(target=wait_for_input)
+    t1 = threading.Thread(target=wait_for_input, daemon=True)
     t1.start()
 
     if enter_event.wait(timeout=timeout):
@@ -646,13 +650,13 @@ def dlg_compare_environment_to_requirements_txt(environment_root_path:Path, exte
             t2.join()
             print_success("Dependency updates completed successfully.")
 
+            if DEVELOPMENT_INSTALL:
+                print_warning("DEVELOPMENT BUILD: Overwriting requirements with editable xlpro version")
+                install_editable_default_reqs(py_interpreter_path=python_exe)
 
         elif v == "no":
             print_warning("Updates skipped due to error, you may be missing requirements for your environment and may need to rectify this manually!")
 
-    if DEVELOPMENT_INSTALL:
-        print_warning("DEVELOPMENT BUILD: Overwriting requirements with editable xlpro version")
-        install_editable_default_reqs(py_interpreter_path=python_exe)
 
     return
 
@@ -734,6 +738,10 @@ def traceback_log_raise(func):
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except SystemExit as e:
+            raise
+        except KeyboardInterrupt as e:
+            raise
         except Exception as e:
             logger.error(f"{func.__qualname__}, error: '{e}'")
             logger.error(f"{traceback.format_exc()}")
@@ -1751,6 +1759,7 @@ def get_interpreter_port(interpreter_path:Path):
 
 def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:bool=True, do_register_wb:bool=True):
     """spins up the xlpro server on a port specified in the launch.json debug configuration"""
+    from win32com.client import Dispatch
 
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
 
@@ -1830,6 +1839,7 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         try:
             for line in _process.stderr:
                 sys.stderr.write(line)  # Mirror stderr
+                sys.stderr.flush()
                 if exit_message in line:
                     break  # Trigger detected
                 if time.time() - start_time > timeout_seconds:
@@ -1837,21 +1847,21 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         except TimeoutError as e:
             print_error(f"Startup timed-out after {timeout_seconds} sec. You will need to manually register (sync) the workbook.")
 
-        
         # Ready to link the workbook to the server.
         # Dispatch the workbook to run the registration macro from here 
         try:
-            from win32com.client import Dispatch
+            print_info("Signalling workbook to sync...")
             xlapp = Dispatch("Excel.Application")
             wb = xlapp.Workbooks.Open(str(workbook_path))
             xlapp.Run("xlpro.xlam!xlproRegisterWorkbook", wb)
+            print_info("Sync attempt complete.")
         except Exception as e:
             print_error("Could not signal to Excel to register the workbook. You will need to manually register (sync) the workbook.")
 
     if do_register_wb:
         register_wb_on_signal(process)
 
-    press_enter_or_timeout_exit(5.0)
+    press_enter_or_timeout_exit(1.0)
 
 
 def get_folder_size(path: str | Path) -> int:

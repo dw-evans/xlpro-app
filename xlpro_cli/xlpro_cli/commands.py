@@ -15,24 +15,18 @@ enable_ansi_escape_codes_in_console()
 from pathlib import Path
 import subprocess
 from . import utils
-from .utils import try_except_press_enter_to_exit_wrapper
 
 import sys
 import argparse
 
-from rich.console import Console
 from rich import print
-from rich.style import Style
-
+import sys
 import os
-import traceback
 
 # change the os working directory... Not sure why.....
 os.chdir(Path(__file__).parent.parent.parent)
 
-from functools import wraps
-
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_start_server(args):
     """Starts the server"""
@@ -45,10 +39,10 @@ def handle_start_server(args):
         raise Exception("workbook must be initialized for xlpro before launching")
     
     utils.start_venv_xlpro_server_for_workbook(workbook_path)
-    pass
+    
 
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_init(args):
     """initializes or re-initializes the workbook"""
@@ -62,7 +56,7 @@ def handle_init(args):
     utils.press_enter_or_timeout_exit(timeout=30.0)
 
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_local_mapping_for_workbook(args):
     """Removes the venv mapping for the workbook"""
@@ -77,7 +71,7 @@ def handle_clear_local_mapping_for_workbook(args):
     utils.press_enter_or_timeout_exit(timeout=30.0)
 
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def _handle_get_guid(args):
     workbook_path = Path(args.workbook)
@@ -88,7 +82,7 @@ def _handle_get_guid(args):
     sys.stderr.write(str(guid))
     pass
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_write_requirements(args):
     """ Writes requirements txt, .python-version, .xlpro-version - pending...
@@ -113,26 +107,26 @@ def handle_write_requirements(args):
     # utils.press_enter_to_exit()
     utils.press_enter_or_timeout_exit(timeout=30.0)
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_venv_data(args):
     utils.check_envs_folder_size_prompt_delete()
     # utils.press_enter_to_exit()
     utils.press_enter_or_timeout_exit(timeout=5.0)
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_tmp_data(args):
     utils.check_folder_size_prompt_delete(utils.XLPRO_TMP_FOLDER_PATH)
     utils.press_enter_or_timeout_exit(timeout=5.0)
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_uv_cache_data(args):
     utils.check_folder_size_prompt_delete(Path(os.environ["UV_CACHE_DIR"]))
     utils.press_enter_or_timeout_exit(timeout=5.0)
 
-@try_except_press_enter_to_exit_wrapper
+@utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_uv_pythons_data(args):
     utils.check_folder_size_prompt_delete(Path(os.environ["UV_PYTHON_INSTALL_DIR"]))
@@ -209,12 +203,7 @@ def main():
     except Exception as e:
         print("Could not load cli-header.txt")
 
-
     _configure_env()
-
-    pass
-
-    # subprocess.run("uv python dir", capture_output=True, text=True, shell=True)
 
     parser = argparse.ArgumentParser(
         prog="xlpro-cli",
@@ -256,25 +245,19 @@ def main():
     parser_clear_wb_venv.set_defaults(func=handle_clear_local_mapping_for_workbook)
 
 
-    try:
-        args = parser.parse_args()
-    except Exception as e:
-        print("Exception occurred")
-        utils.press_enter_or_timeout_exit(timeout=30.0)
-        # utils.press_enter_to_exit()
-        sys.exit()
+    args = parser.parse_args()
     args.func(args)
 
 
-import sys
-import time
 
 if __name__ == "__main__":
     try:
         main()
+    except SystemExit as e:
+        raise
+    except KeyboardInterrupt as e:
+        raise
     except Exception as e:
         print(f"Exception encountered: {e}")
-    finally:
-        input("press enter to continue")
-    time.sleep(5)
+        input("Press enter to Close")
     
