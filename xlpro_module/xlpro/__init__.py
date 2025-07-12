@@ -45,14 +45,14 @@ from xlpro._utils import (
     condense,
     # uncondense,
 
-    _replace_pynone_strs,
+    # _replace_pynone_strs,
 
-    datetime_to_excel,
-    excel_to_datetime,
-    datetime_array_to_excel_serial,
-    excel_to_datetime_vectorized,
-    dataframe_with_dates_to_excel_serial,
-    pd_series_convert_dt_to_excel_serial,
+    # datetime_datetime_to_excel,
+    # excel_to_datetime,
+    # np_datetime_array_to_excel_serial,
+    # excel_to_datetime_vectorized,
+    # dataframe_with_dates_to_excel_serial,
+    # pd_series_convert_dt_to_excel_serial,
 
 )
 

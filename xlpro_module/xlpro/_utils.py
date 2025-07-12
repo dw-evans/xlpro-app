@@ -918,6 +918,7 @@ def show(val):
             `DataFrame` `Series` with column `datetime` dtypes
             `ndarray` with full `datetime` dtypes
     """
+
     if val is None:
         raise Exception("cannot show(None)")
     tval = type(val)
@@ -937,7 +938,6 @@ def show(val):
     #     is_float_dtype, # done
     #     is_complex_dtype,
     # )
-
 
     if tval == pd.DataFrame:
         tdst = ndarray2d
@@ -969,18 +969,30 @@ def show(val):
     
     elif tval == np.ndarray:
         if np.issubdtype(val_adj.dtype, np.datetime64):
-            val_adj = datetime_array_to_excel_serial(val_adj)
+            val_adj = np_datetime_array_to_excel_serial(val_adj)
         tdst = ndarray2d
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
-
     elif isinstance(val, Exception):
         raise val
     
+    # Convert datetime subclasses to serial for showing
+    elif np.issubdtype(getattr(val_adj, "dtype", None), np.datetime64):
+        # val_adj = np_datetime_array_to_excel_serial(val_adj)
+        # val_adj = datetime.datetime(val_adj)
+        ret = val_adj
+        return ret
+        
+    elif isinstance(val_adj, datetime.datetime):
+        # excel can show np.datetime64 natively
+        val_adj = np.datetime64(val_adj)
+        ret = val_adj
+        return ret
+    
     elif tval in [str, int, float, bool]:
         ret = val
-        calc_success = True
+        return ret
 
     else:
         try:
@@ -1012,7 +1024,7 @@ def show(val):
 
 import datetime
 
-def datetime_to_excel(dt: datetime.datetime) -> float:
+def datetime_datetime_to_excel(dt: datetime.datetime) -> float:
     """
     Converts a Python datetime object to an Excel serial number.
     """
@@ -1026,7 +1038,7 @@ def excel_to_datetime(serial: float) -> datetime.datetime:
     return excel_epoch + datetime.timedelta(days=serial)
 
 
-def datetime_array_to_excel_serial(dt_array):
+def np_datetime_array_to_excel_serial(dt_array):
     # Ensure the array is datetime64[us] for microsecond precision
     # dt_array = dt_array.astype('datetime64[us]')
     
