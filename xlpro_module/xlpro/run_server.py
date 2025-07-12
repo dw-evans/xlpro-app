@@ -210,6 +210,8 @@ def serve():
     # import time
     # time.sleep(20)
 
+    # debugpy.wait_for_client()
+
     logger.info(f"Ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
 
     xlpro_lock_fp = file_lock.get_xlpro_lockfile_path_parent() / f"{WORKBOOK_NAME}.xlpro.lock"

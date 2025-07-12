@@ -6,9 +6,10 @@ __logger = __logging.getLogger(__name__)
 from xlpro._utils import (
     # jsonify,
     show,
-    _show_image,
     show_image,
+
     create_table_from_df,
+
     cpy,
     deepcpy,
     _int2rgb,
@@ -59,13 +60,11 @@ from xlpro._utils import (
 from xlpro._wrappers import (
     register,
     ignore,
-    wrap_jsonify,
+    # wrap_jsonify,
     register_sub,
+    wrap_condense,
 )
 
-# from xlpro._enums import (
-#     FunctionTypes
-# )
 
 from xlpro._types import (
     list1d,
@@ -73,6 +72,7 @@ from xlpro._types import (
     ndarray1d,
     ndarray2d,
 )
+
 from xlpro._types import (
     xlproExpandedType,
     xlproCollapsedType,

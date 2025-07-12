@@ -1255,7 +1255,7 @@ def pyhash(vals:ndarray1d):
     s = "".join([str(x) if x in (float, int, str) else str(id(x)) for x in vals])
     return hash(s)
         
-def condense(iterable_val):
+def condense(iterable_val: list2d):
     # XXX - TODO this function needs more thought...
     return _types.xlproCollapsedType(iterable_val)
 
@@ -1471,8 +1471,21 @@ def create_table_if_not_exists(caller, table_name:str):
     return f"xlTable(\"{table_name}\" @ '{tbl_range.Parent.Name}'!{tbl_range.Address})"
 
 
+def flatten_multiindex_columns(df: pd.DataFrame, sep: str = ".") -> pd.DataFrame:
+    if isinstance(df.columns, pd.MultiIndex):
+        df = df.copy()
+        df.columns = [sep.join(map(str, col)).rstrip(sep) for col in df.columns.values]
+    return df
+
 @comsafe
-def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
+def create_table_from_df(caller, df:pd.DataFrame, table_name:str, flatten_multiindex:bool=False, flatten_multiindex_sep:str="."):
+
+    if isinstance(df.columns, pd.MultiIndex):
+        if not flatten_multiindex:
+            raise TypeError("Cannot support pd.MultiIndex columns. Use flatten_multiindex flag to collapse the column names")
+        else:
+            df = flatten_multiindex_columns(df=df, sep=flatten_multiindex_sep)
+
     wb = caller.Parent.Parent
     # Locate the table
     found = False
@@ -1487,8 +1500,8 @@ def create_table_from_df(caller, df:pd.DataFrame, table_name:str):
             break
 
     if not found:
-        return create_table_if_not_exists(caller=caller, table_name=table_name)
-        # raise ValueError(f"Table '{table_name}' not found.")
+        # return create_table_if_not_exists(caller=caller, table_name=table_name)
+        raise ValueError(f"Table '{table_name}' not found.")
 
     # Get starting cell
     top_left = table.Range.Cells(1, 1)

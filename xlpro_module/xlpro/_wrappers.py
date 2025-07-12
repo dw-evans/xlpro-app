@@ -167,6 +167,9 @@ def _register_fname(func, mname, fname):
         raise Exception("Attempted to register function object again")
     if fname in _module_fname_func_register[mname]:
         raise Exception("Attempted to register function name again")
+    from . import vba_reserved_names
+    if fname in vba_reserved_names.RESERVED_VBA_NAMES:
+        raise NameError(f"Function name {fname} clashes with VBA reserved names. Please correct.")
     _module_func_fname_register[mname][func] = fname
     _module_fname_func_register[mname][fname] = func
 
@@ -182,10 +185,9 @@ def _register(func, _mname, _type, _isactive, fname:str=None):
         _type = _utils.infer_func_result_type_from_type_hints(func)
     _register_func_type(func, _mname, _type)
 
-def register(_type:None|int=None, isactive=True, fname:str=None):
+def register(_func=None, *, _type:None|int=None, isactive=True, fname:str=None):
     """Registers the function for xlpro. User can set function type or rely on PEP-484 type hints
     per the documentation"""
-
 
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
@@ -197,7 +199,12 @@ def register(_type:None|int=None, isactive=True, fname:str=None):
         _add_func_module(mname)
         _register(func=func, _mname=mname, _type=_type, _isactive=isactive, fname=fname)
         return func
-    return wrapper
+
+    if _func is None:
+        return wrapper
+    else:
+        return wrapper(_func)
+
 
 
 # def expand(func):
@@ -206,22 +213,30 @@ def register(_type:None|int=None, isactive=True, fname:str=None):
 #         return _utils.expand(func(*args, **kwargs))
 #     return inner
 
-
-
+def wrap_condense(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        ret = func(*args, **kwargs)
+        ret = _types.xlproCollapsedType(ret)
+        return ret
+    return wrapper
 
 
 # XXX - todo - register 'register' and 'ignore' as class based methods to give the option of
 # calling with parentheses or not.
 # Actually don't know if this is a horrendous idea.
 
-def ignore(_type:None|int=None):
-    """Registers the function for xlpro with isactive=False so it does not enter as a UDF in excel.
-    User can set function type or rely on PEP-484 type hints per the documentation"""
+def ignore(_func=None, *, _type:None|int=None):
+    """Registers the function for xlpro with isactive=False so it does not enter as a UDF in excel"""
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
         _register(func, mname, _type, False)
         return func
-    return wrapper
+    
+    if _func is None:
+        return wrapper
+    else:
+        return wrapper(_func)
 
 
 def import_module_with_registration(mname, fpath):
@@ -230,7 +245,22 @@ def import_module_with_registration(mname, fpath):
     _utils.import_module(mname, fpath)
 
     valid_functions = _utils.get_udf_valid_functions_from_module(mname)
-    for f in valid_functions:
+
+    x = ModuleFunctionMapsWrapper(mname)
+
+    active_valid_funcs = []
+    for func in valid_functions:
+        _fname = x.func_fname_register.get(func, None)
+        if _fname is None:
+            active_valid_funcs.append(func)
+            continue
+        if x.fname_isactive_register[_fname]:
+            active_valid_funcs.append(func)
+            continue
+            
+    # active_valid_funcs = [(_fname:=x.func_fname_register[func]) for func in valid_functions if not getattr(x.fname_isactive_register, _fname, True)]
+
+    for f in active_valid_funcs:
         _register(f, mname, None, True)
 
 

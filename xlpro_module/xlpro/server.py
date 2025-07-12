@@ -1584,6 +1584,23 @@ import pandas as pd
 import datetime
 import decimal
 
+
+NP_BASIC_TYPES = [
+    np.float64,
+    np.datetime64,
+    np.int64,
+    np.int32,
+    np.bool_,
+    np.int8,
+    np.int16,
+    np.uint8,
+    np.uint16,
+    np.uint32,
+    np.uint64,
+    np.float16,
+    np.float32,
+]
+
 SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION = {
     # Native Python types
     str: lambda x: x,
@@ -1606,7 +1623,7 @@ SIMPLE_DISPLAY_TYPES_DISPLAY_CONVERSION = {
     np.float32: lambda x: float(x),
     np.float64: lambda x: float(x),
 
-    np.datetime64: lambda x: _utils.datetime_to_excel(x),
+    np.datetime64: lambda x: _utils.datetime_datetime_to_excel(x),
 
     # Complex numbers
     # np.complex64: lambda x: complex(x),
@@ -1697,11 +1714,14 @@ class ClientManager:
                 for i, subval in enumerate(iterable_val):
                     if isinstance(subval, (int, float, str, bool)):
                         val_modified.append(subval)
+                    # elif getattr(subval, "dtype", None):
+                    #     if any(np.issubdtype(subval, x) for x in NP_BASIC_TYPES):
+                    #         val_modified.append(subval)
                     else:
                         val_modified.append(f"PyObj<{uid}>_{i}")
 
                 # create a *_expanded variant of the uid result display
-                self._set_result_display(f"{uid}_expanded", np.array(val_modified, dtype=object).reshape(-1,1))
+                self._set_result_display(f"{uid}_expanded", np.array(val_modified).reshape(-1,1))
 
                 pass
 
