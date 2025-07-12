@@ -1414,7 +1414,7 @@ if CONFIG.MULTI_SERVER_EXPERIEMENT:
         else:
             return decorator(_func)  # used without arguments
 else:
-    XLAPP_LOCK = threading.Lock()
+    XLAPP_LOCK = threading.RLock()
     def comsafe(_func=None, *, sleep=None, attempts=None):
         def decorator(func):
             @wraps(func)
