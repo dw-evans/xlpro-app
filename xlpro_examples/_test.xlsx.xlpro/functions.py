@@ -10,64 +10,47 @@ import xlpro._utils as utils
 from xlpro import list1d, list2d, ndarray1d, ndarray2d
 
 # Display methods
-xlpro.register()(xlpro.show)
-xlpro.register()(xlpro.show_image)
+xlpro.register(xlpro.show)
+xlpro.register(xlpro.show_image)
 
 # Python operators
-xlpro.register()(xlpro.pypow)
-xlpro.register()(xlpro.pymul)
-xlpro.register()(xlpro.pydiv)
-xlpro.register()(xlpro.pymod)
-xlpro.register()(xlpro.pyadd)
-xlpro.register()(xlpro.pysub)
-xlpro.register()(xlpro.pynot)
-xlpro.register()(xlpro.pyeq)
-xlpro.register()(xlpro.pyne)
-xlpro.register()(xlpro.pylt)
-xlpro.register()(xlpro.pyle)
-xlpro.register()(xlpro.pygt)
-xlpro.register()(xlpro.pyge)
+xlpro.register(xlpro.pypow)
+xlpro.register(xlpro.pymul)
+xlpro.register(xlpro.pydiv)
+xlpro.register(xlpro.pymod)
+xlpro.register(xlpro.pyadd)
+xlpro.register(xlpro.pysub)
+xlpro.register(xlpro.pynot)
+xlpro.register(xlpro.pyeq)
+xlpro.register(xlpro.pyne)
+xlpro.register(xlpro.pylt)
+xlpro.register(xlpro.pyle)
+xlpro.register(xlpro.pygt)
+xlpro.register(xlpro.pyge)
 
 # Common Python functions
-xlpro.register()(xlpro.pyrepr)
-xlpro.register()(xlpro.pystr)
-xlpro.register()(xlpro.pylen)
-xlpro.register()(xlpro.pyshape)
-xlpro.register()(xlpro.pytype)
+xlpro.register(xlpro.pyrepr)
+xlpro.register(xlpro.pystr)
+xlpro.register(xlpro.pylen)
+xlpro.register(xlpro.pyshape)
+xlpro.register(xlpro.pytype)
 
 # Object getters
-xlpro.register()(xlpro.pygetattr)
-xlpro.register()(xlpro.pygetitem)
+xlpro.register(xlpro.pygetattr)
+xlpro.register(xlpro.pygetitem)
 
 # Object copying
-xlpro.register()(xlpro.cpy)
-xlpro.register()(xlpro.deepcpy)
+xlpro.register(xlpro.cpy)
+xlpro.register(xlpro.deepcpy)
 
 # Hasher to create unique seeds
-xlpro.register()(xlpro.pyhash)
+xlpro.register(xlpro.pyhash)
 
-xlpro.register()(xlpro.condense)
+xlpro.register(xlpro.condense)
 
 
 def hello(name:str):
     return f"hello {name}"
-
-
-"""
-test_cast_list
-test_cast_list1d
-test_cast_list2d
-test_cast_list_int_
-test_cast_list1d_int_
-test_cast_list2d_int_
-test_cast_np_ndarray
-test_cast_ndarray1d
-test_cast_ndarray2d
-test_cast_np_ndarray_int_
-test_cast_np_ndarray_np_int32_
-test_cast_ndarray1d_np_int32_
-test_cast_ndarray2d_np_int32_
-"""
 
 def test_cast_list(a:list):
     return a
@@ -137,4 +120,70 @@ def test_pd_create_series(a:ndarray1d):
 
 def test_condensed_1(a:list2d):
     ret = xlpro.xlproCollapsedType(a)
+    return ret
+
+def list_expansion_test_pyobjects(seed):
+    fig, axs  = plt.subplots(2, 2)
+    axs = fig.get_axes()
+    return axs
+
+def list_expansion_test_int(seed):
+    return [random.randint(0, 5) for i in range(3)]
+
+def list_expansion_test_float(seed):
+    return [random.random() for i in range(3)]
+
+def list_expansion_test_bool(seed):
+    return [bool(random.randrange(0, 1)) for i in range(3)]
+
+import random
+import datetime
+
+def list_expansion_test_datetime_datetime(seed):
+    ret =[datetime.datetime.now() + datetime.timedelta(i) for i in range(3)]
+    return ret 
+
+def list_expansion_test_np_datetime(seed):
+    ret = [np.datetime64(datetime.datetime.now() + datetime.timedelta(i)) for i in range(3)]
+    return ret
+
+
+@xlpro.ignore
+def test_ignore_function(seed):
+    return "ignore"
+
+def test_register_function(seed):
+    return "register"
+
+@xlpro.wrap_condense
+def test_condense_wrapper(a:ndarray1d):
+    return a
+
+def create_dataframe_basic(seed):
+    df = pd.DataFrame({
+        "value1": [1, 2, 3],
+        "value2": [4, 5, 6],
+    })
+    return df
+
+def create_dataframe_with_datetime(seed):
+    df = pd.DataFrame({
+        "datetime": [np.datetime64(datetime.datetime.now() + datetime.timedelta(i)) for i in range(3)],
+        "value": [4, 5, 6],
+    })
+    return df
+
+def create_dataframe_with_multiindex(seed):
+    arrays = [['foo', 'foo', 'bar'], ['A', 'B', 'C'], [1, 2, 3]]
+    tuples = list(zip(*arrays))
+    index = pd.MultiIndex.from_tuples(tuples, names=['first', 'second', 'third'])
+
+    df = pd.DataFrame(np.random.rand(3, 3), columns=index)
+    return df
+
+xlpro.register(xlpro.create_table_from_df)
+
+@xlpro.comsafe
+def test_create_table_from_df_multiindex_success1(caller, df:pd.DataFrame, table_name:str):
+    ret =  xlpro.create_table_from_df(caller, df, table_name, True)
     return ret
