@@ -39,6 +39,16 @@ _module_subname_isactive_register:dict[dict[str, bool]] = {}
 class ModuleSubMapsWrapper:
     """Wrapper for module-specific function registry maps"""
     def __init__(self, mname):
+        if not mname in _module_subname_func_register:
+            _module_subname_func_register[mname] = {}
+            _module_func_subname_register[mname] = {}
+            _module_subname_isactive_register[mname] = {}
+
+        self.mname = mname
+        self.subname_func_register:dict = _module_subname_func_register[mname]
+        self.func_subname_register:dict = _module_func_subname_register[mname]
+        self.subname_isactive_register:dict = _module_subname_isactive_register[mname]
+        return
         self.mname = mname
         self.subname_func_register:dict = _module_subname_func_register[mname]
         self.func_subname_register:dict = _module_func_subname_register[mname]
