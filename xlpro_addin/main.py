@@ -147,7 +147,10 @@ def build():
             with open(vba_src_dir / "ThisWorkbook.cls") as f:
                 comp.CodeModule.AddFromString(f.read())
                 pass
-
+    
+    # import the user form
+    wb.VBProject.VBComponents.Import(str((vba_src_dir / "UserForm1.frm").resolve()))
+    
     pass
 
     vba_files = list(vba_src_dir.glob("*.bas")) + list(vba_src_dir.glob("*.cls"))

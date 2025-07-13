@@ -797,6 +797,16 @@ Sub write_text_to_module(ByRef Wb As Workbook, c_name As String, contents As Str
 End Sub
 
 
+Sub raiseSubroutineException(wb_name as String, fname as string, e_msg as String)
+    dim msg as string
+
+    msg = "Error encountered in '" & wb_name & "': '" & fname & "'": & vbnewline & "Details:"  & vbnewline &  e_msg
+
+    MsgBox msg, vbCritical, "xlpro Subroutine Error: " & wb_name
+
+End Sub
+
+
 '------------------------------------------------------------------------
 'Helper functions etc
 '------------------------------------------------------------------------
@@ -833,3 +843,10 @@ Public Function ptr(rng As Range)
     ptr = "*<" & Wb.FullName & "::" & ws.name & "::" & rng.Address & ">"
 End Function
 
+
+Public Sub ShowAsyncErrorWindow(caption as string, msg As String)
+    dim frm as New UserForm1
+    frm.Label1.Caption = msg
+    frm.Caption = caption
+    frm.Show vbModeless ' Async
+End Sub
