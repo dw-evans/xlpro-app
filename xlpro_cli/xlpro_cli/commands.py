@@ -137,13 +137,19 @@ XLPRO_INSTALL_DIR = (Path(os.environ["USERPROFILE"]) / ".xlpro").resolve()
 XLPRO_BIN_DIR =  XLPRO_INSTALL_DIR / "bin"
 
 def _configure_env():
+    # uv.exe bin folder
     os.environ["PATH"] = f"{XLPRO_BIN_DIR};" + os.environ["PATH"]
+
+    # uv storage locations
     uv_cache_dir = XLPRO_INSTALL_DIR / "uv/cache"
     uv_cache_dir.mkdir(exist_ok=True, parents=True)
     os.environ["UV_CACHE_DIR"] = str(uv_cache_dir.resolve())
     uv_python_dir = XLPRO_INSTALL_DIR / "uv/python"
     uv_python_dir.mkdir(exist_ok=True)
     os.environ["UV_PYTHON_INSTALL_DIR"] = str(uv_python_dir.resolve())
+
+    # disable the frozen modules warning
+    os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = '1'
 
 def _load_uv_help() -> str:
     result = subprocess.run(

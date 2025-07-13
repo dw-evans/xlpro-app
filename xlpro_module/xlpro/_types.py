@@ -33,6 +33,29 @@ STR_TO_TYPE_MAP = {
     TypeStrEnums.NDARRAY2D: ndarray2d,
 }
 
+if typing.TYPE_CHECKING:
+    from win32typelibs import excel as xl
+    # xlRange = typing.Annotated['xl.Range', "xlRange"]
+    # xlWorkbook = typing.Annotated['xl._Workbook', "xlWorkbook"]
+    # xlWorksheet = typing.Annotated['xl._Worksheet', "xlWorksheet"]
+
+    # give the user options for this, active, workbook/sheet for initial values
+    # xlThisWorkbook = 
+    # xlActiveWorkbook = 
+    # xlActiveSheet = 
+
+else:
+    # xl class for type hint namespace use.
+    class xl:
+        Range = typing.ForwardRef('xl.Range')
+        _Workbook = typing.ForwardRef('xl._Workbook')
+        _Worksheet = typing.ForwardRef('xl._Worksheet')
+
+xlRange = typing.Annotated['xl.Range', "xlRange"]
+xlWorkbook = typing.Annotated['xl._Workbook', "xlWorkbook"]
+xlWorksheet = typing.Annotated['xl._Worksheet', "xlWorksheet"]
+
+
 
 def _get_ndarray_annotated_dtype(_t):
     _args = typing.get_args(_t)[0]

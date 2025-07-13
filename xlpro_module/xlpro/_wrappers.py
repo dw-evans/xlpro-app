@@ -102,6 +102,14 @@ def sub_ignore(func):
 class ModuleFunctionMapsWrapper:
     """Wrapper for module-specific function registry maps"""
     def __init__(self, mname):
+        if not mname in _module_fname_func_register:
+            self.mname = mname
+            _module_fname_func_register[mname] = {}
+            _module_func_fname_register[mname] = {}
+            _module_fname_type_register[mname] = {}
+            _module_fname_isjsonified_register[mname] = {}
+            _module_fname_isactive_register[mname] = {}
+            _module_fname_function_signature_register[mname] = {}
         self.mname = mname
         self.fname_func_register:dict = _module_fname_func_register[mname]
         self.func_fname_register:dict = _module_func_fname_register[mname]
@@ -400,10 +408,6 @@ def generate_wrapped_function(mname, fname):
         return _com_init_dispatch_release_wrapper(retf)
     
     raise NotImplementedError("Function type is not supported")
-
-
-
-
 
 
 # def generate_wrapped_function_sub(mname, fname):

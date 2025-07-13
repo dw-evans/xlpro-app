@@ -1817,7 +1817,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         [
             CONFIG.XLPRO_SERVER_PATH,
             str(py_interpreter_path),
-            # "-Xfrozen_modules=off"
+            "-X",
+            "frozen_modules=on",
             "-m",
             "xlpro.run_server",
             f"--debugpy_port={str(port)}",

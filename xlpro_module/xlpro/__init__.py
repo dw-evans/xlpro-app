@@ -71,6 +71,9 @@ from xlpro._types import (
     list2d,
     ndarray1d,
     ndarray2d,
+    xlRange,
+    xlWorkbook,
+    xlWorksheet,
 )
 
 from xlpro._types import (

@@ -65,10 +65,13 @@ def traceback_log_raise(func):
     return inner
 
 
+fake_globals = {'xl': _types.xl}
+
 def get_function_types_with_fallback(func:Callable):
     try:
         # use include_extras = True to preserve typing.Annotated types
-        hints = typing.get_type_hints(func, globalns={}, localns={}, include_extras=True)
+        # hints = typing.get_type_hints(func, globalns={}, localns={}, include_extras=True)
+        hints = typing.get_type_hints(func, globalns=fake_globals, localns={}, include_extras=True)
     except NameError as e:
         # Fallback: manually replace forward references with Any
         annotations = func.__annotations__
@@ -180,6 +183,7 @@ VB_TYPE_CONVERSION_STRINGS = {
 #     str: "{} As String",
 #     Any: "{} As Variant",
 # }
+
 # leave the inputs as variant and cast them only before sending them to xlpro to
 # suit the checkargsready function call
 VB_TYPE_DECLARATION_STRINGS = {
@@ -188,12 +192,17 @@ VB_TYPE_DECLARATION_STRINGS = {
     bool: "{} As Variant",
     str: "{} As Variant",
     Any: "{} As Variant",
+    _types.xlRange: "{} As Range",
+    _types.xlWorkbook: "{} As Workbook",
+    _types.xlWorksheet: "{} As Worksheet",
 }
 
 # XLPRO_DEFAULT_ARGUMENT_HINT_STR = "XLPRO_DEFAULT"
 XLPRO_EMPTY_STR = "pyEmpty" # used to signal default
 XLPRO_NONE_STR = "pyNone" # used to signal None (this could be a function call but seems extreme)
 
+def raise_e(e:Exception):
+    raise e
 
 VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
     int: lambda x: "{}".format(x),
@@ -201,6 +210,9 @@ VB_DEFAULT_VALUE_REPR_FUNCTIONS = {
     bool: lambda x: "True" if x else "False",
     str: lambda x: "\"{}\"".format(x),
     Any: lambda x: f"\"{XLPRO_EMPTY_STR}\"",
+    # _types.xlRange: lambda x: raise_e(Exception("xlRange default argument is not supported")),
+    # _types.xlWorkbook: "ActiveWorkbook",
+    # _types.xlWorksheet: "ActiveWorksheet",
 }
 
 
@@ -221,15 +233,18 @@ End If
 
 RESERVED_XLPRO_KW_LOOKUPS = {
     "caller": "Application.Caller",
-    "thiswb": "ActiveWorkbook",
+    "thiswb": "ThisWorkbook",
 }
 RESERVED_ARGS = list(RESERVED_XLPRO_KW_LOOKUPS.keys())
 
+RESERVED_XLPRO_KW_LOOKUPS_SUBS = {
+    "thiswb": "ThisWorkbook",
+    "activewb": "ActiveWorkbook",
+    "activews": "activews",
+}
+RESERVED_ARGS_SUBS = list(RESERVED_XLPRO_KW_LOOKUPS_SUBS.keys())
+
 # from vba_reserved_names import RESERVED_VBA_NAMES
-
-if TYPE_CHECKING:
-    from win32typelibs import excel as xl
-
 
 from xlpro.vba_reserved_names import RESERVED_VBA_NAMES
 
@@ -245,11 +260,13 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     if fname is not None:
         func_name = fname
 
+    if func_name in RESERVED_VBA_NAMES:
+        raise NameError(f"Name '{func_name}' is reserved by VBA, please correct in the source file.")
+
     docstring = func.__doc__
     arg_declaration_list = []
     argnames_passed_to_xlpro = []
     arg_range_conversion_check_list = []
-    pre_arg_dim_defs = []
     pre_arg_dim_defs = []
     argnames = [a for a, t in args_and_types]
 
@@ -260,9 +277,6 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
             Exit Function
         End If"""[1:]
     ))
-
-    if func_name == "mpl_add_line_unique":
-        pass
 
     pre_check_arg_sequence_strs = []
     # loop over each arg and type
@@ -295,20 +309,9 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
         pre_arg_dim_defs.append(f"Dim {a}_val As Variant")
 
         if a_orig in default_value_map.keys():
-            # # Optional {argname} As {vbtype} = {defaultvalue}
-            # if t in VB_DEFAULT_VALUE_REPR_FUNCTIONS.keys():
-            #     arg_declaration_list.append(
-            #         f"Optional {VB_TYPE_DECLARATION_STRINGS[t].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[t](default_value_map[a])}"
-            #     )
-            # else:
-            #     arg_declaration_list.append(
-            #         f"Optional {VB_TYPE_DECLARATION_STRINGS[Any].format(a)} = {VB_DEFAULT_VALUE_REPR_FUNCTIONS[Any](default_value_map[a])}"
-            #     )
             arg_declaration_list.append(
                 f"Optional {a} as Variant = \"{XLPRO_EMPTY_STR}\""
             )
-
-
 
         # else define it in the signature with its true type
         else:
@@ -318,17 +321,7 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
             else:
                 arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS[Any].format(a))
 
-
-        # # define the type conversions/casting to pass to xlpro
-        # if VB_TYPE_CONVERSION_STRINGS.get(t, None):
-        #     # handle any args that can be converted
-        #     argnames_passed_to_xlpro.append(VB_TYPE_CONVERSION_STRINGS[t].format(a))
-        # else:
-        #     # handle standard args
-        #     argnames_passed_to_xlpro.append("{}".format(a))
-
         argnames_passed_to_xlpro.append("{}_val".format(a))
-
 
         # we need to be able to handle
         if t in VB_TYPE_CONVERSION_STRINGS:
@@ -342,7 +335,6 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
 
         # convert all range inputs to their .value attribute
         if a not in RESERVED_ARGS:
-
             if t not in [float, int, bool, str]:
                 arg_range_conversion_check_list.append(
                     VB_RANGE_CONVERSION_CHECK_STRING.format(arg=a)
@@ -362,19 +354,66 @@ End Function
 """
     return ret
 
-def sub_template(func:Callable) -> str:
+def sub_template(func:Callable,  fname:str=None) -> str:
     """Returns function template string to send to VBA module.
     If the reserved `caller` argument is used, pass it to the execute function call.
     """
     fsig = get_function_signature(func)
     func_name = fsig.fname
 
+    if fname is not None:
+        func_name = fname
+
+    if func_name in RESERVED_VBA_NAMES:
+        raise NameError(f"Name '{func_name}' is reserved by VBA, please correct in the source file.")
+
+    arg_declaration_list = []
+    pre_arg_dim_defs = []
+    argnames_passed_to_xlpro = []
+    argnames = [a for a, t in fsig.args_and_types]
+
+
+    for a, t in fsig.args_and_types:
+        # handle reserved kwargs
+        # for now, only thiswb is supported for xlpro server passthrough
+        if a in RESERVED_ARGS_SUBS:
+            argnames_passed_to_xlpro.append(RESERVED_XLPRO_KW_LOOKUPS_SUBS[a])
+            continue
+    
+        raise ValueError(f"Only '{RESERVED_ARGS_SUBS}' are currently supported for subroutines.")
+
+        # # Add a trailing underscore to the vba variable names to avoid clashes with 
+        # # vba reserved words
+        # if a.lower() in RESERVED_VBA_NAMES:
+        #     a = f"{a}_"
+        #     while a in argnames:
+        #         a = f"{a}_"
+        # # handle any argument starting with a leading underscore
+        # elif a.startswith("_"):
+        #     a = a.lstrip("_")
+        #     a = f"{a}_"
+        #     while a in argnames:
+        #         a = f"{a}_"
+
+        # TODO - support default arguments
+
+        # # handle arguments
+        # if a in fsig.default_value_map.keys():
+        #     arg_declaration_list.append(
+        #         f"Optional {a} as Variant = \"{XLPRO_EMPTY_STR}\""
+        #     )
+        # else:
+        #     # define the function declaration values
+        #     arg_declaration_list.append(VB_TYPE_DECLARATION_STRINGS.get(t, Any).format(a))
+
+
     from xlpro import server 
 
+    # return f"""Sub {func_name}({', '.join(arg_declaration_list)})
     return f"""Sub {func_name}()
     Dim xlpro As Object
     Set xlpro = GetObject("new: " & xlpro_guid)
-    xlpro.{server.xlproServer.execute_sub_async.__name__} ActiveWorkbook, "{func_name}"
+    xlpro.{server.xlproServer.execute_sub_async.__name__} ActiveWorkbook, "{func_name}"{', ' if argnames_passed_to_xlpro else ''}{', '.join(argnames_passed_to_xlpro)}
 End Sub
 """
 
@@ -438,13 +477,13 @@ def get_xlpro_vb_dynamic_component_contents(func_register:dict[str: Callable]) -
         s_list.append(function_template_with_caller(func=f, fname=fname))
     return "\n".join(s_list)
 
-def get_xlpro_vb_dynamic_component_contents_subs(func_register:list[Callable]) -> str:
+def get_xlpro_vb_dynamic_component_contents_subs(func_register:dict[str: Callable]) -> str:
     s_list = []
 
     from xlpro import server 
     # s_list += [f"public const xlpro_guid as string = \"{server.xlproServer._reg_clsid_}\""]
 
-    for f in func_register:
+    for fname, f in func_register.items():
         if not isinstance(f, Callable):
             raise TypeError(f"Item must be a function, {type(f)}, {f}")
         s_list.append(sub_template(f))
@@ -491,6 +530,14 @@ def com_args_release_to_stream_reserved(func, args):
         thiswb = args[idx]
         thiswb_stream = comarshal_release_and_get_stream(thiswb)
         new_args[idx] = thiswb_stream
+    if "activewb" in arg_names:
+        activewb = args[idx]
+        activewb_stream = comarshal_release_and_get_stream(activewb)
+        new_args[idx] = activewb_stream
+    if "activews" in arg_names:
+        activesheet = args[idx]
+        activesheet_stream = comarshal_release_and_get_stream(activesheet)
+        new_args[idx] = activesheet_stream
     return new_args
 
 def com_args_dispatch_reserved(func, args):
@@ -507,16 +554,21 @@ def com_args_dispatch_reserved(func, args):
         if "caller" in arg_names:
             idx = arg_names.index("caller")
             caller = args[idx]
-            try:
-                caller_stream = comarshal_dispatch_stream(caller)
-                new_args[idx] = caller_stream
-            except Exception as e:
-                raise e
+            caller_stream = comarshal_dispatch_stream(caller)
+            new_args[idx] = caller_stream
         if "thiswb" in arg_names:
             idx = arg_names.index("thiswb")
             thiswb = args[idx]
             thiswb_stream = comarshal_dispatch_stream(thiswb)
             new_args[idx] = thiswb_stream
+        if "activewb" in arg_names: 
+            activewb = args[idx]
+            activewb_stream = comarshal_release_and_get_stream(activewb)
+            new_args[idx] = activewb_stream
+        if "activews" in arg_names: 
+            activesheet = args[idx]
+            activesheet_stream = comarshal_release_and_get_stream(activesheet)
+            new_args[idx] = activesheet_stream
         return new_args
     except Exception as e:
         raise e
@@ -538,6 +590,12 @@ def get_args_minus_reserved(func, args):
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
         arg_idxs_to_del.append(idx)
+    if "activewb" in arg_names:
+        idx = arg_names.index("activewb")
+        arg_idxs_to_del.append(idx)
+    if "activews" in arg_names:
+        idx = arg_names.index("activews")
+        arg_idxs_to_del.append(idx)
     arg_idxs_to_del.sort(reverse=True)
     for idx in arg_idxs_to_del:
         new_args.pop(idx)
@@ -555,6 +613,12 @@ def get_excel_args_of_func(func):
         arg_idxs_to_del.append(idx)
     if "thiswb" in arg_names:
         idx = arg_names.index("thiswb")
+        arg_idxs_to_del.append(idx)
+    if "activewb" in arg_names:
+        idx = arg_names.index("activewb")
+        arg_idxs_to_del.append(idx)
+    if "activews" in arg_names:
+        idx = arg_names.index("activews")
         arg_idxs_to_del.append(idx)
 
     arg_idxs_to_del.sort(reverse=True)
@@ -625,11 +689,12 @@ def get_sub_valid_functions_from_module(module_name):
         for name in dir(module)
         if isinstance((v:=getattr(module, name)), types.FunctionType)
     ]
-    valid_funcs = [
-        v
-        for func in functions
-        if count_function_args(v:=func) == 0
-    ]
+    valid_funcs = functions
+    # valid_funcs = [
+    #     v
+    #     for func in functions
+    #     if count_function_args(v:=func) == 0
+    # ]
     
     return valid_funcs
 

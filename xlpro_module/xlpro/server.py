@@ -6,22 +6,21 @@ import os
 
 import threading
 import queue
-import multiprocessing
+# import multiprocessing
 import time
-
 import pythoncom
 import win32com.client
 from win32com.client import _PyIDispatchType # Type that can be used for isinstance checks.
-import win32com.server.util
-import win32com.server.policy
-
+# import win32com.server.util
+# import win32com.server.policy
+from win32com.client.dynamic import Dispatch
+from functools import wraps
+# from copy import deepcopy
+import re
 import numpy as np
 import pywintypes
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from win32typelibs import excel as xl
-import matplotlib.figure
 import sys
+import traceback
 
 from xlpro import errors
 from xlpro import config
@@ -34,15 +33,17 @@ from xlpro import _utils
 from xlpro._wrappers import ModuleFunctionMapsWrapper, ModuleSubMapsWrapper
 from xlpro._enums import FunctionTypes
 from xlpro import _wrappers
-import re
-from copy import deepcopy
 
 from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 from xlpro._types import ndarray1d, ndarray2d, list1d, list2d
 
-from win32com.client.dynamic import Dispatch
-from functools import wraps
 from xlpro._types import ExcelArrayConverter
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from win32typelibs import excel as xl
+    import matplotlib.figure
+
 
 SLEEP_DURATION = 0.01
 
@@ -76,6 +77,10 @@ def force_clear_queue(q: queue.Queue):
 
 
 SUB_CALLER_FLAG_STRING = "SUB_CALLER_FLAG_STRING"
+
+class CallerTypes:
+    FUNCTION = 0
+    SUBROUTINE = 1
 
 class xlproServer:
     _public_methods_ = [
@@ -289,10 +294,10 @@ class xlproServer:
         return ret
 
     # @_utils.comsafe
-    def execute_sub_async(self, wb_dispatch, func_name):
+    def execute_sub_async(self, wb_dispatch, func_name, *args):
         # marshalling ok afaik - excel vba interface
         workspace = self._get_workspace_from_wb(wb_dispatch)
-        return workspace.execute_sub_async(fname=func_name)
+        return workspace.execute_sub_async(fname=func_name, thiswb=wb_dispatch, args=args)
 
 
     # @_utils.comsafe
@@ -349,7 +354,6 @@ class xlproServer:
             with self._workspace_map_lock:
                 return self._workspace_map[self._workspace_uid_to_workbook_path[uid]]
 
-
 CALLER_THROTTLE_TIME_NS = 200_000_000
 
 class xlproWorkspace:
@@ -398,12 +402,16 @@ class xlproWorkspace:
         self._caller_function_count_map_lock = threading.Lock()
         self._caller_function_count_map:dict=None
 
+
+        self._uid_fname_map_lock = threading.Lock()
+        self._uid_fname_map:dict=None
+
         # maps the uid to the caller and function hash
 
         self._pending_function_queue = queue.Queue()
         self._result_queue = queue.Queue() # stores the results as they come in
         self._client_recalculate_queue = queue.Queue() # stores the cells that need to be recalculated.
-        self._multip_fig_result_queue = multiprocessing.Queue() # stores the multiprocessing results
+        # self._multip_fig_result_queue = multiprocessing.Queue() # stores the multiprocessing results
 
         # results manager handles processing the queue of results as they come in
         # and signalling to the client manager to execute commands.
@@ -453,16 +461,22 @@ class xlproWorkspace:
         logger.info(f"Workspace subroutines registered")
 
     def get_active_registered_functon_map(self):
+        if self._module_function_maps_wrapper is None:
+            return {}
         return {k: v for k, v in self._module_function_maps_wrapper.fname_func_register.items() if self._module_function_maps_wrapper.fname_isactive_register[k]}
         # return [k for k, isactive in self._module_function_maps_wrapper.fname_isactive_register.items() if isactive]
-    def get_active_registered_sub_names(self):
-        return [k for k, isactive in self._module_sub_maps_wrapper.subname_isactive_register.items() if isactive]
+    def get_active_registered_sub_map(self):
+        if self._module_sub_maps_wrapper is None:
+            return {}
+        return {k: v for k, v in self._module_sub_maps_wrapper.subname_func_register.items() if self._module_sub_maps_wrapper.subname_isactive_register[k]}
+        # return k for k, isactive in self._module_sub_maps_wrapper.subname_isactive_register.items() if isactive]
     
     def get_active_registered_functions(self):
         keys = self.get_active_registered_functon_map()
         return [self._module_function_maps_wrapper.fname_func_register[key] for key in keys]
+    
     def get_active_registered_subs(self):
-        keys = self.get_active_registered_sub_names()
+        keys = self.get_active_registered_sub_map()
         return [self._module_sub_maps_wrapper.subname_func_register[key] for key in keys]
     
     def deregister_functions_in_self(self):
@@ -486,8 +500,19 @@ class xlproWorkspace:
 
     def update_module_func_map_wrapper(self):
         self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
+        # try:
+        #     self._module_function_maps_wrapper = ModuleFunctionMapsWrapper(self._temp_module_name)
+        # except KeyError:
+        #     logger.warning("No functions have been registered.")
+        #     self._module_function_maps_wrapper = None
+
     def update_module_sub_map_wrapper(self):
         self._module_sub_maps_wrapper = ModuleSubMapsWrapper(self._sub_module_name)
+        # try:
+        #     self._module_sub_maps_wrapper = ModuleSubMapsWrapper(self._sub_module_name)
+        # except KeyError as e:
+        #     logger.warning("No subroutines have been registered.")
+        #     self._module_sub_maps_wrapper = None
 
 
     def reset(self):
@@ -513,6 +538,13 @@ class xlproWorkspace:
             return self._module_sub_maps_wrapper.subname_func_register[fname]
         except:
             raise KeyError
+        
+    def _get_name_from_sub(self, fn):
+        try:
+            return self._module_sub_maps_wrapper.func_subname_register[fn]
+        except:
+            raise KeyError
+        
 
     def reset_workspace_cache(self):
         logger.debug("Initializing hashmaps")
@@ -540,6 +572,8 @@ class xlproWorkspace:
             self._caller_addr_timer_map = {}
         with self._caller_function_count_map_lock:
             self._caller_function_count_map = {}
+        with self._uid_fname_map_lock:
+            self._uid_fname_map = {}
 
         self._worker_manager._clear_all_threads()
         force_clear_queue(self._pending_function_queue)
@@ -605,6 +639,11 @@ class xlproWorkspace:
                 del self._uid_subresults_display_map[uid]
         except:
             pass
+        try:
+            with self._uid_fname_map_lock:
+                del self._uid_fname_map[uid]
+        except:
+            pass
 
 
     @staticmethod
@@ -614,31 +653,38 @@ class xlproWorkspace:
         # return _utils.hash_str(", ".join([str(x if x is not None else random.random()) for x in args]))
         # return _utils.hash_str(", ".join([str(x) for x in args]))
 
-    def execute_sub_async(self, fname):
+    def execute_sub_async(self, thiswb, fname, args):
         try:
             func = self._get_sub_by_name(fname)
             if not func:
                 raise Exception(f"Function {fname} not found.")
 
+
+            args = _utils.com_args_release_to_stream_reserved(func, args)      
+
             import uuid
-            uid = SUB_CALLER_FLAG_STRING + str(uuid.uuid4())
+            # uid = SUB_CALLER_FLAG_STRING + str(uuid.uuid4())
+            uid = str(uuid.uuid4())
+            
+            with self._uid_fname_map_lock:
+                self._uid_fname_map[uid] = fname
 
             logger.info(f"Calling subroutine '{fname}'...")
             logger.debug(f"Calling subroutine '{fname}', uid: '{uid}'")
 
-            # xxx - todo - hack to signal the clientmanager to skip!
-            caller_stream = SUB_CALLER_FLAG_STRING    
-            
-            with self._uid_to_caller_map_lock:
-                self._uid_to_caller_map[uid] = caller_stream
+            # subroutines can only access 'thiswb' reserved kwarg
+            thiswb_stream = _utils.comarshal_release_and_get_stream(thiswb) # this marshal is the OG
 
+            with self._uid_to_caller_map_lock:
+                self._uid_to_caller_map[uid] = thiswb_stream
+            
             # configure default state for result and iscomplete status
             # with self._uid_result_display_map_lock:
                 # self._uid_result_display_map[uid] = f"Promise<{uid}>"
             with self._uid_result_iscomplete_map_lock:
                 self._uid_result_iscomplete_map[uid] = False
 
-            f = self.create_worker_func_sub(uid, func, args=tuple(), kwargs={})
+            f = self.create_worker_func_sub(uid, func, args=args, kwargs={})
             with self._uid_pending_function_map_lock:
                 self._uid_pending_function_map[uid] = f
             self._pending_function_queue.put(uid)
@@ -670,8 +716,8 @@ class xlproWorkspace:
             if not func:
                 raise Exception(f"Function {fname} not found.")
             
+            # todo finish off thiswb wrapper for subs
             args = _utils.com_args_release_to_stream_reserved(func, args)      
-
             args_less_reserved = _utils.get_args_minus_reserved(func, args)
 
             caller_dispatch = Dispatch(caller)
@@ -681,6 +727,9 @@ class xlproWorkspace:
             # calling_time = time.time_ns()
 
             uid = caller_sheetaddr + xlproWorkspace.hash_excel_function_call(fname, *args_less_reserved)
+
+            with self._uid_fname_map_lock:
+                self._uid_fname_map[uid] = fname
 
             logger.info(f"Calling function '{fname}' from '{caller_sheetaddr}'...")
 
@@ -1082,6 +1131,8 @@ class xlproWorkspace:
                                 raise errors.xlproUnhandledException
                             pass
             return args
+        
+        # TODO - XXX - args which are PyObj replaced should NOT be type-casted
             
         # check for py object request
         # args0 = deepcopy(args)
@@ -1143,7 +1194,8 @@ class xlproWorkspace:
             f = _wrappers.generate_wrapped_function(self._temp_module_name, fname)
             try:
                 ret = f(*args, **kwargs)
-                self._result_queue.put((uid, ret))
+                # self._result_queue.put((uid, ret))
+                self._result_queue.put((uid, ret, CallerTypes.FUNCTION))
                 logger.debug(f"Completed function '{uid}' successfully")
             except Exception as e:
                 if isinstance(e, errors.ArugmentNotReadyException):
@@ -1164,7 +1216,8 @@ class xlproWorkspace:
                     pass
                 elif isinstance(e, Exception):
                     pass
-                self._result_queue.put((uid, e))
+                # self._result_queue.put((uid, e))
+                self._result_queue.put((uid, e, CallerTypes.FUNCTION))
                 logger.warning(f"Completed function '{uid}' unsuccessfully. Error: '{e}'")
             logger.debug("Waking results manager from worker thread...")
             self._results_manager_thread.wake()
@@ -1172,13 +1225,22 @@ class xlproWorkspace:
         return worker
     
     def create_worker_func_sub(self, uid, func, args, kwargs):
+
+        # TODO - XXX - subroutines should support arg passing from vba in future.
+
         def worker():
+            fwrapped = _wrappers._com_init_dispatch_release_wrapper(func)
             try:
-                ret = func(*args, **kwargs)
-                self._result_queue.put((uid, ret))
+                # ret = func(*args, **kwargs)
+                ret = fwrapped(*args, **kwargs)
+                self._result_queue.put((uid, ret, CallerTypes.SUBROUTINE))
                 logger.debug(f"Completed subroutine '{uid}' successfully")
             except Exception as e:
-                self._result_queue.put((uid, e))
+                exc_type, exc_value, tb = sys.exc_info()
+                e._traceback = tb
+                e._traceback_str = traceback.format_exc()
+                self._result_queue.put((uid, e, CallerTypes.SUBROUTINE))
+
                 # logger.debug(f"Completed function '{uid}' unsuccessfully with error {e}")
                 logger.warning(f"Completed subroutine '{uid}' unsuccessfully. Error: '{e}'")
 
@@ -1202,8 +1264,8 @@ class xlproWorkspace:
         # funcs = self.get_active_registered_functions()
         return _utils.get_xlpro_vb_dynamic_component_contents(self.get_active_registered_functon_map())
     def get_vba_sync_text_subs(self) -> str:
-        subs = self.get_active_registered_subs()
-        return _utils.get_xlpro_vb_dynamic_component_contents_subs(subs)
+        # subs = self.get_active_registered_sub_map()
+        return _utils.get_xlpro_vb_dynamic_component_contents_subs(self.get_active_registered_sub_map())
     
     def get_caller_stream(self, uid):
         with self._uid_to_caller_map_lock:
@@ -1346,7 +1408,7 @@ class WorkerManager:
             n_items = len(self._threadpool_dict.keys())
             
         if n_items < self.MAX_THREADS:
-            uid = self._server._pending_function_queue.get(timeout=0.01)
+            uid = self._server._pending_function_queue.get(timeout=10.0)
             try:
                 with self._server._uid_pending_function_map_lock:
                     # func = self.sleep_wrapper(self._wrap_with_cleanup(uid, self._server._uid_pending_function_map[uid]))
@@ -1441,12 +1503,65 @@ class ResultsManager:
         self._server._worker_manager.wake()
 
     def _process_queue_element(self):
-        """Processes either the multiprocessing or threaded results queues
-        """
+        """Processes the results queue"""
         # getting the value tells us the result is complete
-        uid, val = self._server._result_queue.get(timeout=0.01)
-        ret = val
+        # uid, val, = self._server._result_queue.get(timeout=0.01)
+        uid, val, functype = self._server._result_queue.get(timeout=10.0)
 
+        # self._handle_function_item(uid, val)
+        if functype == CallerTypes.FUNCTION:
+            self._handle_function_item(uid, val)
+        elif functype == CallerTypes.SUBROUTINE:
+            self._handle_subroutine_item(uid, val)
+
+    def _handle_subroutine_item(self, uid, val):
+        if isinstance(val, Exception):
+            if isinstance(val, pythoncom.com_error):
+                # recycle if exce is not accessible
+                if VBErrorConverter(val) == VBError.xlCallRejectedByCallee:
+                    logger.debug(f"Call rejected by callee for '{uid}'.")
+                elif VBErrorConverter(val) == 285: # The marshaled interface data packet (OBJREF) has an invalid or unknown format.
+                    logger.debug(f"OBJREF invalid '{uid}'.")
+                    logger.debug(f"ResultsManager is waking the ClientManager after successful calculation of '{uid}'")
+                elif VBErrorConverter(val) == 30: # A disk error occurred during a read operation.
+                    logger.debug(f"Disk read failed '{uid}', recycling function...")
+                else:
+                    logger.debug(f"Other COM error for '{uid}', recycling function...")
+                    logger.debug(f"'{repr(val)}'")
+
+            wb_name = self._server._wb_path.name
+            # with self._server._uid_pending_function_map_lock:
+            #     fn = self._server._uid_pending_function_map[uid]
+            #     # fname = self._server._get_name_from_sub(fn=fn)
+            with self._server._uid_fname_map_lock:
+                func_name = self._server._uid_fname_map[uid]
+
+            # msg = f"Workbook: `{wb_name}`\nSubroutine `{func_name}()`\nException:\n{str(val)}\nTraceback:\n{str(val._traceback_str)}"
+            reminder_msg = "Execution of a subroutine has failed. Connect the debugger with 'Raised Exceptions' to debug."
+            msg = f"{reminder_msg}\n\nWorkbook: `{wb_name}`\nSubroutine `{func_name}()`\n\n{type(val).__name__}:\n{str(val)}"
+            def raise_error_in_excel():
+                pythoncom.CoInitialize()
+                xlapp = Dispatch("Excel.Application")
+                # caller_wb = self._server.get_caller_stream(uid=uid)
+                xlapp.Run("xlpro.xlam!ShowAsyncErrorWindow", "xlpro Subroutine Exception", msg)
+                pythoncom.CoUninitialize()
+            
+            _utils.comsafe(raise_error_in_excel)()
+            
+
+        # signal that it is complete
+        with self._server._uid_result_iscomplete_map_lock:
+            logger.debug(f"calculation marked complete {uid}")
+            self._server._uid_result_iscomplete_map[uid] = True
+            
+        # remove from the pending function map once successfully completed.
+        with self._server._uid_pending_function_map_lock:
+            logger.debug(f"calculation removed as pending function {uid}")
+            del self._server._uid_pending_function_map[uid]
+
+
+    def _handle_function_item(self, uid, val):
+        ret = val
         # the uid may have been removed due to irrelevance from the workspace
         with self._server._uid_pending_function_map_lock:
             if not uid in self._server._uid_pending_function_map.keys():
@@ -1544,9 +1659,8 @@ class ResultsManager:
         # signal that it is complete
         with self._server._uid_result_iscomplete_map_lock:
             logger.debug(f"calculation marked complete {uid}")
-            if uid.startswith("$H$25"):
-                pass
             self._server._uid_result_iscomplete_map[uid] = True
+            
         # remove from the pending function map once successfully completed.
         with self._server._uid_pending_function_map_lock:
             logger.debug(f"calculation removed as pending function {uid}")
@@ -1581,9 +1695,6 @@ class ResultsManager:
                 break 
 
 import pandas as pd
-import datetime
-import decimal
-
 
 NP_BASIC_TYPES = [
     np.float64,
@@ -1914,11 +2025,11 @@ class ClientManager:
                 # never be any result to reach the client.
                 # so we are ok to just skip the loop here, happy days.
 
-                caller_dispatch = self._server.get_caller_stream(uid)
-                if caller_dispatch is SUB_CALLER_FLAG_STRING:
-                    logger.debug("caller_dispatched checked as None, assuming this is a subroutine and skipping further.")
-                    time.sleep(SLEEP_DURATION) # copy the fairness sleep
-                    continue
+                # caller_dispatch = self._server.get_caller_stream(uid)
+                # if caller_dispatch is SUB_CALLER_FLAG_STRING:
+                #     logger.debug("caller_dispatched checked as None, assuming this is a subroutine and skipping further.")
+                #     time.sleep(SLEEP_DURATION) # copy the fairness sleep
+                #     continue
                 
                 value = self._get_value(uid)
 
@@ -1992,6 +2103,7 @@ class ClientManager:
                 pass
             if replace_in_queue:
                 self._server._client_recalculate_queue.put(uid)
+
 
             time.sleep(SLEEP_DURATION) # fairness sleep
 
