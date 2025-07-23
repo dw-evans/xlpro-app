@@ -277,7 +277,7 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
     pre_check_template = textwrap.dedent((
         """
         If Not Application.Run("'xlpro.xlam'!CheckArgReady", {arg}) Then
-            {fname} = "Promise<PENDING_PREDECENTS>"
+            {fname} = "Promise<PENDING_PRECEDENTS>"
             Exit Function
         End If"""[1:]
     ))
