@@ -327,6 +327,7 @@ Sub force_refresh_area_calculationButton(ByRef control As Office.IRibbonControl)
 End Sub
 
 Sub ResetUndoButton(ByRef control As Office.IRibbonControl)    
+    ' Reset the xlpro event handler manually
     Call ThisWorkbook.ResetEventHandler
 End Sub
 '------------------------------------------------------------------------
@@ -850,3 +851,41 @@ Public Sub ShowAsyncErrorWindow(caption as string, msg As String)
     frm.Caption = caption
     frm.Show vbModeless ' Async
 End Sub
+
+
+
+
+' You need a reference to "Microsoft Forms 2.0 Object Library"
+' (contains the StdPicture type)
+
+' Private Declare PtrSafe Function LoadPicture Lib "stdole2.tlb" Alias "LoadPictureA" _
+'     (ByVal FileName As String) As stdole.IPictureDisp
+
+' Public Function GetImageFromFile(filePath As String) As stdole.IPictureDisp
+'     Set GetImageFromFile = LoadPicture(filePath)
+' End Function
+
+
+' Public Function GetImage(control As IRibbonControl) As stdole.IPictureDisp
+'     Set GetImage = LoadPicture("C:\Users\Daniel Evans\projects\xlpro\xlpro_addin\assets\exports\archive-24_0.ico")
+' End Function
+
+' Public Function GetImage(control As IRibbonControl, path as string) As IPictureDisp
+'     ' Dim path As String
+'     ' path = ThisWorkbook.Path & "\myicon.ico"
+'     ' path = "C:\Users\Daniel Evans\projects\xlpro\xlpro_addin\assets\exports\archive-24_0.ico"
+'     ' path = "C:\Users\Public\archive-24_0.ico"
+'     ' path = "C:\Users\Public\slide_export_0000.emf"
+    
+'     If Dir(path) = "" Then
+'         MsgBox "Icon file not found: " & path
+'         Exit Function
+'     End If
+    
+'     GetImage = LoadPicture(path)
+' End Function
+
+
+' Public Sub OnLoadImage(ByVal sImageName As String, ByRef Image As Variant)
+'    Set Image = LoadPicture("C:\Users\Public\" & "Capture.bmp") 
+' End Sub 
