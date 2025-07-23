@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xlpro"
-version = "0.0.4" # Placeholder will be auto-synced
+version = "0.0.5" # Placeholder will be auto-synced
 description = "xlpro internal python module"
 readme = "README.md"
 license = { text = "MIT" }
