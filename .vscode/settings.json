@@ -10,5 +10,8 @@
     "files.associations": {
         "*.bas": "vb",
         "*.cls": "vb"
-}
+    },
+    // "python.autoComplete.extraPaths": [
+    //     "C:/Users/Daniel Evans/projects/win32typelibs"
+    // ],
 }

@@ -32,6 +32,18 @@
             ],
         },
         {
+            "name":"xlpro_cli.main clear-venv-link",
+            "type":"debugpy",
+            "request":"launch",
+            "program":"xlpro_cli/main.py",
+            "args": [
+                "clear-venv-link",
+                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
+                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples/xlpro-ex01-basics.xlsx"
+
+            ],
+        },
+        {
             // BE AWARE THAT START IS NOT ABLE TO TRIGGER SYNC ANYMORE - CAUSED BY UNABLE TO FIND CORRECT TEMPFILE LOCATION FROM VENV
             "name":"xlpro_cli.main start",
             "type":"debugpy",
