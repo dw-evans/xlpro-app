@@ -76,27 +76,45 @@ def _sub_set_active(func, mname, state:bool):
     fname = func.__name__
     _module_subname_isactive_register[mname][fname] = state
 
-def _register_sub(func, _mname, _isactive):
+def _register_sub(func, _mname, _isactive, fname:str=None):
+    # fname = func.__name__
+    fname = fname if fname is not None else func.__name__
     _add_sub_module(_mname)
     # fname = get_registered_func_name(func, _mname)
-    fname = func.__name__
     _module_subname_func_register[_mname][fname] = func
     _module_func_subname_register[_mname][func] = fname
     _sub_set_active(func, _mname, _isactive)
 
 
-def register_sub(isactive=True):
-    """Primary interface for registration"""
+# def register_sub(isactive=True):
+#     """Primary interface for registration"""
+#     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
+#     def wrapper(func):
+#         # fname = get_registered_func_name(func, mname)
+#         fname = func.__name__
+#         if not mname in _module_subname_func_register:
+#             _add_sub_module(mname)
+#         if not fname in _module_subname_func_register[mname]:
+#             _register_sub(func, mname, isactive)
+#         return func
+#     return wrapper
+
+def register_sub(_func=None, *, isactive=True, fname:str=None):
+    """Registers the function for xlpro. User can set function type or rely on PEP-484 type hints
+    per the documentation"""
+
     mname = _utils.get_caller_globals(inspect.currentframe())["__name__"]
     def wrapper(func):
-        # fname = get_registered_func_name(func, mname)
-        fname = func.__name__
-        if not mname in _module_subname_func_register:
-            _add_sub_module(mname)
-        if not fname in _module_subname_func_register[mname]:
-            _register_sub(func, mname, isactive)
+        x = func.__name__
+        _add_sub_module(mname)
+        _register_sub(func=func, _mname=mname, _isactive=isactive, fname=fname)
         return func
-    return wrapper
+
+    if _func is None:
+        return wrapper
+    else:
+        return wrapper(_func)
+
 
 
 def sub_ignore(func):
@@ -288,6 +306,8 @@ def import_module_subs_with_registration(mname, fpath):
     _utils.import_module(mname, fpath)
 
     valid_functions = _utils.get_sub_valid_functions_from_module(mname)
+    valid_functions = []
+
     for f in valid_functions:
         _register_sub(f, mname, _isactive=True)
 
