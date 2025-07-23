@@ -33,6 +33,7 @@ import importlib
 import types
 import sys
 import re
+import copy
 
 from xlpro._types import xlproptr, ExcelArrayConverter
 from xlpro import errors
@@ -44,6 +45,9 @@ import time
 from filelock import FileLock
 import filelock
 
+
+USER_WORKBOOK_WORKING_DIR = Path()
+import win32gui
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +244,7 @@ RESERVED_ARGS = list(RESERVED_XLPRO_KW_LOOKUPS.keys())
 RESERVED_XLPRO_KW_LOOKUPS_SUBS = {
     "thiswb": "ThisWorkbook",
     "activewb": "ActiveWorkbook",
-    "activews": "activews",
+    "activews": "ActiveSheet",
 }
 RESERVED_ARGS_SUBS = list(RESERVED_XLPRO_KW_LOOKUPS_SUBS.keys())
 
@@ -411,8 +415,9 @@ def sub_template(func:Callable,  fname:str=None) -> str:
 
     # return f"""Sub {func_name}({', '.join(arg_declaration_list)})
     return f"""Sub {func_name}()
-    Dim xlpro As Object
-    Set xlpro = GetObject("new: " & xlpro_guid)
+    If xlpro Is Nothing Or xlpro_guid <> xlpro_guid_prev Then
+        InitXlpro
+    End If
     xlpro.{server.xlproServer.execute_sub_async.__name__} ActiveWorkbook, "{func_name}"{', ' if argnames_passed_to_xlpro else ''}{', '.join(argnames_passed_to_xlpro)}
 End Sub
 """
@@ -531,10 +536,12 @@ def com_args_release_to_stream_reserved(func, args):
         thiswb_stream = comarshal_release_and_get_stream(thiswb)
         new_args[idx] = thiswb_stream
     if "activewb" in arg_names:
+        idx = arg_names.index("activewb")
         activewb = args[idx]
         activewb_stream = comarshal_release_and_get_stream(activewb)
         new_args[idx] = activewb_stream
     if "activews" in arg_names:
+        idx = arg_names.index("activews")
         activesheet = args[idx]
         activesheet_stream = comarshal_release_and_get_stream(activesheet)
         new_args[idx] = activesheet_stream
@@ -562,12 +569,14 @@ def com_args_dispatch_reserved(func, args):
             thiswb_stream = comarshal_dispatch_stream(thiswb)
             new_args[idx] = thiswb_stream
         if "activewb" in arg_names: 
+            idx = arg_names.index("activewb")
             activewb = args[idx]
-            activewb_stream = comarshal_release_and_get_stream(activewb)
+            activewb_stream = comarshal_dispatch_stream(activewb)
             new_args[idx] = activewb_stream
         if "activews" in arg_names: 
+            idx = arg_names.index("activews")
             activesheet = args[idx]
-            activesheet_stream = comarshal_release_and_get_stream(activesheet)
+            activesheet_stream = comarshal_dispatch_stream(activesheet)
             new_args[idx] = activesheet_stream
         return new_args
     except Exception as e:
@@ -839,7 +848,12 @@ def pre_p_an_arg(cval, target_type):
         raise errors.xlproArgumentExceptionError()
     if is_arg_stringified_exception(cval):
         raise errors.xlproArgumentExceptionError()
-    
+
+    if target_type == Path:
+        cval = Path(cval) # confirm it is a path
+        if not cval.is_absolute():
+            cval = USER_WORKBOOK_WORKING_DIR / cval
+
     # Replace the pynone strings for arrays
     cval = _replace_pynone_strs(cval, True)
 
@@ -1182,49 +1196,74 @@ def pt_to_px(pt, dpi):
     return pt / 72 * dpi
 
 
-def _show_image(val, name:str, 
-    # sizex:float=None, sizey:float=None, dpi:int, format:str,
-    ):
-    if val is None:
-        raise Exception("cannot show(None)")
-    tval = type(val)
-    if tval == matplotlib.figure.Figure:
-        # get the singleton server
-        # import xlpro.server
-        # server = xlpro.server.xlproServer()
 
-        # # find the uid of the workspace from the value received here
-        # if m:=re.match(r"^functions_(.*)$", val.__globals__["name"]):
-        #     uid = m.group(1)
-        # else:
-        #     raise Exception("could not get uid from value")
-        
-        # # get the workspace from the workspace uid
-        # workspace = server.get_workspace_from_uid_thread_safe(uid)
+def _show_image(val, name:str, 
+    # sizex:float=None, sizey:float=None, dpi:int, 
+    width_mm:float=None,
+    height_mm:float=None,
+    fmt:str=None,
+    dpi:int=None,
+    ):
+
+    _FIGURE_DEFAULT_DPI = 600
+    _FIGURE_DEFAULT_FMT = 'png'
+    _IMAGE_DEFAULT_DPI = 96
+
+    if not fmt.lower() in ("png", "svg"):
+        raise ValueError("Only 'png' and 'svg' formats are accepted.")
+    fmt = fmt.lower()
+    if val is None:
+        raise Exception("cannot show type: None")
+    tval = type(val)
+    if isinstance(val, matplotlib.figure.Figure):
+        if dpi is None:
+            dpi = _FIGURE_DEFAULT_DPI
+        if fmt is None:
+            fmt = _FIGURE_DEFAULT_FMT
         
         # # save the figure as an image in a temporary location
         # val_uid = workspace.get_uid_of_val_thread_safe(val)
-        tmp:matplotlib.figure.Figure = val  
         # create a tmp folder. This matches where the lockfile is created...
         venv_uid = Path(sys.executable).parent.parent.parent
-        root_tmp_path = Path(sys.executable).parent.parent.parent.parent.parent / "tmp"
+        
+        # navigate to the xlpro installation temp folder.
+        # a bit crude...
+        # root_tmp_path = Path(sys.executable).parent.parent.parent.parent.parent / "tmp"
+        root_tmp_path = Path(os.environ["USERPROFILE"]) / ".xlpro" / "tmp"
         tmp_path = root_tmp_path / venv_uid
+        # tmp_path.mkdir(exist_ok=True, parents=True)
         tmp_path.mkdir(exist_ok=True, parents=True)
         # if not tmp_path.parent.exists():
         #     raise FileNotFoundError(f"{tmp_path.parent} does not exist!")
         # tmp_path.mkdir(exist_ok=True)
 
-        fp = tmp_path / f"{uuid.uuid4()}.png"
-        tmp.savefig(fp)
+        # if a custom size is specified, create a copy of the graph to prevent modifying the original
+        if width_mm is not None or height_mm is not None:
+            val_cpy = copy.copy(val)
+            val_old = val # keep for debugging.
+            val = val_cpy
+            _w, _h = np.array(val.get_size_inches()) * 25.4
+            # overwrite the dimensions if requested.
+            val.set_size_inches(np.array(
+                (
+                    _w if width_mm is None else width_mm, 
+                    _h if height_mm is None else height_mm, 
+                )
+            ))
+
+        size_pt = np.array(val.get_size_inches()) * 72
+
+        fp = tmp_path / f"{uuid.uuid4()}.{fmt}"
+        val.savefig(fp, dpi=600, transparent=True) # infer the format and backend
 
         # sizex = sizex if sizex is not None else 
         ret = xlproImage(
             fp, 
-            np.array(tmp.get_size_inches()) * 72,
+            xl_size=size_pt,
             xl_name=name
         )
-        # tmp.savefig(ret.fp, format="svg", dpi=600, backend="svg")
-        tmp.savefig(ret.fp, format="png", dpi=600)
+        # val.savefig(ret.fp, format="svg", dpi=600, backend="svg")
+        # val.savefig(ret.fp, format="png", dpi=600)
 
         # return the xlproImage
         return ret
@@ -1232,18 +1271,52 @@ def _show_image(val, name:str,
     if tval in [str, Path]:
         if tval == str:
             fp = Path(val)
+        # convert filepaths to be relative to the working dir
         elif tval == Path:
             fp = val
+        if not fp.is_absolute():
+            fp_old = Path(fp)
+            fp = USER_WORKBOOK_WORKING_DIR / fp
+            
         if not fp.exists():
             raise FileNotFoundError(f"File does not exist {fp}")
-        with Image.open(fp) as img:
-            size = np.array(img.size)
-            dpi = img.info.get("dpi")
-            size_pt = px_to_pt(size, dpi)
+        
+        if fmt is not None:
+            logger.warning("Requested an image load with 'fmt' specified. This argument is not used for Image loading.")
+
+        if fp.suffix.lower() == ".emf":
+            # Use size_pt = None to resort to default excel behaviour
+            size_pt = (-1, -1)
+        elif fp.suffix.lower() == ".svg":
+            # Use size_pt = None to resort to default excel behaviour
+            size_pt = (-1, -1)
+        else:
+            with Image.open(fp) as img:
+                size = np.array(img.size)
+                if not "dpi" in img.info:
+                    if dpi is None:
+                        logger.warning(f"No 'dpi' attribute of Image() object created from '{fp}'. Using default_dpi={_IMAGE_DEFAULT_DPI}")
+                        dpi = _IMAGE_DEFAULT_DPI
+                else:
+                    img_dpi_attr = img.info.get("dpi")
+                    if dpi is not None:
+                        raise ValueError(f"Overwriting dpi for Image() objects is not supported, use 'width_mm' or 'height_mm' variables instead")
+                    dpi = img_dpi_attr
+                size_pt = px_to_pt(size, dpi)
+                size_pt = (-1, -1)
+
+        # overwrite the sizing if requested.
+        if width_mm is not None or height_mm is not None:
+            size_pt = np.array(
+                (
+                    -1 if width_mm is None else width_mm / 25.4 * 72, 
+                    -1 if height_mm is None else height_mm / 25.4 * 72, 
+                )
+            )
 
         ret = xlproImage(
             fp=fp,
-            size_pt=size_pt,
+            xl_size=size_pt,
             xl_name=name
         )
         return ret
@@ -1252,10 +1325,8 @@ def _show_image(val, name:str,
     raise TypeError(f"type {repr(tval)} is not supported")
 
 
-def show_image(val, name:str, seed=None):
-    return _show_image(val, name)
-
-
+def show_image(val, name:str, seed=None, fmt:str="png", dpi:int=None):
+    return _show_image(val=val, name=name, fmt=fmt, dpi=dpi)
 
 def pypow(val:np.ndarray, exp):
     return val.__pow__(exp)

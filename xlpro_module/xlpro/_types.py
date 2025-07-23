@@ -177,7 +177,7 @@ class xlproptr:
 @dataclass
 class xlproImage:
     fp:Path
-    size_pt:Iterable[float]
+    xl_size:Iterable[float]
     xl_name:str
 
 import pywintypes
@@ -322,6 +322,7 @@ class ExcelArrayConverter:
 
     @classmethod
     def _convert_back_to_range_format(cls, val):
+        raise NotImplementedError
         if isinstance(val, pd.DataFrame):
             return val.to_numpy()
 

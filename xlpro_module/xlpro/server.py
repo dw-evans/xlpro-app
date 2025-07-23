@@ -227,9 +227,9 @@ class xlproServer:
             logger.info(f"Creating new workspace for '{Path(wb_path).name}'...")
             uid = _utils.hash_str(wb_path)
             workspace = xlproWorkspace(self, wb_uid=wb_path, uid=uid)
-            workspace_wd = Path(wb_path).parent.resolve()
+            # workspace_wd = Path(wb_path).parent.resolve()
 
-            workspace.set_xlpro_working_dir(workspace_wd)
+            workspace.set_xlpro_working_dirs()
             workspace.reset()
             self.register_fnames_in_workbook(workspace=workspace, wb_dispatch=Dispatch(wb_dispatch))
 
@@ -363,8 +363,12 @@ class xlproWorkspace:
         self._server = server
         self._wb_uid = wb_uid
         self._wb_path = Path(wb_uid)
+        
+        
+        _utils.USER_WORKBOOK_WORKING_DIR = self._wb_path.parent
+
         self._uid = uid
-        self._wd = None # working directory
+        self._xlpro_wd = None # working directory
 
         self._uid_result_display_map_lock = threading.Lock()
         self._uid_result_display_map:dict=None
@@ -436,11 +440,15 @@ class xlproWorkspace:
         self._module_function_maps_wrapper:ModuleFunctionMapsWrapper = None
         self.reset_workspace_cache()
 
-    def set_xlpro_working_dir(self, wd:Path):
+    def set_xlpro_working_dirs(self):
         logger.info(f"Setting working directory for workspace '{self._wb_path.name}'... ")
         # self._wd = initialize_and_get_workspace_xlpro_dir(self._wb_path)
-        self._wd = get_workspace_xlpro_dir(self._wb_path)
-        logger.info(f"Working directory for '{self._wb_path.name}' set at '{str(wd)}'")
+        self._xlpro_wd = get_workspace_xlpro_dir(self._wb_path)
+        
+        # configure the workbook base path for relative path support.
+        _utils.USER_WORKBOOK_WORKING_DIR = self._wb_path.parent
+
+        logger.info(f"Working directory for '{self._wb_path.name}' set at '{self._xlpro_wd}'")
 
     # def _configure_xlpro_files(self):
     #     # configure_workspace_xlpro_files(self._wd.parent, cfg)
@@ -449,14 +457,14 @@ class xlproWorkspace:
     def register_functions_in_self(self):
         logger.info(f"Registering workspace functions...")
         self._temp_module_name = f"{CFG.xlpro_functions_stem}_{self._uid}"
-        _wrappers.import_module_with_registration(self._temp_module_name, self._wd / f"{CFG.xlpro_functions_stem}.py")
+        _wrappers.import_module_with_registration(self._temp_module_name, self._xlpro_wd / f"{CFG.xlpro_functions_stem}.py")
         self.update_module_func_map_wrapper()
         logger.info(f"Workspace functions registered")
 
     def register_subs_in_self(self):
         logger.info(f"Registering workspace subroutines...")
         self._sub_module_name = f"{CFG.xlpro_subroutines_stem}_{self._uid}"
-        _wrappers.import_module_subs_with_registration(self._sub_module_name, self._wd / f"{CFG.xlpro_subroutines_stem}.py")
+        _wrappers.import_module_subs_with_registration(self._sub_module_name, self._xlpro_wd / f"{CFG.xlpro_subroutines_stem}.py")
         self.update_module_sub_map_wrapper()
         logger.info(f"Workspace subroutines registered")
 
@@ -658,7 +666,6 @@ class xlproWorkspace:
             func = self._get_sub_by_name(fname)
             if not func:
                 raise Exception(f"Function {fname} not found.")
-
 
             args = _utils.com_args_release_to_stream_reserved(func, args)      
 
@@ -1933,7 +1940,7 @@ class ClientManager:
             
             val:xlproImage
             
-            fp, size_pt, xl_name = val.fp, val.size_pt, val.xl_name
+            fp, xl_size, xl_name = val.fp, val.xl_size, val.xl_name
 
             if not fp.suffix.lower()[1:] in ("emf","wmf","jpg","jpeg","jff","jpe","png","bmp","dib","rle","gif","emz","wmz","tif","tiff","svg","ico","webp"):
                 raise Exception(f"Excel does not support this extension {fp.suffix}")
@@ -1941,7 +1948,7 @@ class ClientManager:
             def _xlinteract():
                 caller_adjacent = caller_dispatch.Cells(2,1)
                 xpos, ypos = caller_adjacent.Left, caller_adjacent.Top
-                width, height = size_pt
+                xl_width, xl_height = xl_size
 
                 ws = caller_adjacent.Parent
                 # ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
@@ -1957,7 +1964,7 @@ class ClientManager:
                     logger.debug(f"Could not find object with name: {xl_name} to delete")
 
                 try:
-                    shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, width, height)
+                    shape = ws.Shapes.AddPicture(str(fp.resolve()), False, True, xpos, ypos, xl_width, xl_height)
                     time.sleep(0.10)
                     shape.Name = xl_name
                 except Exception as e:

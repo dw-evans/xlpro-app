@@ -403,16 +403,21 @@ def generate_wrapped_function(mname, fname):
 
     retf:callable = None
 
-    if ftype == FunctionTypes.py_object:
-        if isjson:
-            retf = _jsonified_pyobj_func_wrapper(func)
-        else:
-            retf = _pyobj_func_wrapper(func)
-    elif ftype == FunctionTypes.array_or_value:
-        if isjson:
-            retf = _jsonified_array_or_value_func_wrapper(func)
-        else:
-            retf = _array_or_value_func_wrapper(func)
+    if isjson:
+        retf = _jsonified_pyobj_func_wrapper(func)
+    else:
+        retf = _pyobj_func_wrapper(func)
+        
+    # if ftype == FunctionTypes.py_object:
+    #     if isjson:
+    #         retf = _jsonified_pyobj_func_wrapper(func)
+    #     else:
+    #         retf = _pyobj_func_wrapper(func)
+    # elif ftype == FunctionTypes.array_or_value:
+    #     if isjson:
+    #         retf = _jsonified_array_or_value_func_wrapper(func)
+    #     else:
+    #         retf = _array_or_value_func_wrapper(func)
 
     if retf:
         return _com_init_dispatch_release_wrapper(retf)
