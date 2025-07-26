@@ -1,4 +1,4 @@
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 
 import logging as __logging
 __logger = __logging.getLogger(__name__)
@@ -37,6 +37,8 @@ from xlpro._utils import (
 
     pygetattr,
     pygetitem,
+    pylist,
+    pytuple,
 
     pyhash,
     
@@ -44,6 +46,8 @@ from xlpro._utils import (
     show_image,
 
     condense,
+    get_xlpro_wd,
+    # pyslice,
     # uncondense,
 
     # _replace_pynone_strs,

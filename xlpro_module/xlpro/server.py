@@ -457,6 +457,7 @@ class xlproWorkspace:
     def register_functions_in_self(self):
         logger.info(f"Registering workspace functions...")
         self._temp_module_name = f"{CFG.xlpro_functions_stem}_{self._uid}"
+        # Import (run) functions.py as functions_uid (to avoid name overlap)
         _wrappers.import_module_with_registration(self._temp_module_name, self._xlpro_wd / f"{CFG.xlpro_functions_stem}.py")
         self.update_module_func_map_wrapper()
         logger.info(f"Workspace functions registered")
@@ -715,6 +716,10 @@ class xlproWorkspace:
 
     def execute_function_async(self, caller, fname, args):
         try:
+            force_recalc_functions = [
+                _utils.show_image
+            ]
+
             func = self._get_function_by_name(fname)
 
             if fname == "create_table_if_not_exists":
@@ -743,6 +748,10 @@ class xlproWorkspace:
             logger.debug(f"Calling function '{fname}', uid: '{uid}', args: '{args}'")
 
             self._uid_args_cache[uid] = args
+
+            # force some functions to recalculate
+            # Hmm, this isnt compatible
+            # if not func in force_recalc_functions:
 
             # return the cached result if it exists
             with self._uid_result_display_map_lock:
@@ -1828,15 +1837,26 @@ class ClientManager:
 
             # construct a list off the iterable value
             elif isinstance(iterable_val, typing.Iterable):
+                # handle zero length iterable
+                if not iterable_val:
+                    self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
+                    self._update_client_pyobject_result(uid)
+                    return
+
                 val_modified = []
+                    
                 for i, subval in enumerate(iterable_val):
                     if isinstance(subval, (int, float, str, bool)):
-                        val_modified.append(subval)
+                        new_val = subval
+                    # elif isinstance(subval, Path):
+                    #     new_val = str(subval)
                     # elif getattr(subval, "dtype", None):
                     #     if any(np.issubdtype(subval, x) for x in NP_BASIC_TYPES):
                     #         val_modified.append(subval)
                     else:
-                        val_modified.append(f"PyObj<{uid}>_{i}")
+                        new_val = f"PyObj<{uid}>_{i}"
+                    val_modified.append(new_val)
+
 
                 # create a *_expanded variant of the uid result display
                 self._set_result_display(f"{uid}_expanded", np.array(val_modified).reshape(-1,1))
@@ -1858,8 +1878,6 @@ class ClientManager:
     
     def _update_client_pyobject_result(self, uid) -> None:
         """Update the data for the py_object case (row-major arrays, strings, values)"""
-        if uid.startswith("$H$25"):
-            pass
         try:
             caller_dispatch = _utils.comarshal_dispatch_stream(self._server.get_caller_stream(uid))
             val0 = self._get_value(uid)

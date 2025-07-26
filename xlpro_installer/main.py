@@ -242,9 +242,10 @@ def install():
         logger.critical(e)
         errors.append(e)
 
+    logger.info("Installation completed.")
 
-
-    logger.info("Installation completed successfully.")
+    logger.warning("Please ensure your VSCODE PATH setting in the xlpro config.toml file is set correctly.")
+    logger.warning("Please restart your pc to ensure the xlpro shell commands work.")
 
     return errors
 
@@ -398,7 +399,7 @@ def main():
             errors = uninstall()
             if not errors:
                 logger.info("Successful uninstall.")
-                if prompt_yes_no_input("Would you like to install", default="no") == "yes":
+                if prompt_yes_no_input("Would you like to resintall xlpro", default="no") == "yes":
                     errors = install()
         else: 
             errors = install()

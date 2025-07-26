@@ -30,8 +30,8 @@ from . import file_lock
 from functools import wraps
 import traceback
 
-# DEVELOPMENT_INSTALL = True
-DEVELOPMENT_INSTALL = False
+DEVELOPMENT_INSTALL = True
+# DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,

@@ -34,6 +34,7 @@ import types
 import sys
 import re
 import copy
+import datetime
 
 from xlpro._types import xlproptr, ExcelArrayConverter
 from xlpro import errors
@@ -47,15 +48,16 @@ import filelock
 
 
 USER_WORKBOOK_WORKING_DIR = Path()
-import win32gui
+
 
 logger = logging.getLogger(__name__)
 
-# VB_DYNAMIC_MODULE_NAME = "xlpro_async"
 
 import traceback
 from functools import wraps
 
+def get_xlpro_wd():
+    return USER_WORKBOOK_WORKING_DIR
 
 def traceback_log_raise(func):
     @wraps(func)
@@ -988,6 +990,34 @@ def deepcpy(val):
 
 from xlpro._types import xlproImage, xlproExpandedType, xlproCollapsedType
 
+
+
+def _show_basics(val):
+    """Convert simple values to a representation supported by Excel"""
+    tval = type(val)
+    val_adj = val
+    if isinstance(val, Exception):
+        # Exceptions are handled server-side, raise them.
+        raise val
+    elif isinstance(val_adj, datetime.datetime):
+        # excel can show np.datetime64 natively
+        val_adj = np.datetime64(val_adj)
+        ret = val_adj
+        return ret
+    
+    elif tval in [str, int, float, bool]:
+        ret = val
+        return ret
+    
+    elif isinstance(val_adj, Path):
+        ret = str(val_adj)
+        return ret
+    
+    return None
+
+
+
+
 def show(val):
     """Converts a value to an Excel-ready representation to return to the formula.
         Supported types: `pd.Dataframe`, `pd.Series`, `np.ndarray`
@@ -1000,6 +1030,7 @@ def show(val):
 
     if val is None:
         raise Exception("cannot show(None)")
+    
     tval = type(val)
     val_adj = val
     tdst:type=None
@@ -1053,55 +1084,34 @@ def show(val):
         ret = ExcelArrayConverter(val=val_adj, tdst=tdst)
         calc_success = True
 
-    elif isinstance(val, Exception):
-        raise val
-    
     # Convert datetime subclasses to serial for showing
     elif np.issubdtype(getattr(val_adj, "dtype", None), np.datetime64):
         # val_adj = np_datetime_array_to_excel_serial(val_adj)
         # val_adj = datetime.datetime(val_adj)
         ret = val_adj
-        return ret
-        
-    elif isinstance(val_adj, datetime.datetime):
-        # excel can show np.datetime64 natively
-        val_adj = np.datetime64(val_adj)
-        ret = val_adj
-        return ret
-    
-    elif tval in [str, int, float, bool]:
-        ret = val
-        return ret
+        calc_success = True
 
+    # break out for basic values, return the simple return value.
+    elif (basic_val:=_show_basics(val)) is not None:
+        ret = basic_val
+        calc_success = True
+        # return ret
+    
     else:
         try:
             ret = ExcelArrayConverter(np.array(val), tdst=ndarray2d)
             calc_success = True
         except Exception as e:
-            raise Exception(f"unable to convert value using ndarray2d as last resort: {tval}")
+            logger.warning(f"Unable to convert value using ndarray2d as last resort: {tval}")
     
     if calc_success:
         return xlproExpandedType(ret)
 
-        # # # Constants for VARIANT type
-        # # VT_ARRAY = 0x2000
-        # # VT_R8 = 5  # double
+    try:
+        ret = val_adj.show()
+    except Exception as e:
+        raise TypeError(f"Type {repr(tval)} is not supported by show(). Write a custom .show() object method if required.")
 
-        # # # Wrap as a VARIANT of type SAFEARRAY of doubles
-        # # safearray_variant = VARIANT(VT_ARRAY | VT_R8, [ret.tolist()])
-        # # return xlproExpandedType(safearray_variant)
-
-        # safe_arr = automation.SafeArrayCreateVector(automation.VT_R8, 0, len(arr))
-        # data_ptr = cast(safe_arr.contents.pvData, POINTER(c_double))
-        # ret2 = np.ctypeslib.as_array(data_ptr, shape=(len(arr),))[:] = arr
-        # return xlproExpandedType(ret2)
-
-
-
-    # XXX - WARNING - CODE MUSTERIOSLY STOPPED WORKING?
-    raise TypeError(f"type {repr(tval)} is not supported")
-
-import datetime
 
 def datetime_datetime_to_excel(dt: datetime.datetime) -> float:
     """
@@ -1391,12 +1401,25 @@ def pyhash(vals:ndarray1d):
     s = "".join([str(x) if x in (float, int, str) else str(id(x)) for x in vals])
     return hash(s)
         
-def condense(iterable_val: list2d):
+def condense(iterable_val: ndarray2d):
     # XXX - TODO this function needs more thought...
     return _types.xlproCollapsedType(iterable_val)
 
 def uncondense(condensed_val):
     return _types.xlproExpandedType(condensed_val)
+
+def pyslice(start, stop, step):
+    return slice(start, stop, step)
+
+def pylist(args=None):
+    if args is not None:
+        return list(args)
+    return list()
+
+def pytuple(args=None):
+    if args is not None:
+        return tuple(args)
+    return tuple()
 
 
 # def vectorize(func_name:str, args_list) -> list1d:

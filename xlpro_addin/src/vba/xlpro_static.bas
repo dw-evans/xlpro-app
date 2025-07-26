@@ -113,6 +113,7 @@ Public Sub initialize_workbook_guid_map()
     End If
     Debug.Print "WORKBOOK_GUID_MAP initialized"
 End Sub
+
 Public Sub uninitialize_workbook_guid_map()
     Set WORKBOOK_GUID_MAP = Nothing
     WORKBOOK_GUID_MAP_INITIALIZED = False

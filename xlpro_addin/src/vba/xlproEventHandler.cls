@@ -58,7 +58,9 @@ End Sub
 Private Sub app_WorkbookBeforeClose(ByVal Wb As Workbook, Cancel As Boolean)
     ' Drop workbooks off the event handler if they are closed
     if Not Cancel Then
+        On Error Resume Next
         workbookHandlers.Remove Wb.name
+        On Error goto 0
         Debug.Print "Workbook has been closed: " & Wb.name
     End If  
 End Sub
