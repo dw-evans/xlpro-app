@@ -214,6 +214,7 @@ def get_registered_func_name(func, mname):
 
 def _register(func, _mname, _type, _isactive, fname:str=None):
     fname = fname if fname is not None else func.__name__
+    _add_func_module(_mname)
     _register_fname(func, _mname, fname)
     _register_func(func, _mname)
     _func_set_active(func, _mname, _isactive)
@@ -232,7 +233,6 @@ def register(_func=None, *, _type:None|int=None, isactive=True, fname:str=None):
             pass
         if func.__name__ == "get_stock_prices":
             pass
-        _add_func_module(mname)
         _register(func=func, _mname=mname, _type=_type, _isactive=isactive, fname=fname)
         return func
 
