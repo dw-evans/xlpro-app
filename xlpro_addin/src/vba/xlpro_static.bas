@@ -380,10 +380,9 @@ Sub ClearUvCache()
     taskID = shell(command, vbNormalFocus)
 End Sub
 
-Sub RemoveLink(wb as Workbook)
+Sub RemoveLink(Wb as Workbook)
     Dim command As String
     Dim taskID As Double
-    Dim Wb As Workbook
     Set Wb = ActiveWorkbook
 
     LoadXlproConfigTOML
@@ -801,7 +800,7 @@ End Sub
 Sub raiseSubroutineException(wb_name as String, fname as string, e_msg as String)
     dim msg as string
 
-    msg = "Error encountered in '" & wb_name & "': '" & fname & "'": & vbnewline & "Details:"  & vbnewline &  e_msg
+    msg = "Error encountered in '" & wb_name & "': '" & fname & "':" & vbnewline & "Details:"  & vbnewline &  e_msg
 
     MsgBox msg, vbCritical, "xlpro Subroutine Error: " & wb_name
 
