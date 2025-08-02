@@ -476,7 +476,10 @@ Function IsValueReady(val As Variant) As Boolean
     If rePromise Is Nothing Or reException Is Nothing Then
         InitRegex
     End If
-    If rePromise.Test(val) Then
+    If IsError(val) Then
+        IsValueReady = False
+        Exit Function
+    ElseIf rePromise.Test(val) Then
         IsValueReady = False
         Exit Function
     ' Test for Error
@@ -661,8 +664,8 @@ End Sub
 ' End Sub
 Private Sub register_workbook(ByRef Wb As Workbook)
     On Error GoTo 0
-    initialize_workbook_guid_map
     InitializeShell
+    initialize_workbook_guid_map
     Dim guid As String
     guid = get_workbook_guid_map_value(Wb.name)
     If guid = "" Then

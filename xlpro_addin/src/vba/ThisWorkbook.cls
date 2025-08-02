@@ -10,6 +10,7 @@ End Sub
 Sub ResetEventHandler()
     Set ehandler = New xlproEventHandler
     Debug.Print "xlpro Event handler initialized for the add-in."
+    Call initialize_workbook_guid_map
 End Sub
 
 Private Sub Workbook_BeforeClose(Cancel As Boolean)
