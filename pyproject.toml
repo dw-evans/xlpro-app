@@ -1,24 +1,38 @@
 [project]
 name = "xlpro"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.6.0"
+description = "See http://xlpro.pages.dev for further information."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
-    "build>=1.2.2.post1",
-    "debugpy>=1.8.14",
-    "filelock>=3.18.0",
-    "matplotlib>=3.10.3",
-    "numpy>=2.3.1",
-    "olefile>=0.47",
-    "oletools>=0.60.2",
-    "pandas>=2.3.0",
+    # xlpro_module
+    "debugpy>=1.8.4",
+    "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
     "psutil>=7.0.0",
-    "pyinstaller>=6.14.2",
-    "pyinstaller-versionfile>=3.0.1",
-    "pywin32>=310",
+    "pywin32>=309",
+    "filelock>=3.18.0",
+    "numpy>=2.3.1",
     "readchar>=4.2.1",
-    "rich>=14.0.0",
-    "setuptools>=80.9.0",
-    "typer>=0.16.0",
+    "rich>=13.9.4",
+    # "win32typelibs",
+    "pip-licenses>=5.0.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    # build
+    "setuptools>=80.9.0",
+    "build>=1.2.2.post1",
+    "pyinstaller>=6.14.2",
+    
+    # other
+    "pip-licenses>=5.0.0",
+
+    # xlpro_cli_shell_wrapper
+    "pyinstaller-versionfile>=3.0.1",
+]
+
+# [tool.uv.editable-dependencies]
+# xlpro = { path = "xlpro_module"}
+# xlpro-cli = { path = "xlpro_cli"}

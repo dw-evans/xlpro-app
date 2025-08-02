@@ -1,25 +1,19 @@
 
-# [build-system]
-# requires = ["setuptools>=61.0"]
-# build-backend = "setuptools.build_meta"
-
 [project]
 name = "xlpro_cli"
 version = "0.0.5" # Placeholder will be auto-synced
 description = "xlpro Command Line Interface"
 readme = "N/A"
-license = { text = "MIT" }
+license = { text = "MIT License" }
 authors = [{ name = "Daniel Evans", email = "danielevans@users.noreply.github.com" }]
 
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
-    "bs4>=0.0.2",
     "debugpy>=1.8.13",
     "psutil>=7.0.0",
     "pywin32>=309",
     "readchar>=4.2.1",
     "rich>=13.9.4",
-    "typer>=0.15.2",
     # "win32typelibs",
 ]
 

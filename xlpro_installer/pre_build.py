@@ -44,6 +44,14 @@ paths = [
         f"licenses/uv_LICENSE.txt",
     ),
     (
+        f"../licenses/third_party_licenses_summary.md",
+        f"licenses/third_party_licenses_summary.txt",
+    ),
+    (
+        f"../licenses/third_party_licenses.md",
+        f"licenses/third_party_licenses.txt",
+    ),
+    (
         f"../xlpro_cli_shell_wrapper/xlpro-server.exe",
         f"xlpro-server.exe",
     )

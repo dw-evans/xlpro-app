@@ -1,11 +1,9 @@
 import zipfile
 from pathlib import Path
 import shutil
-import olefile
-from oletools.olevba import VBA_Parser
 import os
 from win32com.client.dynamic import Dispatch
-import re
+
 root_dir = Path(__file__).parent
 
 xlpro_xlam_fp = Path(r"C:\Users\Daniel Evans\AppData\Roaming\Microsoft\Excel\XLSTART\xlpro.xlam")

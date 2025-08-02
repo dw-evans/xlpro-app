@@ -1,12 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
-import shutil
 import subprocess
-import os
-
 import struct
 from pathlib import Path
-import sys
 from PIL import Image
 import multiprocessing
 
@@ -190,7 +186,6 @@ import multiprocessing
 #     # in same order as directory entries
 #     for imagedata in (info[1] for info in withRankAndPIL):
 #         iconfile.write(imagedata)
-
 
 
 def write_ico_from_pngs(png_fps:list[Path], ico_fp:Path):

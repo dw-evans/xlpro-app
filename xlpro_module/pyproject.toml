@@ -7,16 +7,17 @@ name = "xlpro"
 version = "0.0.5" # Placeholder will be auto-synced
 description = "xlpro internal python module"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "MIT License" }
 authors = [{ name = "Daniel Evans", email = "danielevans@users.noreply.github.com" }]
 
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "debugpy>=1.8.13",
     "matplotlib>=3.10.1",
     "pandas>=2.2.3",
     "psutil>=7.0.0",
     "pywin32>=309",
-    "typer>=0.15.2",
     "filelock>=3.18.0",
+    "pillow==11.3.0",
+    "numpy>=2.3.1",
 ]
