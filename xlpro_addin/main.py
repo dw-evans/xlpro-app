@@ -255,7 +255,7 @@ def reload_to_xlstart():
     print(f"archiving existing version")
     if dst_file.exists():
         print(f"existing file found, archiving")
-        shutil.copy2(dst_file, archive_dir / f"{dst_file.stem}_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}{dst_file.suffix}")
+        shutil.copy2(dst_file, archive_dir / f"{dst_file.stem}_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')}{dst_file.suffix}")
         os.remove(dst_file)
     
     print(f"moving xlpro to xlstart")
