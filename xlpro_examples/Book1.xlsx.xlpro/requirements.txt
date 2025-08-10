@@ -43,5 +43,6 @@ typing-extensions==4.14.1
 tzdata==2025.2
 urllib3==2.5.0
 websockets==15.0.1
-xlpro @ file:///C:/Users/Daniel%20Evans/projects/xlpro/xlpro_module/dist/xlpro-0.0.6-py3-none-any.whl
 yfinance==0.2.65
+tomli==2.2.1
+xlpro

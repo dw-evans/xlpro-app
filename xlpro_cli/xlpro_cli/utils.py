@@ -702,6 +702,7 @@ def write_requirements_txt_to_folder(xlpro_venv_root_path:Path, xlpro_workbook_d
 
     # XXX - todo - check this is writing from the correct interpreter
     result = subprocess.run(
+        # todo change this to pip list --format=freeze --not-required!
         [
             "uv",
             "pip",
