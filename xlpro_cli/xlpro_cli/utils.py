@@ -30,8 +30,8 @@ from . import file_lock
 from functools import wraps
 import traceback
 
-DEVELOPMENT_INSTALL = True
-# DEVELOPMENT_INSTALL = False
+# DEVELOPMENT_INSTALL = True
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -300,7 +300,7 @@ def create_xlpro_venv_from_interpreter_and_get_root_path(py_interpreter_path:Pat
         ],
         check=True,
     )
-    initialize_xlpro_venv_files(xlpro_venv_path)
+    # initialize_xlpro_venv_files(xlpro_venv_path)
     return xlpro_venv_path.resolve()
 
 
@@ -1171,39 +1171,72 @@ class venv_types:
     REUSED_XLPRO_VENV = "reused-xlpro"
 
 
-def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None, allow_override:bool=False) -> tuple[Path, venv_types]:
+
+def get_recommended_python_version() -> str:
+    with open(fp:=(XLPRO_ROOT_PATH / ".python-version-recommended")) as f:
+        data = f.read()
+
+    if not re.match(r"3\.\d+(?:\.\d+)?", data, re.IGNORECASE):
+        raise ValueError(f"Provided recommended '{data}' version is invalid in {fp}")
+    
+    return data
+
+
+class MenuSelection:
+    BASIC = 1
+    ADVANCED = 2
+
+
+def dlg_select_and_optionally_create_valid_python_interpreter(version_required=None, allow_override:bool=False, menutype=MenuSelection.BASIC) -> tuple[Path, venv_types]:
 
     # result = subprocess.run("where.exe python", shell=True, capture_output=True, text=True, check=True)
     result = subprocess.run(["where.exe", "python"], capture_output=True, text=True, check=True)
     py_path_locations_system = result.stdout.split("\n")[:-1]
 
-    menu_items = []
-    menu_items += [
+    menu_items_advanced = []
+    menu_items_advanced += [
+        (recommended_prefix:="(recommended)") +  f" Python {get_recommended_python_version()}" 
+    ]
+    menu_items_basic = menu_items_advanced.copy()
+    menu_items_basic += [
+        (enable_advanced:="(advanced)    Enable advanced selection")
+    ]
+    menu_items_advanced += [
         f"(system)      {x}" for x in py_path_locations_system
     ]
-
     xlpro_exes = get_xlpro_python_interpreters()
     local_version_str1 = "(xlpro-local)"
-    menu_items += [
-        f"{local_version_str1}      {x}" for x in xlpro_exes
+    menu_items_advanced += [
+        f"{local_version_str1} {x}" for x in xlpro_exes
     ]
-
     uv_py_exes = get_uv_python_interpreters() 
-    menu_items += [
-        f"(uv-local)   {x}" for x in uv_py_exes
+    menu_items_advanced += [
+        f"(uv-local)    {x}" for x in uv_py_exes
+    ]
+    uv_dl_prefix='(uv-download)'
+    menu_items_advanced += [
+        # f"{uv_dl_prefix} Python 3.12",
+        # f"{uv_dl_prefix} Python 3.13",
+        # f"{uv_dl_prefix} Python 3.14",
+        other_version_str:="(uv-download) Specify Version",
+        local_version_str2:="(local)       Reuse other [specify path]",
     ]
 
-    menu_items += [
-        (uv_dl_prefix:='(uv-download)') + " Python 3.12", 
-        f"{uv_dl_prefix} Python 3.13",
-        f"{uv_dl_prefix} Python 3.14",
-        other_version_str:="(uv-download) Other [specify version]",
-        local_version_str2:="(local) Reuse other [specify path]",
-    ]
-
-    override_str = "(override) Allow overriding of the Python version [NOT RECOMMENDED]"
+    
+    override_str = "(override)    Allow overriding of the Python version [ADVANCED USE ONLY]"
     if not allow_override:
-        menu_items.append(override_str)
+        menu_items_advanced.append(override_str)
+
+    disable_advanced = "(simple)      Go back to simple selection"
+    menu_items_advanced.append(disable_advanced)
+
+    d = {
+        MenuSelection.BASIC: menu_items_basic,
+        MenuSelection.ADVANCED: menu_items_advanced,
+    }
+
+    menu_items = d[menutype]
+    
 
     def _convert_menu_item_to_path(s:str):
         return re.match(r"^\(.+\)\s+(.*)$", s).group(1)
@@ -1212,10 +1245,22 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
 
     ret = get_user_selection(prompt=prompt, selection_items=menu_items)
 
+
     # Handle the override toggle
     if ret == override_str:
         print_warning("User has requested to override the python version safeguards, mismatched versions can be forced on the next prompt")
         return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+
+    # Enable advanced configuration
+    if ret == enable_advanced:
+        print_warning("Advanced configuration selected")
+        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override, menutype=MenuSelection.ADVANCED)
+    
+    # Enable advanced configuration
+    if ret == disable_advanced:
+        print_warning("Advanced configuration selected")
+        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override, menutype=MenuSelection.BASIC)
+
 
     rettype:venv_types = None
 
@@ -1229,8 +1274,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             while not compare_py_version_t2(uv_py_version, version_required):
                 print_error(f"provided version {uv_py_version} is not compatible with {version_required}, please correct")
                 if allow_override:
-                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
-                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 uv_py_version = prompt_user_input(msg)
                 if uv_py_version.lower() == "b":
                     return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
@@ -1246,12 +1291,27 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             if not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"provided version {provided_py_version} is not compatible with {version_required}, restarting this dialogue")
                 if allow_override:
-                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
-                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                     
         ret = uv_download_python_version(provided_py_version)
         rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+
+    # Download the recommended python version
+    elif ret.startswith(recommended_prefix):
+        provided_py_version = re.search(r"Python (\d\.\d+)", ret).group(1)
+        if version_required is not None:
+            if not compare_py_version_t2(provided_py_version, version_required):
+                print_error(f"provided version {provided_py_version} is not compatible with {version_required}, restarting this dialogue")
+                if allow_override:
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+                return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
+                    
+        ret = uv_download_python_version(provided_py_version)
+        rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+
 
     # XXX - todo - handle reuse of an xlpro venv...
     # if the user selects an existing xlpro venv, we don't want to create a new virtual environment.
@@ -1267,8 +1327,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             while not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"Provided version {provided_py_version} does not match {version_required}, please correct")
                 if allow_override:
-                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
-                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
         
         # ret = py_path
@@ -1291,8 +1351,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             if not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"Provided version {provided_py_version} is not compatible with {version_required}, please correct")
                 if allow_override:
-                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
-                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=True)
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
+                        return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 
 
@@ -1311,7 +1371,7 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             if not compare_py_version_t2(provided_py_version, version_required):
                 print_error(f"Provided version {provided_py_version} is not compatible with {version_required}, please correct")
                 if allow_override:
-                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [NOT RECOMMENDED]") == "no":
+                    if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "no":
                         return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override)
 

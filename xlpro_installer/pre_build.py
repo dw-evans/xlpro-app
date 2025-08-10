@@ -55,6 +55,11 @@ paths = [
         f"../xlpro_cli_shell_wrapper/xlpro-server.exe",
         f"xlpro-server.exe",
     )
+    # Copy recommended python version to correct location
+    (
+        f".python-version-recommended",
+        f".python-version-recommended",
+    )
 ]
 
 import os
