@@ -7,13 +7,13 @@ readme = "N/A"
 license = { text = "MIT License" }
 authors = [{ name = "Daniel Evans", email = "danielevans@users.noreply.github.com" }]
 
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
-    "debugpy>=1.8.13",
+    "debugpy>=1.8.16",
     "psutil>=7.0.0",
     "pywin32>=309",
     "readchar>=4.2.1",
-    "rich>=13.9.4",
+    "rich>=14.1.0",
     # "win32typelibs",
 ]
 

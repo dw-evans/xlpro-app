@@ -3,28 +3,28 @@ name = "xlpro"
 version = "0.6.0"
 description = "See http://xlpro.pages.dev for further information."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     # xlpro_module
-    "debugpy>=1.8.4",
-    "matplotlib>=3.10.1",
-    "pandas>=2.2.3",
-    "psutil>=7.0.0",
-    "pywin32>=309",
+    "debugpy>=1.8.16",
     "filelock>=3.18.0",
-    "numpy>=2.3.1",
+    "matplotlib>=3.10.5",
+    "numpy>=2.2.6",
+    "pandas>=2.3.1",
+    "psutil>=7.0.0",
+    "pywin32>=311",
     "readchar>=4.2.1",
-    "rich>=13.9.4",
-    # "win32typelibs",
-    "pip-licenses>=5.0.0",
+    "rich>=14.1.0",
+    # win32typelibs
 ]
+
 
 [project.optional-dependencies]
 dev = [
     # build
     "setuptools>=80.9.0",
-    "build>=1.2.2.post1",
-    "pyinstaller>=6.14.2",
+    "build>=1.3.0",
+    "pyinstaller>=6.15.0",
     
     # other
     "pip-licenses>=5.0.0",

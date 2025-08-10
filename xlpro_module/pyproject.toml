@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,14 +10,14 @@ readme = "README.md"
 license = { text = "MIT License" }
 authors = [{ name = "Daniel Evans", email = "danielevans@users.noreply.github.com" }]
 
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
-    "debugpy>=1.8.13",
-    "matplotlib>=3.10.1",
-    "pandas>=2.2.3",
+    "debugpy>=1.8.16",
+    "filelock>=3.18.0",
+    "matplotlib>=3.10.5",
+    "numpy>=2.2.6",
+    "pandas>=2.3.1",
     "psutil>=7.0.0",
     "pywin32>=309",
-    "filelock>=3.18.0",
     "pillow==11.3.0",
-    "numpy>=2.3.1",
 ]
