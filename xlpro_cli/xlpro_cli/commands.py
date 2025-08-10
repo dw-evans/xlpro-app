@@ -110,8 +110,7 @@ def handle_write_requirements(args):
 @utils.try_except_press_enter_to_exit_wrapper
 @utils.traceback_log_raise
 def handle_clear_venv_data(args):
-    utils.check_envs_folder_size_prompt_delete()
-    # utils.press_enter_to_exit()
+    utils.check_folder_size_prompt_delete(utils.XLPRO_ENVS_DIR)
     utils.press_enter_or_timeout_exit(timeout=5.0)
 
 @utils.try_except_press_enter_to_exit_wrapper

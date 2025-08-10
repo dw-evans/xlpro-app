@@ -11,10 +11,10 @@ wd = Path(__file__).parent
 
 
 paths = [
-    (
-        "startfiles", 
-        "startfiles",
-    ),
+    # (
+    #     "startfiles", 
+    #     "startfiles",
+    # ),
     (
         f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl", 
         f"src/xlpro-{xlpro.__version__}-py3-none-any.whl",
@@ -31,10 +31,10 @@ paths = [
         f"../xlpro_cli/dist/xlpro-cli.exe",
         "xlpro-cli.exe",
     ),
-    (
-        f"../xlpro_examples",
-        f"examples",
-    ),
+    # (
+    #     f"../xlpro_examples",
+    #     f"examples",
+    # ),
     (
         f"../LICENSE",
         f"LICENSE.txt",
@@ -48,13 +48,13 @@ paths = [
         f"licenses/third_party_licenses_summary.txt",
     ),
     (
-        f"../licenses/third_party_licenses.md",
+        f"../licenses/third_party_licenses.txt",
         f"licenses/third_party_licenses.txt",
     ),
     (
         f"../xlpro_cli_shell_wrapper/xlpro-server.exe",
         f"xlpro-server.exe",
-    )
+    ),
     # Copy recommended python version to correct location
     (
         f".python-version-recommended",
@@ -62,34 +62,57 @@ paths = [
     )
 ]
 
+
+
+PRE_BUILD_DIR = wd / "install"
+
+
+def collect_examples():
+    r = []
+    for fp in (wd / Path("../xlpro_examples")).rglob("*"):
+        if fp.is_dir():
+            continue
+        if any([y in ["__pycache__", ".vscode", "Modified", "Original"] for y in fp.parts]):
+            continue
+        if fp.name.startswith("~$"):
+            continue
+        r.append(fp.relative_to(wd))
+        pass
+    return r
+
+def collect_startfiles():
+    return [x.relative_to(wd) for x in (wd / "startfiles").rglob("*")]
+
+paths += [(str(fp), str(Path("examples") / fp)) for fp in collect_examples()]
+paths += [(str(fp), str(fp)) for fp in collect_startfiles()]
+
 import os
 import shutil
 
 import xlpro
 
-PRE_BUILD_DIR = wd / "install"
 
 def main():
     if PRE_BUILD_DIR.exists():
         shutil.rmtree(PRE_BUILD_DIR)
     PRE_BUILD_DIR.mkdir()
     for p0, p1 in [((wd / p0), PRE_BUILD_DIR / p1) for p0, p1 in paths]:
-        if p0.is_dir():
-            shutil.copytree(p0, p1)
-            for fp in p1.rglob("*"):
-                if not fp.is_dir() and fp.name.startswith("~$"):
-                    try:
-                        os.remove(fp)
-                    except Exception as e:
-                        print(e)  
+        # if p0.is_dir():
+        #     shutil.copytree(p0, p1)
+        #     for fp in p1.rglob("*"):
+        #         if not fp.is_dir() and fp.name.startswith("~$"):
+        #             try:
+        #                 os.remove(fp)
+        #             except Exception as e:
+        #                 print(e)  
 
-        else:
-            if not p1.parent.exists():
-                p1.parent.mkdir(parents=True)
-            shutil.copy2(p0, p1)
+        if not p1.parent.exists():
+            p1.parent.mkdir(parents=True)
+        shutil.copy2(p0, p1)
 
 
 
 
 if __name__ == "__main__":
     main()
+    pass

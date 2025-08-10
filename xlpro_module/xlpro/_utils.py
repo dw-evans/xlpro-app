@@ -347,14 +347,18 @@ def function_template_with_caller(func:Callable, fname:str=None) -> str:
                 )
 
 
+    s1 = textwrap.indent('\n'.join(pre_arg_dim_defs), prefix="    ")
+    s2 = textwrap.indent('\n'.join(pre_check_arg_sequence_strs), prefix="    ")
+    s3 = textwrap.indent('\n'.join(arg_range_conversion_check_list), prefix="    ")
+
     from xlpro import server 
     ret = f"""Function {func_name}({', '.join(arg_declaration_list)}) as Variant
     If xlpro is Nothing Or xlpro_guid <> xlpro_guid_prev Then
         InitXlpro
     End If
-{textwrap.indent('\n'.join(pre_arg_dim_defs), prefix="    ")}
-{textwrap.indent('\n'.join(pre_check_arg_sequence_strs), prefix="    ")}
-{textwrap.indent('\n'.join(arg_range_conversion_check_list), prefix="    ")}
+{s1}
+{s2}
+{s3}
     {func_name} = xlpro.{server.xlproServer.execute_function_async.__name__}(ActiveWorkbook, Application.Caller, "{func_name}"{', ' if argnames_passed_to_xlpro else ''}{', '.join(argnames_passed_to_xlpro)})
 End Function
 """

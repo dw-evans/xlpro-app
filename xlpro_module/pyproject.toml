@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=2.2.6",
     "pandas>=2.3.1",
     "psutil>=7.0.0",
-    "pywin32>=309",
+    "pywin32>=311",
     "pillow==11.3.0",
+    "tomli>=2.2.1",
 ]

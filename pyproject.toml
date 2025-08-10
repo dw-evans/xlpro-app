@@ -5,7 +5,6 @@ description = "See http://xlpro.pages.dev for further information."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    # xlpro_module
     "debugpy>=1.8.16",
     "filelock>=3.18.0",
     "matplotlib>=3.10.5",
@@ -15,10 +14,8 @@ dependencies = [
     "pywin32>=311",
     "readchar>=4.2.1",
     "rich>=14.1.0",
-    # win32typelibs
+    "tomli>=2.2.1",
 ]
-
-
 [project.optional-dependencies]
 dev = [
     # build
@@ -32,7 +29,3 @@ dev = [
     # xlpro_cli_shell_wrapper
     "pyinstaller-versionfile>=3.0.1",
 ]
-
-# [tool.uv.editable-dependencies]
-# xlpro = { path = "xlpro_module"}
-# xlpro-cli = { path = "xlpro_cli"}

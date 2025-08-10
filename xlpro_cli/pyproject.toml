@@ -11,10 +11,11 @@ requires-python = ">=3.10"
 dependencies = [
     "debugpy>=1.8.16",
     "psutil>=7.0.0",
-    "pywin32>=309",
+    "pywin32>=311",
     "readchar>=4.2.1",
     "rich>=14.1.0",
     # "win32typelibs",
+    "tomli>=2.2.1",
 ]
 
 [project.scripts]

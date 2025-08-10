@@ -1,5 +1,6 @@
 from __future__ import annotations
-import tomllib
+# import tomllib
+import tomli
 from pathlib import Path
 from dataclasses import dataclass, field, fields
 import sys
@@ -32,7 +33,7 @@ def load() -> Configuration:
             raise err
             
         with open(config_path, "rb") as f:
-            kwargs = tomllib.load(f)
+            kwargs = tomli.load(f)
         err = Configuration.validate_kwargs(kwargs)
         if err:
             logger.error(f"Configuration values invalid, see output below")
@@ -61,9 +62,10 @@ class Configuration:
         e = None
         try:
             with open(fp, "rb") as f:
-                x = tomllib.load(f)
+                # x = tomllib.load(f)
+                x = tomli.load(f)
             return 
-        except tomllib.TOMLDecodeError as e:
+        except tomli.TOMLDecodeError as e:
             return e
         
     @staticmethod
