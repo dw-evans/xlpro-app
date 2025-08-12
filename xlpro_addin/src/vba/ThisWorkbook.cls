@@ -3,15 +3,19 @@ Option Explicit
 ' Declare a module-level variable to hold the instance of the event handler class
 Dim ehandler As xlproEventHandler
 
-Private Sub Workbook_Open()
-    ResetEventHandler
-End Sub
-
 Sub ResetEventHandler()
     Set ehandler = New xlproEventHandler
     Debug.Print "xlpro Event handler initialized for the add-in."
     Call initialize_workbook_guid_map
 End Sub
+
+Private Sub Workbook_Open()
+    ResetEventHandler
+End Sub
+
+Public Property Get EventHandler() As Object
+    Set EventHandler = ehandler
+End Property
 
 Private Sub Workbook_BeforeClose(Cancel As Boolean)
     If Not Cancel Then

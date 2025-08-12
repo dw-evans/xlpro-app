@@ -1,6 +1,5 @@
 Attribute VB_Name = "xlpro_static"
 
-
 Option Explicit
 
 Public XLPRO_CLI_PATH As String
@@ -47,7 +46,7 @@ Public Sub LoadXlproConfigTOML()
 
     ' Check if file exists
     If Not fso.FileExists(configPath) Then
-        MsgBox "Config file not found: " & configPath, vbExclamation
+        MsgBox "Config file not found: " & configPath, vbExclamation,  "xlpro Error"
         Exit Sub
     End If
 
@@ -55,7 +54,9 @@ Public Sub LoadXlproConfigTOML()
     Set file = fso.OpenTextFile(configPath, 1) ' 1 = ForReading
     fileText = file.ReadAll
     file.Close
-    Debug.Print fileText
+    ' Debug.Print fileText
+    ' Replace escaped backslashes with single forward slashes
+    fileText = Replace(fileText, "\\", "/")
 
     ' Use RegExp to extract a and b
     Dim re As Object
@@ -70,6 +71,14 @@ Public Sub LoadXlproConfigTOML()
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         XLPRO_CLI_PATH = matches(0).SubMatches(0)
+        If Not IsValidShellPath(XLPRO_CLI_PATH) Then
+            MsgBox "Your provided XLPRO_CLI_PATH, is not valid. " & vbNewLine & _
+            "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
+            "You can manually fix this error" & vbNewLine & _
+            "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
+                vbExclamation, "xlpro Error"
+            XLPRO_CLI_PATH = ""
+        End If
     Else:
         GoTo RegistrationErrorHandler
     End If
@@ -78,6 +87,16 @@ Public Sub LoadXlproConfigTOML()
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         VSCODE_PATH = matches(0).SubMatches(0)
+        If Not IsValidShellPath(VSCODE_PATH) Then
+            MsgBox "Your provided VSCODE_PATH, is not valid. " & vbNewLine & _
+            "Please correct this in config.toml at the installation location " & _
+            "Go to Manage xlpro > Edit Global Config and fix this to allow " & _
+            "this button to work. " & vbNewLine & _
+            "Error: The provided string '" & VSCODE_PATH & "' cannot be called from a shell, " & _
+            "the path may not exist or is not found via the PATH environment variable.", _
+                vbExclamation, "xlpro Error"
+            VSCODE_PATH = ""
+        End If
     Else:
         GoTo RegistrationErrorHandler
     End If
@@ -85,12 +104,21 @@ Public Sub LoadXlproConfigTOML()
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
         XLPRO_SERVER_PATH = matches(0).SubMatches(0)
+        If Not IsValidShellPath(XLPRO_SERVER_PATH) Then
+            MsgBox "Your provided XLPRO_SERVER_PATH, is not valid. " & vbNewLine & _
+            "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
+            "You can manually fix this error" & vbNewLine & _
+            "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
+                vbExclamation,  "xlpro Error"
+            XLPRO_SERVER_PATH = ""
+        End If
     Else:
         GoTo RegistrationErrorHandler
     End If
     re.Pattern = "(?:^|\n)\s*UNDO_STACK_DEPTH\s*=\s*(\d+)"
     Set matches = re.Execute(fileText)
     If matches.Count > 0 Then
+        ' UNDOSTACKDEPTH must be an integer, this is loaded by the undo tracker on initialization.
         UNDOSTACKDEPTH = CLng(matches(0).SubMatches(0))
     Else:
         GoTo RegistrationErrorHandler
@@ -99,7 +127,7 @@ Public Sub LoadXlproConfigTOML()
     
 RegistrationErrorHandler:
     MsgBox "Error: Error, could not load config.toml XLPRO_CLI_PATH, VSCODE_PATH, XLPRO_SERVER_PATH, UNDO_STACK_DEPTH may not be defined correctly", _
-           vbExclamation, "Warning"
+        vbExclamation,  "xlpro Error"
     Err.Clear
     Exit Sub
 
@@ -170,6 +198,11 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
 
     ' Load the toml xlpro configuration file to ensure the paths are correct
     LoadXlproConfigTOML
+    
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from xlproStart"
+        Exit Sub
+    End If
 
     ' Use the Shell function to call the program
     command = """" & XLPRO_CLI_PATH & """" & " start " & """" & Wb.Path & "\" & Wb.name & """"
@@ -191,6 +224,11 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
     Dim command As String
 
     LoadXlproConfigTOML
+    
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from xlproInit"
+        Exit Sub
+    End If
 
     ' Use the Shell function to call the program
     'taskID = Shell("cmd.exe /K xlpro", vbNormalFocus)
@@ -232,7 +270,7 @@ Sub xlproRegisterWorkbook(Wb As Workbook)
     
 RegistrationErrorHandler:
     MsgBox "Error: Error during registration. Check the logs and and/or connect the debugger with 'Uncaught Exceptions' enabled and retry.", _
-           vbExclamation, "Warning"
+           vbExclamation, "xlpro Error"
     Err.Clear
     Exit Sub
 End Sub
@@ -247,6 +285,11 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     Set Wb = ActiveWorkbook
 
     LoadXlproConfigTOML
+    
+    If VSCODE_PATH = "" Then
+        Debug.Print "VSCODE_PATH is Nothing. No command to execute from xlproStartIDE"
+        Exit Sub
+    End If
 
     command = """" & VSCODE_PATH & """" & " " & """" & Wb.Path & "\" & ActiveWorkbook.name & ".xlpro" & """"
     Debug.Print command
@@ -301,6 +344,12 @@ Sub RemoveLinkForThisWorkbookButton(Byref control as Office.IRibbonControl)
     RemoveLink ActiveWorkbook
 End Sub
 
+Private Function getXlproCOMServer(guid As String) As Object
+    Dim xlpro_async As Object
+    Set xlpro_async = GetObject("new: " & guid)
+    Set getXlproCOMServer = xlpro_async
+End Function
+
 
 
 Private Sub force_refresh_area_calculation(ByRef Wb As Workbook, rng as Range)
@@ -315,7 +364,7 @@ Private Sub force_refresh_area_calculation(ByRef Wb As Workbook, rng as Range)
     Debug.Print "XLPRO_GUID: " & guid
 
     Dim xlpro_async As Object
-    Set xlpro_async = GetObject("new: " & guid)
+    Set xlpro_async = getXlproCOMServer(guid)
 
     xlpro_async.force_refresh_area_calculation Wb, rng
 
@@ -331,6 +380,7 @@ Sub ResetUndoButton(ByRef control As Office.IRibbonControl)
     ' Reset the xlpro event handler manually
     Call ThisWorkbook.ResetEventHandler
 End Sub
+
 '------------------------------------------------------------------------
 'Items below here are helper subroutines for the addin.
 '------------------------------------------------------------------------
@@ -425,30 +475,6 @@ Sub OpenXlproInstallDir()
     shell command, vbNormalFocus
 
 End Sub
-
-' Sub AddReferenceToMyAddin()
-'     Dim vbProj As VBIDE.VBProject
-'     Dim refPath As String
-
-'     LoadXlproConfigTOML
-
-'     ' Full path to your add-in (adjust as needed)
-'     refPath = XLPRO_ADDIN_PATH
-
-'     ' Set reference to the current project
-'     Set vbProj = ThisWorkbook.VBProject
-
-'     ' Add reference if it's not already present
-'     On Error Resume Next
-'     vbProj.References.AddFromFile refPath
-'     If Err.Number <> 0 Then
-'         MsgBox "Failed to add reference: " & Err.Description, vbExclamation
-'     Else
-'         MsgBox "Reference to myaddin.xlam added.", vbInformation
-'     End If
-'     On Error GoTo 0
-' End Sub
-
 
 Sub TestArg()
     Dim res As Boolean
@@ -659,9 +685,7 @@ Sub register_activeworkbook()
     register_workbook ActiveWorkbook
 End Sub
 
-' Sub unregister_activeworkbook()
-'     uninitialize ActiveWorkbook
-' End Sub
+
 Private Sub register_workbook(ByRef Wb As Workbook)
     On Error GoTo 0
     InitializeShell
@@ -676,58 +700,11 @@ Private Sub register_workbook(ByRef Wb As Workbook)
     Debug.Print "XLPRO_GUID: " & guid
 
     Dim xlpro_async As Object
-    Set xlpro_async = GetObject("new: " & guid)
+    Set xlpro_async = getXlproCOMServer(guid)
 
     xlpro_async.register_and_configure_wb_workspace Wb
 
 End Sub
-
-
-' Sub uninitialize(ByRef Wb As Workbook)
-' 'Uninitialize this workbook from the com server
-'     Dim xlpro_async As Object
-'     Dim guid As String
-'     guid = get_workbook_guid_map_value(Wb.name)
-'     Set xlpro_async = GetObject("new: " & guid)
-'     xlpro_async.shutdown_workspace Wb
-' End Sub
-
-' Private Sub shutdown_xlpro(ByRef Wb As Workbook)
-' 'Attempt to shutdown the xlpro server.
-'     Dim xlpro_async As Object
-'     Dim guid As String
-'     guid = get_workbook_guid_map_value(Wb.name)
-'     Set xlpro_async = GetObject("new: " & guid)
-'     xlpro_async.shutdown
-' End Sub
-
-' Private Sub getpid(ByRef Wb As Workbook)
-'     Dim xlpro_async As Object
-'     Dim guid As String
-'     guid = get_workbook_guid_map_value(Wb.name)
-'     Set xlpro_async = GetObject("new: " & guid)
-'     Debug.Print xlpro_async.getpid
-' End Sub
-
-' Private Sub shutdown_workspace(ByRef Wb As Workbook)
-'     Dim xlpro_async As Object
-'     Dim guid As String
-'     guid = get_workbook_guid_map_value(Wb.name)
-'     Set xlpro_async = GetObject("new: " & guid)
-'     xlpro_async.shutdown_workspace Wb
-' End Sub
-
-' Sub reload_global_config(ByRef wb As Workbook)
-' 'Use a workbook com server to reload the configuration
-'     Dim xlpro_async As Object
-'     Dim guid As String
-'     guid = get_workbook_guid_map_value(wb.Name)
-'     Set xlpro_async = GetObject("new: " & guid)
-'     Dim dict as Object
-'     Set dict = xlpro_async.reload_and_get_config
-'     XLPRO_CLI_PATH = dict.Item("XLPRO_CLI_PATH")
-'     VSCODE_PATH = dict.Item("VSCODE_PATH")
-' End Sub
 
 
 ' Replacement synchronization functions
@@ -741,10 +718,11 @@ Sub write_vba_sync_module(ByRef Wb As Workbook)
 End Sub
 
 Function get_vba_sync_text(Wb As Workbook) As String
-    Dim xlpro_async As Object
     Dim guid As String
     guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
+    Dim xlpro_async As Object
+    Set xlpro_async = getXlproCOMServer(guid)
+
     get_vba_sync_text = xlpro_async.get_vba_sync_text(Wb)
     
 'SyncTextErrorHandler:
@@ -755,10 +733,11 @@ Function get_vba_sync_text(Wb As Workbook) As String
 
 End Function
 Function get_vba_sync_text_subs(Wb As Workbook) As String
-    Dim xlpro_async As Object
     Dim guid As String
     guid = get_workbook_guid_map_value(Wb.name)
-    Set xlpro_async = GetObject("new: " & guid)
+    Dim xlpro_async As Object
+    Set xlpro_async = getXlproCOMServer(guid)
+
     get_vba_sync_text_subs = xlpro_async.get_vba_sync_text_subs(Wb)
     
 End Function
@@ -810,6 +789,12 @@ Sub raiseSubroutineException(wb_name as String, fname as string, e_msg as String
 
 End Sub
 
+Sub raiseWarningWindow(title as string, msg As String)
+
+    MsgBox msg, vbExclamation, title
+
+End Sub
+
 
 '------------------------------------------------------------------------
 'Helper functions etc
@@ -856,39 +841,54 @@ Public Sub ShowAsyncErrorWindow(caption as string, msg As String)
 End Sub
 
 
-
-
-' You need a reference to "Microsoft Forms 2.0 Object Library"
-' (contains the StdPicture type)
-
-' Private Declare PtrSafe Function LoadPicture Lib "stdole2.tlb" Alias "LoadPictureA" _
-'     (ByVal FileName As String) As stdole.IPictureDisp
-
-' Public Function GetImageFromFile(filePath As String) As stdole.IPictureDisp
-'     Set GetImageFromFile = LoadPicture(filePath)
-' End Function
-
-
-' Public Function GetImage(control As IRibbonControl) As stdole.IPictureDisp
-'     Set GetImage = LoadPicture("C:\Users\Daniel Evans\projects\xlpro\xlpro_addin\assets\exports\archive-24_0.ico")
-' End Function
-
-' Public Function GetImage(control As IRibbonControl, path as string) As IPictureDisp
-'     ' Dim path As String
-'     ' path = ThisWorkbook.Path & "\myicon.ico"
-'     ' path = "C:\Users\Daniel Evans\projects\xlpro\xlpro_addin\assets\exports\archive-24_0.ico"
-'     ' path = "C:\Users\Public\archive-24_0.ico"
-'     ' path = "C:\Users\Public\slide_export_0000.emf"
+' Checks if a given path is valid and callable
+Function IsValidShellPath(cmd As String) As Boolean
+    Dim wsh As Object
+    Dim exitCode As Long
+    Dim hasSlash As Boolean
     
-'     If Dir(path) = "" Then
-'         MsgBox "Icon file not found: " & path
-'         Exit Function
-'     End If
+    On Error GoTo ErrHandler
+
+    Dim command As String
     
-'     GetImage = LoadPicture(path)
-' End Function
+    ' Check if string contains a slash/backslash ? treat as a path
+    hasSlash = (InStr(cmd, "\") > 0 Or InStr(cmd, "/") > 0)
+    
+    If hasSlash Then
+        ' Full or relative path ? check file existence directly
+        IsValidShellPath = (Dir(cmd) <> "")
+    Else
+        InitializeShell
+        Set wsh = WSCRIPT_SHELL
+        ' Command name ? check PATH using `where`
+        command = "cmd /C where """ & cmd & """ >NUL 2>NUL"
+        Debug.Print command
+        exitCode = wsh.Run(command, 0, True)
+        IsValidShellPath = (exitCode = 0)
+    End If
+    Exit Function
+
+ErrHandler:
+    IsValidShellPath = False
+End Function
 
 
-' Public Sub OnLoadImage(ByVal sImageName As String, ByRef Image As Variant)
-'    Set Image = LoadPicture("C:\Users\Public\" & "Capture.bmp") 
-' End Sub 
+
+Function query_xlpro_isactive() as Boolean
+    Dim eh As Object
+    Set eh = ThisWorkbook.EventHandler
+    query_xlpro_isactive = Not (eh is Nothing)
+End Function
+
+
+Sub reset_ehandler()
+    ThisWorkbook.ResetEventHandler
+End Sub
+
+Sub test_query_xlpro_isactive()
+    Debug.Print query_xlpro_isactive
+End Sub
+
+Sub force_crash()
+    Err.Raise 1
+End Sub
