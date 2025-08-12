@@ -1796,6 +1796,9 @@ class ClientManager:
         self._wake_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._server = server
+        self._query_timer_interval = 1.0
+        self._query_timer = time.time() + self._query_timer_interval
+        self._xl_run_func_ptr = None
         logger.info("Client Manager initialized")
 
     def start(self):
@@ -2132,6 +2135,30 @@ class ClientManager:
 
             time.sleep(SLEEP_DURATION) # fairness sleep
 
+    def _query_excel(self):
+        try:
+            excel = win32com.client.GetActiveObject("Excel.Application")
+            logger.debug("Attached to running Excel.")
+        except pythoncom.com_error:
+            logger.debug("COM error while attempting to attach to excel in _query_excel")
+            return
+        
+        try:
+            if self._xl_run_func_ptr is None:
+                run = excel.Application.Run
+                self._xl_run_func_ptr = run
+            else:
+                run = self._xl_run_func_ptr
+            xlpro_vba_is_active = run("'xlpro.xlam'!query_xlpro_isactive")
+        except pythoncom.com_error:
+            self._xl_run_func_ptr = None
+            return
+
+        if not xlpro_vba_is_active:
+            run("'xlpro.xlam'!reset_ehandler")
+            msg = f"The Undo Manager was found to be idle due to a crash. The last {self._query_timer_interval} sec of modifications are untracked. Consider saving."
+            run("'xlpro.xlam'!raiseWarningWindow", "xlpro Error", msg)
+        
 
     def _run(self):
         """When awakened, retrieves the result queue and sends to the server cache.
@@ -2146,6 +2173,12 @@ class ClientManager:
                 logger.debug("ClientManager thread woke up for an event!")
                 self._wake_event.clear()
             self._process_queue()
+
+            t0 = time.time()
+            if (t0 - self._query_timer) > self._query_timer_interval:
+                logger.debug("Querying that the xlpro undo manager is still running")
+                self._query_excel()
+                self._query_timer = t0
 
             # XXX - todo - could check for the exit event during the loop also.
             if self._stop_event.is_set():
