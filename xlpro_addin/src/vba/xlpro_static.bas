@@ -28,7 +28,12 @@ Public reException As Object
 #End If
 
 
-Public Sub LoadXlproConfigTOML()
+Public Sub LoadXlproConfigTOML( _
+    Optional do_get_xlpro_paths As Boolean = True, _
+    Optional do_get_vscode_path As Boolean = True, _
+    Optional do_get_undo_stack As Boolean = True _
+)
+    
     Dim fso As Object
     Dim file As Object
     Dim fileText As String
@@ -67,62 +72,69 @@ Public Sub LoadXlproConfigTOML()
     re.IgnoreCase = False
 
     ' Find a
-    re.Pattern = "(?:^|\n)\s*XLPRO_CLI_PATH\s*=\s*""([^""]+)"""
-    Set matches = re.Execute(fileText)
-    If matches.Count > 0 Then
-        XLPRO_CLI_PATH = matches(0).SubMatches(0)
-        If Not IsValidShellPath(XLPRO_CLI_PATH) Then
-            MsgBox "Your provided XLPRO_CLI_PATH, is not valid. " & vbNewLine & _
-            "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
-            "You can manually fix this error" & vbNewLine & _
-            "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
-                vbExclamation, "xlpro Error"
-            XLPRO_CLI_PATH = ""
+    if do_get_vscode_path Then
+        re.Pattern = "(?:^|\n)\s*VSCODE_PATH\s*=\s*""([^""]+)"""
+        Set matches = re.Execute(fileText)
+        If matches.Count > 0 Then
+            VSCODE_PATH = matches(0).SubMatches(0)
+            If Not IsValidShellPath(VSCODE_PATH) Then
+                MsgBox "Your provided VSCODE_PATH, is not valid. " & vbNewLine & _
+                "Please correct this in config.toml at the installation location " & _
+                "Go to Manage xlpro > Edit Global Config and fix this to allow " & _
+                "this button to work. " & vbNewLine & _
+                "Error: The provided string '" & VSCODE_PATH & "' cannot be called from a shell, " & _
+                "the path may not exist or is not found via the PATH environment variable.", _
+                    vbExclamation, "xlpro Error"
+                VSCODE_PATH = ""
+            End If
+        Else:
+            GoTo RegistrationErrorHandler
         End If
-    Else:
-        GoTo RegistrationErrorHandler
     End If
-    ' Find b
-    re.Pattern = "(?:^|\n)\s*VSCODE_PATH\s*=\s*""([^""]+)"""
-    Set matches = re.Execute(fileText)
-    If matches.Count > 0 Then
-        VSCODE_PATH = matches(0).SubMatches(0)
-        If Not IsValidShellPath(VSCODE_PATH) Then
-            MsgBox "Your provided VSCODE_PATH, is not valid. " & vbNewLine & _
-            "Please correct this in config.toml at the installation location " & _
-            "Go to Manage xlpro > Edit Global Config and fix this to allow " & _
-            "this button to work. " & vbNewLine & _
-            "Error: The provided string '" & VSCODE_PATH & "' cannot be called from a shell, " & _
-            "the path may not exist or is not found via the PATH environment variable.", _
-                vbExclamation, "xlpro Error"
-            VSCODE_PATH = ""
+    if do_get_xlpro_paths Then
+        re.Pattern = "(?:^|\n)\s*XLPRO_CLI_PATH\s*=\s*""([^""]+)"""
+        Set matches = re.Execute(fileText)
+        If matches.Count > 0 Then
+            XLPRO_CLI_PATH = matches(0).SubMatches(0)
+            If Not IsValidShellPath(XLPRO_CLI_PATH) Then
+                MsgBox "Your provided XLPRO_CLI_PATH, is not valid. " & vbNewLine & _
+                "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
+                "You can manually fix this error" & vbNewLine & _
+                "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
+                    vbExclamation, "xlpro Error"
+                XLPRO_CLI_PATH = ""
+            End If
+        Else:
+            GoTo RegistrationErrorHandler
         End If
-    Else:
-        GoTo RegistrationErrorHandler
-    End If
-    re.Pattern = "(?:^|\n)\s*XLPRO_SERVER_PATH\s*=\s*""([^""]+)"""
-    Set matches = re.Execute(fileText)
-    If matches.Count > 0 Then
-        XLPRO_SERVER_PATH = matches(0).SubMatches(0)
-        If Not IsValidShellPath(XLPRO_SERVER_PATH) Then
-            MsgBox "Your provided XLPRO_SERVER_PATH, is not valid. " & vbNewLine & _
-            "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
-            "You can manually fix this error" & vbNewLine & _
-            "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
-                vbExclamation,  "xlpro Error"
-            XLPRO_SERVER_PATH = ""
+        re.Pattern = "(?:^|\n)\s*XLPRO_SERVER_PATH\s*=\s*""([^""]+)"""
+        Set matches = re.Execute(fileText)
+        If matches.Count > 0 Then
+            XLPRO_SERVER_PATH = matches(0).SubMatches(0)
+            If Not IsValidShellPath(XLPRO_SERVER_PATH) Then
+                MsgBox "Your provided XLPRO_SERVER_PATH, is not valid. " & vbNewLine & _
+                "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
+                "You can manually fix this error" & vbNewLine & _
+                "Go to Manage xlpro > Edit Global Config and point to the correct path " & _
+                    vbExclamation,  "xlpro Error"
+                XLPRO_SERVER_PATH = ""
+            End If
+        Else:
+            GoTo RegistrationErrorHandler
         End If
-    Else:
-        GoTo RegistrationErrorHandler
+    End if
+
+    If do_get_undo_stack Then
+        re.Pattern = "(?:^|\n)\s*UNDO_STACK_DEPTH\s*=\s*(\d+)"
+        Set matches = re.Execute(fileText)
+        If matches.Count > 0 Then
+            ' UNDOSTACKDEPTH must be an integer, this is loaded by the undo tracker on initialization.
+            UNDOSTACKDEPTH = CLng(matches(0).SubMatches(0))
+        Else:
+            GoTo RegistrationErrorHandler
+        End If
     End If
-    re.Pattern = "(?:^|\n)\s*UNDO_STACK_DEPTH\s*=\s*(\d+)"
-    Set matches = re.Execute(fileText)
-    If matches.Count > 0 Then
-        ' UNDOSTACKDEPTH must be an integer, this is loaded by the undo tracker on initialization.
-        UNDOSTACKDEPTH = CLng(matches(0).SubMatches(0))
-    Else:
-        GoTo RegistrationErrorHandler
-    End If
+    
     Exit Sub
     
 RegistrationErrorHandler:

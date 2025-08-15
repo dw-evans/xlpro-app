@@ -25,7 +25,7 @@ Private Sub Class_Initialize()
     Set UndoStack = New Collection
     DoTrackChanges = True
     EnumPointer = 1
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_xlpro_paths:=False, do_get_vscode_path:=False
     UndoHistoryLength = UNDOSTACKDEPTH
 End Sub
 
