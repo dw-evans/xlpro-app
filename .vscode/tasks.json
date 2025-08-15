@@ -160,6 +160,43 @@
           "cwd": "${workspaceFolder}/xlpro_cli_shell_wrapper"
         },
       },
+
+      {
+        "label": "xlpro_installer_inno pre_build",
+        "type": "shell",
+        "command": "${workspaceFolder}/.venv/scripts/python.exe",
+        "args": [
+          "pre_build.py"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": false
+        },
+        "problemMatcher": [],
+        "options": {
+          "cwd": "${workspaceFolder}/xlpro_installer_inno"
+        }
+      },
+
+      {
+        "label": "xlpro_installer_inno run",
+        "type": "shell",
+        "command": "C:/Program Files (x86)/Inno Setup 6/ISCC.exe",
+        "args": [
+          "build_installer.iss"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": false
+        },
+        "options": {
+          "cwd": "${workspaceFolder}/xlpro_installer_inno"
+        },
+        "dependsOn": [
+          "xlpro_installer_inno pre_build"
+        ],
+        "dependsOrder": "sequence",
+      },
       
       {
         "type": "go",
