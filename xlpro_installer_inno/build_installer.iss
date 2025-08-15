@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "xlpro"
-#define MyAppVersion "0.6.0"
+#define MyAppVersion "0.0.6"
 #define MyAppPublisher "Daniel Evans"
 #define MyAppURL "https://xlpro.pages.dev"
 #define MyAppExeName "xlpro-cli.exe"
@@ -12,7 +12,7 @@
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 Uninstallable=yes
-AppId={{F105E59A-28CB-4347-A757-F9664C5FA092}
+AppId={{0C5E81F2-DE65-4421-AC7D-52B378CE85CD}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -27,6 +27,7 @@ UsePreviousAppDir=no
 SetupIconFile=favicon.ico
 UninstallDisplayIcon={app}\xlpro-cli.exe
 WizardImageFile=installer-splash-1.bmp
+WizardSmallImageFile=inno-small.bmp
 
 UninstallFilesDir={app}
 
