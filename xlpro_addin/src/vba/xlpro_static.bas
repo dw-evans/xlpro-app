@@ -209,7 +209,8 @@ Sub xlproStart(ByRef control As Office.IRibbonControl)
     Set Wb = ActiveWorkbook
 
     ' Load the toml xlpro configuration file to ensure the paths are correct
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
     
     If XLPRO_CLI_PATH = "" Then
         Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from xlproStart"
@@ -235,7 +236,7 @@ Sub xlproInit(ByRef control As Office.IRibbonControl)
     Dim taskID As Double
     Dim command As String
 
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
     
     If XLPRO_CLI_PATH = "" Then
         Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from xlproInit"
@@ -267,7 +268,7 @@ Sub xlproRegisterWorkbook(Wb As Workbook)
 ' Register the workbook
     Debug.Print ActiveWorkbook.Path
     
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
 
     ' clear the workbook guid key if it exists
     initialize_workbook_guid_map
@@ -296,7 +297,7 @@ Sub xlproStartIDE(ByRef control As Office.IRibbonControl)
     Dim Wb As Workbook
     Set Wb = ActiveWorkbook
 
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_xlpro_paths:=False, do_get_undo_stack:=False
     
     If VSCODE_PATH = "" Then
         Debug.Print "VSCODE_PATH is Nothing. No command to execute from xlproStartIDE"
@@ -404,7 +405,14 @@ Sub PushRequirementsTxt()
     Dim Wb As Workbook
     Set Wb = ActiveWorkbook
 
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from PushRequirementsTxt"
+        Exit Sub
+    End If
+
     command = """" & XLPRO_CLI_PATH & """" & " write-reqs " & """" & Wb.Path & "\" & Wb.name & """"
     ' Debug.Print command
     taskID = shell(command, vbNormalFocus)
@@ -414,7 +422,14 @@ End Sub
 Sub ClearVenvData()
     Dim command As String
     Dim taskID As Double
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from ClearVenvData"
+        Exit Sub
+    End If
+
     command = """" & XLPRO_CLI_PATH & """" & " clear-venvs" 
     taskID = shell(command, vbNormalFocus)
 End Sub
@@ -422,7 +437,15 @@ End Sub
 Sub ClearTempData()
     Dim command As String
     Dim taskID As Double
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from ClearTempData"
+        Exit Sub
+    End If
+
+
     command = """" & XLPRO_CLI_PATH & """" & " clear-tmp"
     taskID = shell(command, vbNormalFocus)
 End Sub
@@ -430,7 +453,13 @@ End Sub
 Sub ClearUvPythons()
     Dim command As String
     Dim taskID As Double
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from ClearUvPythons"
+        Exit Sub
+    End If
+
     command = """" & XLPRO_CLI_PATH & """" & " clear-uv-pythons"
     taskID = shell(command, vbNormalFocus)
 End Sub
@@ -438,7 +467,14 @@ End Sub
 Sub ClearUvCache()
     Dim command As String
     Dim taskID As Double
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from ClearUvCache"
+        Exit Sub
+    End If
+
+
     command = """" & XLPRO_CLI_PATH & """" & " clear-uv-cache"
     taskID = shell(command, vbNormalFocus)
 End Sub
@@ -448,7 +484,13 @@ Sub RemoveLink(Wb as Workbook)
     Dim taskID As Double
     Set Wb = ActiveWorkbook
 
-    LoadXlproConfigTOML
+    LoadXlproConfigTOML do_get_vscode_path:=False, do_get_undo_stack:=False
+
+    If XLPRO_CLI_PATH = "" Then
+        Debug.Print "XLPRO_CLI_PATH is Nothing. No command to execute from RemoveLink"
+        Exit Sub
+    End If
+
     command = """" & XLPRO_CLI_PATH & """" & " clear-venv-link " & """" & Wb.Path & "\" & Wb.name & """"
     taskID = shell(command, vbNormalFocus)
 End Sub
