@@ -26,8 +26,9 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "init",
-                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
+                // "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
+                "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
+                // "C:/Users/Daniel Evans/AppData/Roaming/Microsoft/Excel/XLSTART/PERSONAL.XLSB"
 
             ],
         },
@@ -38,8 +39,8 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "clear-venv-link",
-                // "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
+                // "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
+                "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
 
             ],
         },
@@ -52,7 +53,7 @@
             "args": [
                 "start",
                 
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
+                "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
             ],
         },
         {
@@ -62,7 +63,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "guid",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
+                "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
             ],
         },
         {
@@ -72,7 +73,7 @@
             "program":"xlpro_cli/main.py",
             "args": [
                 "write-reqs",
-                "C:/Users/Daniel Evans/projects/xlpro/xlpro_examples_archive/Archive1/xlpro-ex01-basics.xlsx"
+                "C:/Users/Daniel Evans/Downloads/xlpro_demo/Book2.xlsx"
             ],
         },
         {

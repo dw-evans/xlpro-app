@@ -98,7 +98,7 @@
         }
       },
       {
-        "label": "xlpro_installer complete_build",
+        "label": "xlpro_installer_inno complete_build",
         "type": "shell",
         "command": "${workspaceFolder}/.venv/scripts/pyinstaller.exe",
         "args": [
@@ -179,7 +179,7 @@
       },
 
       {
-        "label": "xlpro_installer_inno run",
+        "label": "xlpro_installer_inno build",
         "type": "shell",
         "command": "C:/Program Files (x86)/Inno Setup 6/ISCC.exe",
         "args": [
@@ -189,14 +189,17 @@
           "kind": "build",
           "isDefault": false
         },
+        "problemMatcher": [],
         "options": {
           "cwd": "${workspaceFolder}/xlpro_installer_inno"
         },
         "dependsOn": [
+          "xlpro_installer pre_build",
           "xlpro_installer_inno pre_build"
         ],
         "dependsOrder": "sequence",
       },
+
       
       {
         "type": "go",
@@ -222,6 +225,20 @@
           "cwd": "${workspaceFolder}/xlpro_cli_shell_wrapper"
         },
         // "detail": "cd c:\\Users\\Daniel Evans\\projects\\xlpro\\xlpro_cli_shell_wrapper; go build main.go"
-      }
+      },
+      {
+        "label": "XLPRO BUILD ALL",
+        "problemMatcher": [],
+        "dependsOrder": "sequence",
+        "dependsOn": [
+          "xlpro_addin compile and push",
+          "xlpro_module build wheel",
+          "xlpro_cli build",
+          "xlpro_shell_wrapper go build xlpro-server",
+          "xlpro_installer_inno build"
+        ]
+      },
+      
+
     ]
 }

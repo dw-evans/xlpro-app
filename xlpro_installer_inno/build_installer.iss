@@ -12,7 +12,7 @@
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 Uninstallable=yes
-AppId={{0C5E81F2-DE65-4421-AC7D-52B378CE85CD}
+AppId={{18EBB23D-BA47-463B-A7E9-D718648EC73F}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -53,7 +53,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "..\xlpro_installer\install\*"; DestDir: {app}; Flags: recursesubdirs ignoreversion
-Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {#GetEnv('USERPROFILE')}\AppData\Roaming\Microsoft\Excel\XLSTART;
+Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {#GetEnv('USERPROFILE')}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
 
 [Icons]
 ; Name: "favicon.ico"; Filename: "{uninstallexe}"
@@ -69,6 +69,14 @@ Root: HKCU; Subkey: "Environment"; \
     ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
     Check: NeedsAddPath('{app}')
     
+[Dirs]
+Name: "{app}"; Flags: uninsalwaysuninstall
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\envs"
+Type: filesandordirs; Name: "{app}\uv"
+
+
 [Code]
 function NeedsAddPath(Param: string): boolean;
 var
@@ -116,7 +124,7 @@ begin
   Result := True;
   while IsAppRunning(AppName) do
   begin
-    Answer := MsgBox(AppName + ' must be closed during installation, please save your files and close, then press OK to continue. Press Cancel to exit.', mbError, MB_OKCANCEL);
+    Answer := MsgBox(AppName + ' must be closed during installation, please save your files and close, then press OK to continue. Press Cancel to exit. Check for process `Microsoft Excel` in Task Manager if Excel appears to be closed but this message continues.', mbError, MB_OKCANCEL);
     if Answer = IDCANCEL then
     begin
       Result := False
@@ -134,7 +142,7 @@ begin
   Result := True;
   while IsAppRunning(AppName) do
   begin
-    Answer := MsgBox(AppName + ' must be closed during uninstallation, please save your files and close, then press OK to continue. Press Cancel to exit.', mbError, MB_OKCANCEL);
+    Answer := MsgBox(AppName + ' must be closed during uninstallation, please save your files and close, then press OK to continue. Press Cancel to exit. Check for process `Microsoft Excel` in Task Manager if Excel appears to be closed but this message continues.', mbError, MB_OKCANCEL);
     if Answer = IDCANCEL then
     begin
       Result := False
@@ -143,3 +151,22 @@ begin
   end;
 end;
 
+
+[Code]
+const
+  WM_SETTINGCHANGE = $001A;
+
+function SendMessage(hWnd: Integer; Msg: Integer; wParam: Integer; lParam: String): LongInt;
+  external 'SendMessageW@user32.dll stdcall';
+
+procedure NotifyEnvironmentChange;
+begin
+  // Broadcast to all top-level windows that environment has changed
+  SendMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, 'Environment');
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    NotifyEnvironmentChange;
+end;

@@ -156,3 +156,4 @@ xlpro_cli/version.txt
 
 *.pdf
 !.python-version
+*.bmp
