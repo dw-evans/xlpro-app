@@ -68,9 +68,6 @@ import debugpy
 
 import contextlib
 import io
-import rich
-
-
 
 
 @contextlib.contextmanager
@@ -109,8 +106,6 @@ logger = logging.getLogger()
 # )
 
 # logger = logging.getLogger("rich_logger")
-
-
 
 
 # # Create a handler to output logs to stdout

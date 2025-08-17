@@ -1,8 +1,5 @@
 import win32com.client
 from PIL import Image
-
-
-from pywintypes import IID
 from win32com.client.dynamic import Dispatch
 
 from typing import TYPE_CHECKING
@@ -20,7 +17,6 @@ from pathlib import Path
 import hashlib
 import uuid
 from functools import wraps
-# import ._types
 from xlpro import _types
 import ctypes
 import os
@@ -44,7 +40,6 @@ from xlpro._types import list1d, list2d, ndarray1d, ndarray2d
 import time
 
 from filelock import FileLock
-import filelock
 
 
 USER_WORKBOOK_WORKING_DIR = Path()

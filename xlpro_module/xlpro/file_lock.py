@@ -121,23 +121,7 @@ def close_file(handle):
     pass
     _winapi.CloseHandle(handle)
 
-# def check_existing_lock_and_pid(lock_file):
-#     """Check if a process holding the lock is still running."""
-#     try:
-#         with open(lock_file, 'r') as f:
-#             pid = int(f.read().strip())
-#             if psutil.pid_exists(pid):
-#                 return pid  # Process is still running
-#     except (ValueError, FileNotFoundError):
-#         pass
-#     return False
-
 import re
-
-# from dataclasses import dataclass
-# @dataclass
-# class ProcessInfo:
-#     ...
 
 def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
     """Check if a process holding the lock is still running."""
@@ -163,34 +147,12 @@ def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
 from pathlib import Path
 import sys
 
-def get_xlpro_lockfile_path(interpreter_path:Path=None) -> Path:
-    raise NotImplementedError
-    if interpreter_path is not None:
-        xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
-    else:
-        xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
-    return xlpro_dir / "xlpro.lock"
-
 def get_xlpro_lockfile_path_parent(interpreter_path:Path=None) -> Path:
     if interpreter_path is not None:
         xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
     else:
         xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
     return xlpro_dir
-
-
-if __name__ == "__main__":
-    import config
-    config = config.load()
-
-    p = config.xlpro_lock_path
-
-    try:
-        handle = acquire_file_and_write_datas(p)
-    except Exception as e:
-        b = check_lockfile_get_contents_as_dict_if_alive(p)
-        pass
-    close_file(handle)
 
     
 

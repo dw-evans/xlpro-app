@@ -14,6 +14,7 @@ from win32com.client import _PyIDispatchType # Type that can be used for isinsta
 # import win32com.server.util
 # import win32com.server.policy
 from win32com.client.dynamic import Dispatch
+from win32com.client import GetActiveObject
 from functools import wraps
 # from copy import deepcopy
 import re
@@ -273,7 +274,6 @@ class xlproServer:
 
 
     @_utils.traceback_log_raise
-    # @_utils.comsafe
     def force_refresh_area_calculation(self, wb_dispatch, rng):
         workspace = self._get_workspace_from_wb(wb_dispatch)
         rng_dispatch = Dispatch(rng)
@@ -281,7 +281,11 @@ class xlproServer:
         for area in rng_dispatch.Areas:
             for cell in area.Cells:
                 workspace.force_clear_addr(sheetaddr=shtname + cell.Address)
-            _utils.comsafe(lambda: rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area))()
+            try:
+                _utils.comsafe(lambda: area.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area))()
+            except Exception as e:
+                logger.warning("Error during AtomicFormulaRefreshNoEvents call")
+                raise
             # rng_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", area)
 
 
@@ -1557,7 +1561,8 @@ class ResultsManager:
             msg = f"{reminder_msg}\n\nWorkbook: `{wb_name}`\nSubroutine `{func_name}()`\n\n{type(val).__name__}:\n{str(val)}"
             def raise_error_in_excel():
                 pythoncom.CoInitialize()
-                xlapp = Dispatch("Excel.Application")
+                # xlapp = Dispatch("Excel.Application")
+                xlapp = GetActiveObject("Excel.Application")
                 # caller_wb = self._server.get_caller_stream(uid=uid)
                 xlapp.Run("xlpro.xlam!ShowAsyncErrorWindow", "xlpro Subroutine Exception", msg)
                 pythoncom.CoUninitialize()
@@ -1867,8 +1872,11 @@ class ClientManager:
                 pass
 
             # update by resetting the formula
-            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
-        
+            try:
+                _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            except Exception as e:
+                logger.warning("Error during AtomicFormulaRefreshNoEvents call")
+
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
         except KeyError as e:
             # XXX - todo - there is a risk of a keyerror here for some reason
@@ -1900,7 +1908,10 @@ class ClientManager:
                     # self._set_result_display(uid, val)
 
             # update by resetting the formula
-            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            try:
+                _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            except Exception as e:
+                logger.warning("Error during AtomicFormulaRefreshNoEvents call")
             # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             # self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
@@ -1936,7 +1947,10 @@ class ClientManager:
                 self._set_result_display(uid, val)
 
             # update by resetting the formula
-            _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            try:
+                _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+            except Exception as e:
+                logger.warning("Error during AtomicFormulaRefreshNoEvents call")
             # caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
             # caller_dispatch.Formula2 = caller_dispatch.Formula2
             self._server.set_caller_stream(uid, _utils.comarshal_release_and_get_stream(caller_dispatch))
@@ -1993,7 +2007,10 @@ class ClientManager:
                     raise e
                 logger.info(f"Image '{xl_name}' added successfully")
                 self._set_result_display(uid, f"Image<{xl_name}>")
-                caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch)
+                try:
+                    _utils.comsafe(lambda: caller_dispatch.Application.Run("'xlpro.xlam'!AtomicFormulaRefreshNoEvents", caller_dispatch))()
+                except Exception as e:
+                    logger.warning("Error during AtomicFormulaRefreshNoEvents call")
                 return
             
             _utils.comsafe(_xlinteract)()
@@ -2145,12 +2162,20 @@ class ClientManager:
         
         try:
             if self._xl_run_func_ptr is None:
-                run = excel.Application.Run
+                app = getattr(excel, "Application", None)
+                if app is None:
+                    raise errors.ExcelNotAccessibleError
+                run = getattr(app, "Run", None)
+                if run is None:
+                    raise errors.ExcelNotAccessibleError
                 self._xl_run_func_ptr = run
             else:
                 run = self._xl_run_func_ptr
             xlpro_vba_is_active = run("'xlpro.xlam'!query_xlpro_isactive")
-        except pythoncom.com_error:
+        except pythoncom.com_error as e:
+            self._xl_run_func_ptr = None
+            return
+        except errors.ExcelNotAccessibleError as e:
             self._xl_run_func_ptr = None
             return
 
@@ -2174,11 +2199,11 @@ class ClientManager:
                 self._wake_event.clear()
             self._process_queue()
 
-            t0 = time.time()
-            if (t0 - self._query_timer) > self._query_timer_interval:
-                logger.debug("Querying that the xlpro undo manager is still running")
-                self._query_excel()
-                self._query_timer = t0
+            # t0 = time.time()
+            # if (t0 - self._query_timer) > self._query_timer_interval:
+            #     logger.debug("Querying that the xlpro undo manager is still running")
+            #     self._query_excel()
+            #     self._query_timer = t0
 
             # XXX - todo - could check for the exit event during the loop also.
             if self._stop_event.is_set():
