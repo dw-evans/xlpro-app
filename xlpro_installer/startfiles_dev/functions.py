@@ -12,8 +12,7 @@ if typing.TYPE_CHECKING:
 import xlpro
 from xlpro import list1d, list2d, ndarray1d, ndarray2d
 
-matplotlib.use("Agg")  # Use Non-GUI backend
-
+matplotlib.use("Agg")
 
 @xlpro.ignore
 def register_defaults():
@@ -58,18 +57,38 @@ def register_defaults():
     xlpro.register(xlpro.condense)
     xlpro.register(xlpro.pylist)
     xlpro.register(xlpro.pytuple)
-
-
 register_defaults()
 
-# This file is the 'entry point' of xlpro to define functions in Excel.
+@xlpro.ignore
+def configure():
+    import matplotlib.font_manager as fm
+
+    fm.fontManager.addfont(
+        r"C:\Users\Daniel Evans\Downloads\JetBrainsMono-2.304\fonts\ttf\JetBrainsMono-Regular.ttf"
+    )
+    plt.rcParams.update(
+        {
+            "font.family": "JetBrains Mono",
+            "font.size": 10,
+            "axes.titlesize": "large",
+            "axes.labelsize": "medium",
+            "xtick.labelsize": "small",
+            "ytick.labelsize": "small",
+            "legend.fontsize": "small",
+            "figure.titlesize": "x-large",
+        }
+    )
+configure()
 
 
-def hello_world(name: str):
-    return f"Hello {name}!"
+# NOTE, this file is the 'entry point' of xlpro to define functions in Excel.
+# all functions must be 'registered' in this file *only*.
 
+# xlpro will auto-register any module function, like below
+def hello(name:str):
+    return f"Hello {name}"
 
-# use xlpro.ignore to hide a function from Excel
+# use xlpro.ignore to hide a function from Excel in this namespace
 @xlpro.ignore
 def helper_function(a, b):
     return a + b
