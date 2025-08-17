@@ -31,8 +31,8 @@ import datetime
 from functools import wraps
 import traceback
 
-DEVELOPMENT_INSTALL = True
-# DEVELOPMENT_INSTALL = False
+# DEVELOPMENT_INSTALL = True
+DEVELOPMENT_INSTALL = False
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -207,6 +207,7 @@ def get_global_python_interpreters():
 
 
 def uv_download_python_version(version_str:str) -> Path:
+    print_info("Downloading Python interpreter from uv...")
     result = subprocess.run(
         [
             "uv", 
@@ -219,6 +220,7 @@ def uv_download_python_version(version_str:str) -> Path:
         text=True, 
         check=True,
     )
+    print_info("Download complete.")
 
 
     def uninstall():
@@ -1313,8 +1315,10 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             if not do_proceed_with_creation:
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override, menutype=menutype)
                 
+            
         ret = uv_download_python_version(uv_py_version)
         rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+
 
     # handle prescribed uv-download request specific download request 
     # (must occur after handling uv other version for namespace clash)
@@ -1332,7 +1336,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override, menutype=menutype)
                     
         ret = uv_download_python_version(provided_py_version)
-        rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+        rettype = venv_types.UV_DOWNLOAD_NEW_VENV        
+
 
 
     # Download the recommended python version
@@ -1359,9 +1364,11 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
             if not do_proceed_with_creation:
                 return dlg_select_and_optionally_create_valid_python_interpreter(version_required=version_required, allow_override=allow_override, menutype=menutype)
         
+        
         ret = uv_download_python_version(provided_py_version)
         # store_venv_to_workbook_mapping("default", ret)
         rettype = venv_types.UV_DOWNLOAD_NEW_VENV
+
 
 
     # XXX - todo - handle reuse of an xlpro venv...
@@ -1665,7 +1672,7 @@ def dlg_xlpro_initialize_workbook(workbook_path:Path):
     # if its not an xlpro directory, we can start a new venv for it
     # the user has the same options to create the environment as above.
     else:
-        print_info(f"workbook is not initialized for xlpro, the following steps will configure your environment, no version required")
+        print_info(f"Workbook is not initialized for xlpro, the following steps will configure your environment, no version required")
         venv_root_path = dlg_user_selects_or_creates_valid_interpreter(version_required=None)
         #i install the default requirements
         py_interpreter_path = get_python_exe_from_xlpro_root_venv_path(venv_root_path)
@@ -1875,7 +1882,7 @@ def get_interpreter_port(interpreter_path:Path):
 
 def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:bool=True, do_register_wb:bool=True):
     """spins up the xlpro server on a port specified in the launch.json debug configuration"""
-    from win32com.client import Dispatch
+    from win32com.client import Dispatch, GetActiveObject
 
     py_interpreter_root_dir = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
 
@@ -1968,7 +1975,8 @@ def start_venv_xlpro_server_for_workbook(workbook_path:Path, do_kill_running:boo
         # Dispatch the workbook to run the registration macro from here 
         try:
             print_info("Signalling workbook to sync...")
-            xlapp = Dispatch("Excel.Application")
+            # xlapp = Dispatch("Excel.Application")
+            xlapp = GetActiveObject("Excel.Application")
             wb = xlapp.Workbooks.Open(str(workbook_path))
             xlapp.Run("xlpro.xlam!xlproRegisterWorkbook", wb)
             print_info("Sync attempt complete.")
