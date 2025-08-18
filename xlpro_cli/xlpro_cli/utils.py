@@ -1371,6 +1371,7 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
 
 
 
+
     # XXX - todo - handle reuse of an xlpro venv...
     # if the user selects an existing xlpro venv, we don't want to create a new virtual environment.
     elif ret.startswith(local_version_str1):
@@ -1382,8 +1383,8 @@ def dlg_select_and_optionally_create_valid_python_interpreter(version_required=N
         
         provided_py_version = get_py_exe_version(ret)
         if version_required is not None:
-            while not compare_py_version_t2(provided_py_version, version_required):
-                print_error(f"Provided version {provided_py_version} does not match {version_required}")
+            if not compare_py_version_t2(provided_py_version, version_required):
+                print_error(f"Provided version {provided_py_version} is not compatible with {version_required}")
                 if allow_override:
                     if prompt_yes_no_input("OVERRIDE ENABLED: Do you want to override the python version? [ADVANCED USE ONLY]") == "yes":
                         do_proceed_with_creation = True
