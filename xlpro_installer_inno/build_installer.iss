@@ -44,7 +44,7 @@ DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users).
 PrivilegesRequired=lowest
 OutputDir=dist
-OutputBaseFilename={#MyAppName}-{#MyAppVersion}-installer
+OutputBaseFilename={#MyAppName}-v{#MyAppVersion}-installer
 SolidCompression=yes
 WizardStyle=modern
 
