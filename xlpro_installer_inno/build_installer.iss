@@ -20,7 +20,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={#GetEnv('USERPROFILE')}\.xlpro
+DefaultDirName={code:GetUserProfile}\.xlpro
 DisableDirPage=yes
 UsePreviousAppDir=no
 
@@ -76,6 +76,12 @@ Name: "{app}"; Flags: uninsalwaysuninstall
 Type: filesandordirs; Name: "{app}\envs"
 Type: filesandordirs; Name: "{app}\uv"
 
+[Code]
+function GetUserProfile(Param: string): string;
+begin
+  // Expands the USERPROFILE environment variable
+  Result := ExpandConstant('{%USERPROFILE}');
+end;
 
 [Code]
 function NeedsAddPath(Param: string): boolean;
