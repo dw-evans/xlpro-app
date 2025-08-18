@@ -14,7 +14,7 @@ with open(fp_inno, "r") as f:
 
 txt2 = txt
 
-version, version_guid = (xlpro.__version__, str(pythoncom.CreateGuid()))
+version = xlpro.__version__
 
 import json
 
@@ -24,7 +24,11 @@ with open(wd / "app_id_map.json", "r") as f:
 
 if not version in app_id_map:
     with open(wd / "app_id_map.json", "w") as f:
-        f.write(json.dumps(app_id_map | {version: version_guid}, indent=4))
+        app_id_map = app_id_map | {version: str(pythoncom.CreateGuid())}
+        f.write(json.dumps(app_id_map, indent=4))
+
+else:
+    version_guid = app_id_map[version]
 
 pat = r'^#define MyAppVersion\s*".*"\s*$'
 x1a = re.search(pat, txt2, flags=re.MULTILINE)
