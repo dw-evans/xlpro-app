@@ -53,7 +53,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "..\xlpro_installer\install\*"; DestDir: {app}; Flags: recursesubdirs ignoreversion
-Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {#GetEnv('USERPROFILE')}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
+Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {code:GetUserProfile}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
 
 [Icons]
 ; Name: "favicon.ico"; Filename: "{uninstallexe}"
