@@ -55,6 +55,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "..\xlpro_installer\install\*"; DestDir: {app}; Flags: recursesubdirs ignoreversion
 Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {code:GetUserProfile}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
 
+
 [Icons]
 ; Name: "favicon.ico"; Filename: "{uninstallexe}"
 
@@ -68,13 +69,11 @@ Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {code:GetUserProfi
 Root: HKCU; Subkey: "Environment"; \
     ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
     Check: NeedsAddPath('{app}')
-    
-[Dirs]
-Name: "{app}"; Flags: uninsalwaysuninstall
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\envs"
 Type: filesandordirs; Name: "{app}\uv"
+Type: filesandordirs; Name: "{app}\xlpro_examples"
 
 [Code]
 function GetUserProfile(Param: string): string;
