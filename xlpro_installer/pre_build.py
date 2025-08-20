@@ -59,7 +59,11 @@ paths = [
     (
         f".python-version-recommended",
         f".python-version-recommended",
-    )
+    ),
+    (
+        f"uv/uv.exe",
+        f"bin/uv.exe",
+    ),
 ]
 
 
