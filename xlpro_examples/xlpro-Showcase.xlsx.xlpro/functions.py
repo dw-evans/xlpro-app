@@ -63,9 +63,6 @@ register_defaults()
 def configure():
     import matplotlib.font_manager as fm
 
-    # fm.fontManager.addfont(
-    #     r"C:\Users\Daniel Evans\Downloads\JetBrainsMono-2.304\fonts\ttf\JetBrainsMono-Regular.ttf"
-    # )
     plt.rcParams.update(
         {
             "font.family": "JetBrains Mono",
