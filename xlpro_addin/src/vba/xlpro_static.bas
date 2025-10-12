@@ -100,7 +100,7 @@ Public Sub LoadXlproConfigTOML( _
                 MsgBox "Your provided XLPRO_CLI_PATH, is not valid. " & vbNewLine & _
                 "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
                 "You can manually fix this error" & vbNewLine & _
-                "Go to Manage xlpro > Edit Global Config and point to the correct path ", & _
+                "Go to Manage xlpro > Edit Global Config and point to the correct path ", _
                     vbExclamation, "xlpro Error"
                 XLPRO_CLI_PATH = ""
             End If
@@ -115,7 +115,7 @@ Public Sub LoadXlproConfigTOML( _
                 MsgBox "Your provided XLPRO_SERVER_PATH, is not valid. " & vbNewLine & _
                 "You likely need to restart your PC for Excel to see this in the PATH " & vbNewLine & _
                 "You can manually fix this error" & vbNewLine & _
-                "Go to Manage xlpro > Edit Global Config and point to the correct path ", & _
+                "Go to Manage xlpro > Edit Global Config and point to the correct path ", _
                     vbExclamation,  "xlpro Error"
                 XLPRO_SERVER_PATH = ""
             End If
