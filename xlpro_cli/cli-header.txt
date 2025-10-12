@@ -7,7 +7,7 @@
         ██╔╝ ██╗███████╗██║     ██║  ██║╚██████╔╝
         ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ 
 
-          xlpro v0.0.7
+          xlpro v0.0.8
           Copyright (c) 2025 Daniel Evans
           License: MIT. Free for commercial use.
 
