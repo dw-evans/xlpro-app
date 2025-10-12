@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "xlpro"
-#define MyAppVersion "0.0.7"
+#define MyAppVersion "0.0.8"
 #define MyAppPublisher "Daniel Evans"
 #define MyAppURL "https://xlpro.pages.dev"
 #define MyAppExeName "xlpro-cli.exe"
@@ -12,7 +12,7 @@
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 Uninstallable=yes
-AppId={{1D3CCF30-5568-496F-B638-7893097D691B}
+AppId={{62D69F3D-C6AC-4122-A15B-020076C23696}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -119,7 +119,7 @@ begin
     FSWbemLocator := Unassigned;
 end;
 
-
+[Code]
 function InitializeSetup(): Boolean;
 var
   Answer: Integer;
@@ -156,8 +156,6 @@ begin
   end;
 end;
 
-
-[Code]
 const
   WM_SETTINGCHANGE = $001A;
 
@@ -170,8 +168,311 @@ begin
   SendMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, 'Environment');
 end;
 
+
+[Code]
+function GetEnvVariable(Param: string): string;
+begin
+  Result := GetEnv(Param);
+end;
+
+[Code]
+function FindCodeExe(): string;
+var
+  TempFile: string; 
+  OutputLine: AnsiString;
+  ResultCode: Integer;
+begin
+  Result := '';  // Default (not found)
+  TempFile := ExpandConstant('{tmp}\where_output.txt');
+
+  // Run "where code.exe" and redirect stdout to a file
+  if Exec(ExpandConstant('{cmd}'),
+           '/C where code.exe > "' + TempFile + '"',
+           '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if LoadStringFromFile(TempFile, OutputLine) then
+    begin
+      OutputLine := Trim(OutputLine);
+      if OutputLine <> '' then
+      begin
+        Log('Found code.exe at: ' + OutputLine);
+        Result := string(OutputLine);
+      end;
+    end;
+  end;
+
+  DeleteFile(TempFile);
+end;
+
+[Code]
+var
+  Page: TInputOptionWizardPage;
+  SelectedPath: string;
+  CustomPathEdit: TEdit;
+  PathValues: array of String;
+  PathWarningLabel: TLabel;
+  pathEditLabel: TLabel;
+
+
+procedure PageClickHandler(Sender: TObject);
+begin
+  if PathValues[Page.SelectedValueIndex] = 'CUSTOM_PATH' then
+  begin
+    CustomPathEdit.Enabled := True;
+    PathWarningLabel.Visible := True;
+    pathEditLabel.Font.Color := $00000000;
+  end
+  else
+  begin
+    CustomPathEdit.Enabled := False;
+    PathWarningLabel.Visible := False;
+    pathEditLabel.Font.Color := $FF000000;
+  end;
+end;
+
+
+function PathValidator(fpath: String): Integer;
+var
+  fname: String;
+  fexists: Boolean;
+begin
+  fname := ExtractFileName(fpath);
+  fexists := FileExists(fpath);
+
+  if fexists and (LowerCase(fname) <> 'code.exe') then
+    Result := 0;
+
+  if fexists and (LowerCase(fname) = 'code.exe') then
+    Result := 1;
+    
+  if not fexists then
+    Result := 2;
+end;
+
+procedure CustomPathValidator(Sender: TObject);
+var
+  x, fname: String;
+  fexists: Boolean;
+  val: Integer;
+begin
+  PathWarningLabel.Visible := True;
+  x := CustomPathEdit.Text;
+  fname := ExtractFileName(x);
+  fexists := FileExists(x);
+
+  val := PathValidator(x);
+  
+  if val = 0 then
+  begin
+    PathWarningLabel.Font.Color := $001a98e5
+    PathWarningLabel.Caption := 'Path exists, filename does not appear correct, expected `Code.exe`.';
+    Log('0');
+  end;
+
+  if val = 1 then
+  begin
+    PathWarningLabel.Font.Color := $001fad1f;
+    PathWarningLabel.Caption := 'Path exists and filename appears valid.';
+    Log('1');
+  end;
+
+  if val = 2 then
+  begin
+    PathWarningLabel.Font.Color := $001414b8;
+    PathWarningLabel.Caption := 'Path does not exist.';
+    Log('2');
+  end;
+  
+end;
+
+
+procedure InitializeWizard;
+var
+  Path1, Path2: string;
+  Path3: string;
+
+begin
+  Path3 := FindCodeExe();
+  
+  Path1 := 'C:\Users\Daniel Evans\AppData\Local\Programs\Microsoft VS Code\Code.exe';  
+  Path2 := ExpandConstant('{pf}') + '\Microsoft VS Code\Code.exe';
+  
+
+  // Create an option page (radio button list)
+  Page := CreateInputOptionPage(
+    wpSelectDir,                 // after directory page (adjust if needed)
+    'Select VS Code Installation',
+    'Choose which VS Code executable `Code.exe` to use. This will be written into `config.toml`',
+    'Select one of the following',
+    True,                        // True = radio buttons, not checkboxes
+    False
+  );
+
+  if Path3 <> '' then
+  begin
+    Page.Add('[RECOMMENDED] Use `code.exe` from PATH');
+    SetArrayLength(PathValues, Length(PathValues) + 1);
+    PathValues[High(PathValues)] := 'code.exe';
+  end;
+
+  // Add options for each existing path
+  if FileExists(Path1) then
+  begin
+    Page.Add(Path1);
+    SetArrayLength(PathValues, Length(PathValues) + 1);
+    PathValues[High(PathValues)] := Path1;
+  end;
+
+  if FileExists(Path2) then
+  begin
+    Page.Add(Path2);
+    SetArrayLength(PathValues, Length(PathValues) + 1);
+    PathValues[High(PathValues)] := Path2;
+  end;
+
+    
+  // Add "Custom path" option
+  Page.Add('[NOT RECOMMENDED] Continue without specifying a path. (Defaults to `code.exe`)');
+  SetArrayLength(PathValues, Length(PathValues) + 1);
+  PathValues[High(PathValues)] := 'NO_PATH';
+  
+  // Add "Custom path" option
+  Page.Add('Specify a custom path to `Code.exe`...');
+  SetArrayLength(PathValues, Length(PathValues) + 1);
+  PathValues[High(PathValues)] := 'CUSTOM_PATH';
+  
+
+  // Optionally preselect the first one
+  if Page.CheckListBox.Items.Count > 0 then
+    Page.SelectedValueIndex := 0;
+    
+  Page.CheckListBox.Height := ScaleY(128); // adjust height as needed
+    
+    
+  pathEditLabel := TLabel.Create(WizardForm);
+  pathEditLabel.Parent := Page.Surface;
+  pathEditLabel.Left := 20;
+  pathEditLabel.Top := Page.Surface.Top + Page.Surface.Height + 4;
+  pathEditLabel.Width := Page.Surface.Width;
+  pathEditLabel.Caption := 'Enter Custom Path:';
+  pathEditLabel.Font.Color := $FF000000;  // amber
+  
+  // Create an edit box for the custom path
+  CustomPathEdit := TEdit.Create(WizardForm);
+  CustomPathEdit.Parent := Page.Surface;
+  CustomPathEdit.Left := 20;
+  CustomPathEdit.Top := pathEditLabel.Top + pathEditLabel.Height;
+  CustomPathEdit.Width := Page.Surface.Width;
+  CustomPathEdit.Enabled := False;  // initially disabled
+  
+  PathWarningLabel := TLabel.Create(WizardForm);
+  PathWarningLabel.Parent := Page.Surface;
+  PathWarningLabel.Left := CustomPathEdit.Left;
+  PathWarningLabel.Top := CustomPathEdit.Top + CustomPathEdit.Height + 4;
+  PathWarningLabel.Width := CustomPathEdit.Width;
+  PathWarningLabel.Caption := '';
+  PathWarningLabel.Visible := False;
+  
+  CustomPathEdit.OnChange := @CustomPathValidator;
+  
+  // Enable the edit box only when the last radio button is selected
+  Page.CheckListBox.OnClickCheck := @PageClickHandler;       
+end;
+
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  validator: Integer;
+  userchoice: Integer;
+begin
+  Result := True;
+  if CurPageID = Page.ID then
+  begin
+    if Page.SelectedValueIndex >= 0 then
+    begin
+      SelectedPath := PathValues[Page.SelectedValueIndex];
+      if SelectedPath = 'CUSTOM_PATH' then
+        begin
+        SelectedPath := CustomPathEdit.Text;
+        validator := PathValidator(SelectedPath);
+        if validator = 0 then
+          begin
+          userchoice := MsgBox(
+            'Path does not appear valid (Expected `*/Code.exe`). Are you sure you want to continue? [NOT RECOMMENDED]' + #13#10 + '`' + SelectedPath + '`', 
+             mbError, MB_YESNO or MB_DEFBUTTON2);
+          if userchoice = IDNO then
+          begin
+            Log('in here bro');
+            Result := False;
+          end;
+          end
+        else if validator = 1 then
+          begin
+          Log('Path is ok :' + SelectedPath);
+          end
+        else if validator = 2 then
+          begin
+          userchoice := MsgBox(
+            'Path does not exist, are you sure you want to continue? [NOT RECOMMENDED]' + #13#10 + '`' + SelectedPath + '`', 
+            mbError, MB_YESNO or MB_DEFBUTTON2);
+          if userchoice = IDNO then
+            begin
+            Log('in here bro 2');
+            Result := False;
+            end;
+          end;
+         end
+      else
+        begin
+        Log('User selected VS Code path: ' + SelectedPath);
+        // MsgBox('User selected VS Code path: ' + SelectedPath, mbError, MB_OK);
+        Result := True;
+        end;
+    end
+    else
+    begin
+      MsgBox('Please select a VS Code installation before continuing.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+
+procedure UpdateConfigFile(NewPath: String);
+var
+  ConfigLines: TStringList;
+  i: Integer;
+  path: String;
+begin
+  Log('updating config file...');
+  ConfigLines := TStringList.Create;
+  path := NewPath;
+  StringChange(path, '\', '/');
+  try
+    ConfigLines.LoadFromFile(ExpandConstant('{app}\config.toml'));
+
+    for i := 0 to ConfigLines.Count - 1 do
+    begin
+      if Pos('VSCODE_PATH =', ConfigLines[i]) = 1 then
+      begin
+        ConfigLines[i] := 'VSCODE_PATH = "' + path + '"';
+      end;
+    end;
+
+    ConfigLines.SaveToFile(ExpandConstant('{app}\config.toml'));
+  except
+    MsgBox('Failed to update config.toml with new path. You may encounter errors which instruct you how to fix this manually if there are issues.', mbError, MB_OK)
+  finally
+    ConfigLines.Free;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
+    UpdateConfigFile(SelectedPath);
     NotifyEnvironmentChange;
+  end;
 end;
+
