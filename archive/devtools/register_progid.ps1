@@ -1,1 +1,0 @@
-Start-Process powershell -ArgumentList "-Command", "cd 'C:\Users\Daniel Evans\projects\xlpro'; './.venv/scripts/python xlpro_async/register_progid.py'; Start-Sleep -Seconds 0.5" -Verb RunAs

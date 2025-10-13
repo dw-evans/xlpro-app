@@ -1,1 +1,0 @@
-cd "C:\Users\Daniel Evans\projects\xlpro"; ./.venv/scripts/python xlpro_async/run_server.py
