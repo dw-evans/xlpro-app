@@ -59,5 +59,3 @@ from xlpro._types import (
     xlproCollapsedType,
     xlproImage,
 )
-
-

@@ -1,6 +1,10 @@
 import os
 import msvcrt
 import _winapi
+import psutil
+from ctypes.wintypes import HANDLE, DWORD, LPCWSTR
+from pathlib import Path
+import sys
 
 CREATE_NEW                  = 1
 CREATE_ALWAYS               = 2
@@ -38,19 +42,18 @@ _CREATE_MAP  = {0                                   : OPEN_EXISTING,
                 os.O_CREAT | os.O_TRUNC             : CREATE_ALWAYS}
 
 
-def os_open(file, flags, mode=0o777,
-            *, share_flags=FILE_SHARE_VALID_FLAGS):
-    '''
+def os_open(file, flags, mode=0o777, *, share_flags=FILE_SHARE_VALID_FLAGS):
+    """
     Replacement for os.open() allowing moving or unlinking before closing
-    '''
+    """
     if not isinstance(flags, int) and mode >= 0:
-        raise ValueError('bad flags: %r' % flags)
+        raise ValueError("bad flags: %r" % flags)
 
     if not isinstance(mode, int) and mode >= 0:
-        raise ValueError('bad mode: %r' % mode)
+        raise ValueError("bad mode: %r" % mode)
 
     if share_flags & ~FILE_SHARE_VALID_FLAGS:
-        raise ValueError('bad share_flags: %r' % share_flags)
+        raise ValueError("bad share_flags: %r" % share_flags)
 
     access_flags = _ACCESS_MAP[flags & _ACCESS_MASK]
     create_flags = _CREATE_MAP[flags & _CREATE_MASK]
@@ -73,19 +76,14 @@ def os_open(file, flags, mode=0o777,
     if flags & os.O_RANDOM:
         attrib_flags |= FILE_FLAG_RANDOM_ACCESS
 
-    h = _winapi.CreateFile(file, access_flags, share_flags, NULL,
-                           create_flags, attrib_flags, NULL)
+    h = _winapi.CreateFile(file, access_flags, share_flags, NULL, create_flags, attrib_flags, NULL)
     return msvcrt.open_osfhandle(h, flags | os.O_NOINHERIT)
 
 
-import psutil
-from ctypes.wintypes import HANDLE, DWORD, LPCWSTR
-import ctypes
-
-def write_to_file(handle, data:str):
+def write_to_file(handle, data: str):
     """Writes data to the file associated with the given handle."""
     # Prepare data for writing
-    buffer = data.encode('utf-8')
+    buffer = data.encode("utf-8")
     # buffer = ctypes.create_string_buffer((data).encode('utf-8'))  # Convert string to bytes
     # bytes_written = DWORD(0)  # To store the number of bytes written
 
@@ -99,7 +97,8 @@ def write_to_file(handle, data:str):
     return rc
     # return bytes_written.value
 
-def acquire_file_and_write_datas(file_path, guid:str, debugpy_port:int):
+
+def acquire_file_and_write_datas(file_path, guid: str, debugpy_port: int):
     """Try to acquire an exclusive lock on the file."""
     handle = _winapi.CreateFile(
         file_path,
@@ -110,52 +109,47 @@ def acquire_file_and_write_datas(file_path, guid:str, debugpy_port:int):
         FILE_ATTRIBUTE_NORMAL,
         0,
     )
-    
+
     write_to_file(handle, f"pid={str(os.getpid())}\n")
     write_to_file(handle, f"guid={guid}\n")
     write_to_file(handle, f"debugpy_port={debugpy_port}\n")
 
     return handle
 
+
 def close_file(handle):
     pass
     _winapi.CloseHandle(handle)
 
+
 import re
+
 
 def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
     """Check if a process holding the lock is still running."""
     try:
-        with open(lock_file, 'r') as f:
-            contents = f.read().strip() 
+        with open(lock_file, "r") as f:
+            contents = f.read().strip()
 
             pid = int(re.search("pid=(.+)$", contents, re.MULTILINE).group(1))
             guid = re.search("guid=(.+)$", contents, re.MULTILINE).group(1)
             debugpy_port = re.search("debugpy_port=(.+)$", contents, re.MULTILINE).group(1)
-            
+
             if psutil.pid_exists(pid):
                 # Process is still running
                 return {
-                    "pid": pid, 
+                    "pid": pid,
                     "guid": guid,
-                    "debugpy_port":debugpy_port,
+                    "debugpy_port": debugpy_port,
                 }
     except (ValueError, FileNotFoundError):
         pass
     return {}
 
-from pathlib import Path
-import sys
 
-def get_xlpro_lockfile_path_parent(interpreter_path:Path=None) -> Path:
+def get_xlpro_lockfile_path_parent(interpreter_path: Path = None) -> Path:
     if interpreter_path is not None:
         xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
     else:
         xlpro_dir = Path(sys.executable).parent.parent.parent / ".xlpro"
     return xlpro_dir
-
-    
-
-
-
-

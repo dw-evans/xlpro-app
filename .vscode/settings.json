@@ -14,4 +14,9 @@
     // "python.autoComplete.extraPaths": [
     //     "C:/Users/Daniel Evans/projects/win32typelibs"
     // ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "black-formatter.args": ["--line-length", "256"]
+
 }

@@ -25,6 +25,7 @@ disable_quickedit()
 
 import os
 import ctypes
+
 def enable_ansi_escape_codes_in_console():
     # Enable ANSI escape codes (24-bit color)
     kernel32 = ctypes.windll.kernel32
@@ -37,23 +38,21 @@ enable_ansi_escape_codes_in_console()
 
 
 from pathlib import Path
-
-import threading
 import asyncio
-
 import pythoncom
-import win32com.client
 import win32com.server.util
 import win32com.server.policy
 import win32api
 import pywintypes
 import win32event
 import argparse
-
-
 import sys
 import os
 import logging
+import psutil
+import debugpy
+import contextlib
+import io
 
 from xlpro import config
 
@@ -62,12 +61,7 @@ config = config.load()
 from xlpro.server import xlproServer
 from xlpro import file_lock
 from xlpro import _utils
-import psutil
 from xlpro import errors
-import debugpy
-
-import contextlib
-import io
 
 
 @contextlib.contextmanager
@@ -76,11 +70,6 @@ def suppress_output():
         yield
 
 wd = Path(__file__).parent
-
-# __logging_dir = Path(config.logging_path).parent
-# if not __logging_dir.exists():
-#     __logging_dir.mkdir(parents=True, exist_ok=True)
-
 
 logging.basicConfig(
     # filename= wd / 'log.log',   # The file where logs will be saved
@@ -95,29 +84,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-# from rich.logging import RichHandler
-
-# # Basic configuration for logging
-# logging.basicConfig(
-#     level="DEBUG",  # or INFO, WARNING, etc.
-#     format="%(message)s",
-#     datefmt="[%X]",
-#     handlers=[RichHandler()]
-# )
-
-# logger = logging.getLogger("rich_logger")
-
-
-# # Create a handler to output logs to stdout
-# handler = logging.StreamHandler(sys.stdout)
-# handler.setLevel(logging.DEBUG)  # Set the handler's log level
-
-# # Create a formatter and attach it to the handler
-# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# handler.setFormatter(formatter)
-
-# # Add the handler to the logger
-# logger.addHandler(handler)
 
 # the background loop to keep the process alive
 loop = asyncio.new_event_loop()
@@ -192,19 +158,12 @@ def serve():
 
     """
     print(f"{s}")
-    # from rich import print
-    # print(f"{s}", style="#526cfe")
 
     logger.info(f"Starting xlpro server...")
     logger.info(f"Server parameters: CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
     logger.debug(f"xlpro.run_server.main() being run with CLSID='{CLSID}', DEBUGPY_PORT={DEBUGPY_PORT}, WORKBOOK_NAME='{WORKBOOK_NAME}'")
 
-    # logger.debug(f"serve() being run at root directory: {os.getcwd()}")
-
     debugpy.listen(('localhost', DEBUGPY_PORT))
-    # import time
-    # time.sleep(20)
-
     # debugpy.wait_for_client()
 
     logger.info(f"Ready to receive connection to debugger at {("localhost", DEBUGPY_PORT)}...")
@@ -216,7 +175,6 @@ def serve():
         xlpro_lock_fp.parent.mkdir()
 
     pass
-    # global PARENT_PID
     global SERVER
     try:
         lock_file_handle = file_lock.acquire_file_and_write_datas(str(xlpro_lock_fp), guid=CLSID, debugpy_port=DEBUGPY_PORT)
@@ -278,12 +236,10 @@ def serve():
     logger.debug(f"xlpro server starting on PID: {os.getpid()}")
     SERVER = xlproServer()
 
-    # print("XLPROSTART_TRIGGER_OK")
     logger.info("Startup OK, ready for synchronisation. Sending signal")
     sys.stderr.write("XLPROSTART_TRIGGER_OK\n")
     sys.stderr.flush()
-    # sys.stdout.write("XLPROSTART_TRIGGER_OK\n")
-    # sys.stdout.flush()
+
     logger.info("Signal sent.")
 
     def tidy_up_lock_file():
@@ -333,33 +289,21 @@ def serve():
 
     logger.info("Graceful shutdown. Program exiting...")
     input("Press Enter to exit")
-    sys.exit(1)
-
-
-# def press_enter_to_exit_timeout(timeout_sec=60):
-#     def wait_and_close():
-#         logger.info("Timing out in")
+    sys.exit(0)
 
 
 def main():
     try:
-
-        # global PARENT_PID
         global DEBUGPY_PORT
         global CLSID
         global WORKBOOK_NAME
 
         parser = argparse.ArgumentParser(description="Run the xlpro COM server.")
         
-        # default_clsid = '{122BB48A-57EF-4775-A28C-3F71ED0D02A7}'
-
         parser.add_argument("--workbook_path", type=str, required=True, help="The workbook")
-        # parser.add_argument("--guid", type=str, required=False, help="The CLSID to run the server on", default=default_clsid)
         parser.add_argument("--debugpy_port", type=int, required=True, help="The port to configure for debugpy debugging")
-        # parser.add_argument("--parent_pid", type=int, required=False, help="The parent pid of the process for the script to monitor", default=None)
 
         args = parser.parse_args()
-        # PARENT_PID = args.parent_pid
         DEBUGPY_PORT = args.debugpy_port
         CLSID = pythoncom.CreateGuid()
         WORKBOOK_NAME = Path(args.workbook_path).name

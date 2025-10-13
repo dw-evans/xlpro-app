@@ -1,5 +1,3 @@
-
-
 RESERVED_VBA_NAMES = {
     "and",
     "as",

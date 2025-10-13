@@ -8,17 +8,20 @@ import re
 from dataclasses import dataclass, field
 from win32com.client import GetActiveObject, Dispatch
 import pythoncom
+
 # from win32typelibs import excel as xl
 from pathlib import Path
 import pandas as pd
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class TypeStrEnums:
     LIST1D = "list1d"
     LIST2D = "list2d"
     NDARRAY1D = "ndarray1d"
     NDARRAY2D = "ndarray2d"
+
 
 list1d = typing.Annotated[list[T], TypeStrEnums.LIST1D]
 list2d = typing.Annotated[list[list[T]], TypeStrEnums.LIST2D]
@@ -35,26 +38,27 @@ STR_TO_TYPE_MAP = {
 
 if typing.TYPE_CHECKING:
     from win32typelibs import excel as xl
+
     # xlRange = typing.Annotated['xl.Range', "xlRange"]
     # xlWorkbook = typing.Annotated['xl._Workbook', "xlWorkbook"]
     # xlWorksheet = typing.Annotated['xl._Worksheet', "xlWorksheet"]
 
     # give the user options for this, active, workbook/sheet for initial values
-    # xlThisWorkbook = 
-    # xlActiveWorkbook = 
-    # xlActiveSheet = 
+    # xlThisWorkbook =
+    # xlActiveWorkbook =
+    # xlActiveSheet =
 
 else:
     # xl class for type hint namespace use.
     class xl:
-        Range = typing.ForwardRef('xl.Range')
-        _Workbook = typing.ForwardRef('xl._Workbook')
-        _Worksheet = typing.ForwardRef('xl._Worksheet')
+        Range = typing.ForwardRef("xl.Range")
+        _Workbook = typing.ForwardRef("xl._Workbook")
+        _Worksheet = typing.ForwardRef("xl._Worksheet")
 
-xlRange = typing.Annotated['xl.Range', "xlRange"]
-xlWorkbook = typing.Annotated['xl._Workbook', "xlWorkbook"]
-xlWorksheet = typing.Annotated['xl._Worksheet', "xlWorksheet"]
 
+xlRange = typing.Annotated["xl.Range", "xlRange"]
+xlWorkbook = typing.Annotated["xl._Workbook", "xlWorkbook"]
+xlWorksheet = typing.Annotated["xl._Worksheet", "xlWorksheet"]
 
 
 def _get_ndarray_annotated_dtype(_t):
@@ -64,11 +68,13 @@ def _get_ndarray_annotated_dtype(_t):
     _dtype = None if _dtype == T else _dtype
     return _dtype
 
+
 def _get_list1d_annotated_dtype(_t):
     _args = typing.get_args(_t)[0]
     _dtype = typing.get_args(_args)[0]
     _dtype = None if _dtype == T else _dtype
     return _dtype
+
 
 def _get_list2d_annotated_dtype(_t):
     _args = typing.get_args(_t)[0]
@@ -89,6 +95,7 @@ def _get_generic_dtype(_t):
 def _is_annotated_type(tp) -> bool:
     return typing.get_origin(tp) is typing.Annotated
 
+
 def _is_generic_alias_type(tp) -> bool:
     return isinstance(tp, typing.GenericAlias)
 
@@ -100,28 +107,28 @@ class xlproptr:
     within this class using the decode method.
     """
 
-    wb_path:str
-    ws_name:str
-    rng_addr:str
-    
+    wb_path: str
+    ws_name: str
+    rng_addr: str
+
     def __post_init__(self):
         # XXX - todo - implement validation for xlproptr
         pass
 
     def __repr__(self):
         return f"xlproptr({self.wb_path}::{self.ws_name}::{self.rng_addr})"
-    
+
     def __str__(self):
         return self.__repr__()
 
     @classmethod
-    def decode(cls, s:str):
+    def decode(cls, s: str):
         """Primary entry point into class"""
         mtch = re.search(r"^\*\<(.+)::(.+)::(.+)\>", s)
         return cls(*mtch.groups())
-    
+
     @staticmethod
-    def is_ptr(s:str):
+    def is_ptr(s: str):
         """Crude check for a valid ptr"""
         if not isinstance(s, str):
             return False
@@ -130,14 +137,14 @@ class xlproptr:
             return True
         except Exception:
             return False
-    
+
     # def evaluate(self, wb_stream):
     def evaluate(self):
         """Evaluates the cell pointer's value. Returns 2d array for ranges, or a value for
         a 1x1 range object.
         For reliability, the calling workbook is passed so we ensure we don't spin up a new
         excel session.
-        Workflow will be to overwrite the argument if xlproptr.is_ptr(arg) -> 
+        Workflow will be to overwrite the argument if xlproptr.is_ptr(arg) ->
         i.e. pparg = xlproptr.decode(arg)
              args[arg_idx] = pparg
              kwargs[arg_key] = pparg
@@ -169,32 +176,32 @@ class xlproptr:
             pass
             raise e
 
-    
     # if any array argument arrives as a string, a pre-process step should be used
     # to evaluate the range.
 
 
 @dataclass
 class xlproImage:
-    fp:Path
-    xl_size:Iterable[float]
-    xl_name:str
+    fp: Path
+    xl_size: Iterable[float]
+    xl_name: str
+
 
 import pywintypes
+
 
 # XXX - todo - apparently this is sensitive to imports...
 # type checking broke when I refactored, presumably changed the origin of some of the objects?
 class ExcelArrayConverter:
     """Excel will convert ranges to 2d tuple arrays. Use this class to convert
     2d arrays into a user-specified type before the user's code receives it.
-    
+
     The user should only require up to 2d data with float, int, str and maybe
     boolean types so we can implement this custom logic confidently.
     """
 
-    def __new__(cls, val:Any, tdst:type):
+    def __new__(cls, val: Any, tdst: type):
 
-        
         dtype = None
         # if annotated type is provided, get the base type
         if _is_annotated_type(tdst):
@@ -243,7 +250,7 @@ class ExcelArrayConverter:
             dtype = _get_list1d_annotated_dtype(tdst)
         elif tdstnew == list2d:
             dtype = _get_list2d_annotated_dtype(tdst)
-            
+
         # handle the list/ndarray GenericAlias casees
         elif tdstnew == list:
             if _is_generic_alias_type(tdst):
@@ -255,7 +262,7 @@ class ExcelArrayConverter:
                 dtype = _get_generic_dtype(tdst)
             elif tdst == np.ndarray:
                 dtype = None
-        
+
         def handle_ndarray1d(val, dtype):
             intermediate = np.array(val, dtype=dtype)
             shape = intermediate.shape
@@ -271,7 +278,7 @@ class ExcelArrayConverter:
             if (not len(shape) == 1) and (all([x > 1 for x in shape])):
                 raise TypeError(f"Provided value is not compatible with {tdstnew}")
             return intermediate.flatten().tolist()
-        
+
         def handle_ndarray2d(val, dtype):
             intermediate = np.array(val, dtype=dtype)
             # convert to a 2d
@@ -283,11 +290,11 @@ class ExcelArrayConverter:
             else:
                 raise TypeError(f"Cannot convert shape {shape} to ndarray2d")
             return ret
-        
+
         def handle_ndarray(val, dtype):
             intermediate = np.array(val, dtype=dtype)
             return intermediate
-        
+
         def handle_list(val, dtype):
             intermediate = np.array(val, dtype=dtype)
             return intermediate.tolist()
@@ -308,17 +315,16 @@ class ExcelArrayConverter:
 
         elif tdstnew == list:
             newval = handle_list(val=val, dtype=dtype)
-            
+
         elif tdstnew == np.ndarray:
             newval = handle_ndarray(val=val, dtype=dtype)
-    
+
         elif tdstnew == typing.Any:
             newval = val
         else:
             raise TypeError(f"Type {tdstnew} is too complicated or not supported for coersion.")
 
         return newval
-
 
     @classmethod
     def _convert_back_to_range_format(cls, val):
@@ -335,11 +341,13 @@ class ExcelArrayConverter:
                 return [val]
 
         return val
-    
+
 
 class xlproExpandedType:
     """Class to signal that an array is to be expanded, overwrites xlproCollapsedType"""
+
     oned_direction_rowwise = True
+
     def __init__(self, arraydata):
         if isinstance(arraydata, (xlproCollapsedType, xlproExpandedType)):
             arraydata = arraydata.data
@@ -348,14 +356,14 @@ class xlproExpandedType:
 
 class xlproCollapsedType:
     """Wrapper class that signals a result to forcibly be collapsed, overwrites xlproExpandedType"""
+
     def __init__(self, arraydata):
         if isinstance(arraydata, (xlproCollapsedType, xlproExpandedType)):
             arraydata = arraydata.data
         self.data = arraydata
 
 
-
-if __name__ == "__main__":
+def tests():
     # r1  = ExcelArrayConverter(((1, 2,),), list1d)
     # print(f"r1={r1}")
     # r2  = ExcelArrayConverter(((1, 2,),), list2d)
@@ -386,56 +394,61 @@ if __name__ == "__main__":
     # print(f"r15={r15}, dtype={r15.dtype}")
     i = 0
     results = []
-    val = ((1.5, 2.5,),)
+    val = (
+        (
+            1.5,
+            2.5,
+        ),
+    )
 
     # t = ndarray1d
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = ndarray2d
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = ndarray1d[np.int32]
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = ndarray2d[np.int32]
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = list1d
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = list2d
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = list1d[int]
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     # t = list2d[int]
     # r = ExcelArrayConverter(val, t)
     # print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
     # results.append(r)
     # i += 1
-    
+
     t = np.ndarray[np.int32]
     r = ExcelArrayConverter(val, t)
     print(f"t={t} r{i}={r}, dtype={getattr(r, 'dtype', 'N/A')}")
@@ -450,6 +463,5 @@ if __name__ == "__main__":
 
     pass
 
-
-pass
-
+if __name__ == "__main__":
+    tests()

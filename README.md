@@ -11,3 +11,5 @@ Create new release in `xlpro_releases`
 Tag release in `xlpro_releases`
 
 Upload installer binary to `xlpro_releases` releases page on GitHub.
+
+Push new version link and change notes to to website.
