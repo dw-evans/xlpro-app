@@ -5,41 +5,42 @@ import psutil
 from ctypes.wintypes import HANDLE, DWORD, LPCWSTR
 from pathlib import Path
 import sys
+import re
 
-CREATE_NEW                  = 1
-CREATE_ALWAYS               = 2
-OPEN_EXISTING               = 3
-OPEN_ALWAYS                 = 4
-TRUNCATE_EXISTING           = 5
-FILE_SHARE_READ             = 0x00000001
-FILE_SHARE_WRITE            = 0x00000002
-FILE_SHARE_DELETE           = 0x00000004
-FILE_SHARE_VALID_FLAGS      = 0x00000007
-FILE_ATTRIBUTE_READONLY     = 0x00000001
-FILE_ATTRIBUTE_NORMAL       = 0x00000080
-FILE_ATTRIBUTE_TEMPORARY    = 0x00000100
-FILE_FLAG_DELETE_ON_CLOSE   = 0x04000000
-FILE_FLAG_SEQUENTIAL_SCAN   = 0x08000000
-FILE_FLAG_RANDOM_ACCESS     = 0x10000000
-GENERIC_READ                = 0x80000000
-GENERIC_WRITE               = 0x40000000
-DELETE                      = 0x00010000
-NULL                        = 0
+CREATE_NEW = 1
+CREATE_ALWAYS = 2
+OPEN_EXISTING = 3
+OPEN_ALWAYS = 4
+TRUNCATE_EXISTING = 5
+FILE_SHARE_READ = 0x00000001
+FILE_SHARE_WRITE = 0x00000002
+FILE_SHARE_DELETE = 0x00000004
+FILE_SHARE_VALID_FLAGS = 0x00000007
+FILE_ATTRIBUTE_READONLY = 0x00000001
+FILE_ATTRIBUTE_NORMAL = 0x00000080
+FILE_ATTRIBUTE_TEMPORARY = 0x00000100
+FILE_FLAG_DELETE_ON_CLOSE = 0x04000000
+FILE_FLAG_SEQUENTIAL_SCAN = 0x08000000
+FILE_FLAG_RANDOM_ACCESS = 0x10000000
+GENERIC_READ = 0x80000000
+GENERIC_WRITE = 0x40000000
+DELETE = 0x00010000
+NULL = 0
 
 _ACCESS_MASK = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
-_ACCESS_MAP  = {os.O_RDONLY : GENERIC_READ,
-                os.O_WRONLY : GENERIC_WRITE,
-                os.O_RDWR   : GENERIC_READ | GENERIC_WRITE}
+_ACCESS_MAP = {os.O_RDONLY: GENERIC_READ, os.O_WRONLY: GENERIC_WRITE, os.O_RDWR: GENERIC_READ | GENERIC_WRITE}
 
 _CREATE_MASK = os.O_CREAT | os.O_EXCL | os.O_TRUNC
-_CREATE_MAP  = {0                                   : OPEN_EXISTING,
-                os.O_EXCL                           : OPEN_EXISTING,
-                os.O_CREAT                          : OPEN_ALWAYS,
-                os.O_CREAT | os.O_EXCL              : CREATE_NEW,
-                os.O_CREAT | os.O_TRUNC | os.O_EXCL : CREATE_NEW,
-                os.O_TRUNC                          : TRUNCATE_EXISTING,
-                os.O_TRUNC | os.O_EXCL              : TRUNCATE_EXISTING,
-                os.O_CREAT | os.O_TRUNC             : CREATE_ALWAYS}
+_CREATE_MAP = {
+    0: OPEN_EXISTING,
+    os.O_EXCL: OPEN_EXISTING,
+    os.O_CREAT: OPEN_ALWAYS,
+    os.O_CREAT | os.O_EXCL: CREATE_NEW,
+    os.O_CREAT | os.O_TRUNC | os.O_EXCL: CREATE_NEW,
+    os.O_TRUNC: TRUNCATE_EXISTING,
+    os.O_TRUNC | os.O_EXCL: TRUNCATE_EXISTING,
+    os.O_CREAT | os.O_TRUNC: CREATE_ALWAYS,
+}
 
 
 def os_open(file, flags, mode=0o777, *, share_flags=FILE_SHARE_VALID_FLAGS):
@@ -120,9 +121,6 @@ def acquire_file_and_write_datas(file_path, guid: str, debugpy_port: int):
 def close_file(handle):
     pass
     _winapi.CloseHandle(handle)
-
-
-import re
 
 
 def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:

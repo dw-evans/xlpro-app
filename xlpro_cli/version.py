@@ -1,9 +1,8 @@
-
-
 import datetime
 import xlpro
 
 __version__ = f"{xlpro.__version__}.0"
+
 
 class VersionInfo:
     VERSION = __version__
@@ -12,16 +11,19 @@ class VersionInfo:
     AUTHOR = "D. Evans"
     DATE = datetime.datetime.now().strftime("%Y-%m-%d")
     DESCRIPTION_SHORT = "xlpro Command Line Interface"
-    COMPANY_NAME="D. Evans"
+    COMPANY_NAME = "D. Evans"
+
 
 import pyinstaller_versionfile
 
 from pathlib import Path
+
 wd = Path(__file__).parent
+
 
 def create_version_file_get_path() -> str:
     pyinstaller_versionfile.create_versionfile(
-        output_file=(ret:=(wd / "version.txt")),
+        output_file=(ret := (wd / "version.txt")),
         version=VersionInfo.VERSION,
         company_name=VersionInfo.COMPANY_NAME,
         file_description=VersionInfo.DESCRIPTION_SHORT,
@@ -31,5 +33,6 @@ def create_version_file_get_path() -> str:
         product_name=VersionInfo.NAME,
     )
     return str(ret)
+
 
 pass

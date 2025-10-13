@@ -8,6 +8,7 @@ wd = Path(__file__).parent
 # version = re.search(r"__version__\s*=\s*['\"](.+)['\"]", version_file).group(1)
 
 import xlpro
+
 version = xlpro.__version__
 
 # Replace version in pyproject.toml
