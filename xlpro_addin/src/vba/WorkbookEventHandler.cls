@@ -2,7 +2,7 @@ VERSION 1.0 CLASS
 BEGIN
   MultiUse = -1  'True
 END
-Attribute VB_Name = "CWorkbookEventHandler"
+Attribute VB_Name = "WorkbookEventHandler"
 
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
@@ -11,7 +11,7 @@ Attribute VB_Exposed = True
 
 
 
-' Class Module: CWorkbookEventHandler
+' Class Module: WorkbookEventHandler
 Option Explicit
 
 Public WithEvents Wb As Workbook

@@ -2,7 +2,7 @@ VERSION 1.0 CLASS
 BEGIN
   MultiUse = -1  'True
 END
-Attribute VB_Name = "clsUndoItem"
+Attribute VB_Name = "UndoItem"
 
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
@@ -10,7 +10,7 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = True
 
 
-' Class Module: clsUndoItem
+' Class Module: UndoItem
 Option Explicit
 
 Public WorkbookName As String

@@ -1,10 +1,10 @@
 Option Explicit
 
 ' Declare a module-level variable to hold the instance of the event handler class
-Dim ehandler As xlproEventHandler
+Dim ehandler As XlproEventHandler
 
 Sub ResetEventHandler()
-    Set ehandler = New xlproEventHandler
+    Set ehandler = New XlproEventHandler
     Debug.Print "xlpro Event handler initialized for the add-in."
     Call initialize_workbook_guid_map
 End Sub

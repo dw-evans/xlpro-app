@@ -1,4 +1,4 @@
-Attribute VB_Name = "modUtils"
+Attribute VB_Name = "utils"
 
 Option Explicit
 

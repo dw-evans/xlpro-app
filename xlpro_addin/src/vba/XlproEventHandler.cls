@@ -2,7 +2,7 @@ VERSION 1.0 CLASS
 BEGIN
   MultiUse = -1  'True
 END
-Attribute VB_Name = "xlproEventHandler"
+Attribute VB_Name = "XlproEventHandler"
 
 
 Attribute VB_GlobalNameSpace = False
@@ -18,7 +18,7 @@ Private Sub Class_Initialize()
     Set app = Application ' Initialize the app variable
     Set workbookHandlers = New Collection
 
-    Debug.Print "Initializing xlproEventHandler"
+    Debug.Print "Initializing XlproEventHandler"
 
     ' Attach to already open workbooks (doubt this affects anything if we auto-load xlpro.xlam)
     Dim Wb As Workbook
@@ -39,8 +39,8 @@ End Sub
 
 Public Sub AttachToWorkbook(Wb As Workbook)
     ' Attach the event handler to a workbook.
-    Dim wbHandler As CWorkbookEventHandler
-    Set wbHandler = New CWorkbookEventHandler
+    Dim wbHandler As WorkbookEventHandler
+    Set wbHandler = New WorkbookEventHandler
     Set wbHandler.Wb = Wb
     Debug.Print "Creating new xlpro workbook event handler for " & Wb.Name & "..."
     workbookHandlers.Add wbHandler, Wb.name

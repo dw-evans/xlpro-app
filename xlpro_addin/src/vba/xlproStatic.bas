@@ -1,4 +1,4 @@
-Attribute VB_Name = "xlpro_static"
+Attribute VB_Name = "xlproStatic"
 
 Option Explicit
 

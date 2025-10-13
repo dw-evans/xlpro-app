@@ -1,4 +1,4 @@
-Attribute VB_Name = "modUndoEntryPoint"
+Attribute VB_Name = "undoEntryPoint"
 
 Option Explicit
 

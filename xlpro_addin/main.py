@@ -154,13 +154,13 @@ def build():
     vba_files = list(vba_src_dir.glob("*.bas")) + list(vba_src_dir.glob("*.cls"))
 
     valid_file_stems = [
-        "xlpro_static",
+        "xlprostatic",
         "xlproeventhandler",
         "undomanager",
-        "modundoentrypoint",
-        "cworkbookeventhandler",
-        "clsundoitem",
-        "modutils",
+        "undoentrypoint",
+        "workbookeventhandler",
+        "undoitem",
+        "utils",
     ]
 
     for file in vba_files:

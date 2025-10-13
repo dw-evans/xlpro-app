@@ -45,8 +45,8 @@ Public Sub TrackChange( _
 
     ' ByVal changeType As ChangeCategory,
 
-    Dim item As clsUndoItem
-    Set item = New clsUndoItem
+    Dim item As UndoItem
+    Set item = New UndoItem
     item.WorkbookName = Wb.name
     item.WorksheetName = ws.name
     item.RangeAddress = TargetRange.Address
@@ -84,8 +84,8 @@ Public Sub RevertChange()
     
     EnumPointer = EnumPointer - 1
 
-    Dim item As clsUndoItem
-    Set item = New clsUndoItem
+    Dim item As UndoItem
+    Set item = New UndoItem
 
     Set item = UndoStack(EnumPointer)
 
@@ -116,8 +116,8 @@ Public Sub ImplementChange()
     
 
 
-    Dim item As clsUndoItem
-    Set item = New clsUndoItem
+    Dim item As UndoItem
+    Set item = New UndoItem
 
     Set item = UndoStack(EnumPointer)
 
