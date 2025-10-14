@@ -61,11 +61,11 @@
       },
 
       {
-        "label": "xlpro_installer pre_build",
+        "label": "xlpro_installer_inno pre_pre_build",
         "type": "shell",
         "command": "${workspaceFolder}/.venv/scripts/python.exe",
         "args": [
-          "pre_build.py"
+          "pre_pre_build.py"
         ],
         "group": {
           "kind": "build",
@@ -73,54 +73,10 @@
         },
         "problemMatcher": [],
         "options": {
-          "cwd": "${workspaceFolder}/xlpro_installer"
+          "cwd": "${workspaceFolder}/xlpro_installer_inno"
         }
       },
 
-      {
-        "label": "xlpro_installer pre_build and install",
-        "type": "shell",
-        "command": "${workspaceFolder}/.venv/scripts/python.exe",
-        "args": [
-          "main.py"
-        ],
-        "group": {
-          "kind": "build",
-          "isDefault": false
-        },
-        "dependsOn": [
-          "xlpro_installer pre_build"
-        ],
-        "dependsOrder": "sequence",
-        "problemMatcher": [],
-        "options": {
-          "cwd": "${workspaceFolder}/xlpro_installer"
-        }
-      },
-      {
-        "label": "xlpro_installer_inno complete_build",
-        "type": "shell",
-        "command": "${workspaceFolder}/.venv/scripts/pyinstaller.exe",
-        "args": [
-          "main.spec"
-        ],
-        "group": {
-          "kind": "build",
-          "isDefault": false
-        },
-        "dependsOn": [
-          "xlpro_addin compile and push",
-          "xlpro_module build wheel",
-          "xlpro_cli build",
-          "xlpro_shell_wrapper go build xlpro-server",
-          "xlpro_installer pre_build"
-        ],
-        "dependsOrder": "sequence",
-        "problemMatcher": [],
-        "options": {
-          "cwd": "${workspaceFolder}/xlpro_installer"
-        }
-      },
       {
         "label": "xlpro_addin compile and push",
         "type": "shell",
@@ -175,7 +131,9 @@
         "problemMatcher": [],
         "options": {
           "cwd": "${workspaceFolder}/xlpro_installer_inno"
-        }
+        },
+        "dependsOn": [],
+        "dependsOrder": "sequence",
       },
 
       {
@@ -194,7 +152,7 @@
           "cwd": "${workspaceFolder}/xlpro_installer_inno"
         },
         "dependsOn": [
-          "xlpro_installer pre_build",
+          "xlpro_installer_inno pre_pre_build",
           "xlpro_installer_inno pre_build"
         ],
         "dependsOrder": "sequence",

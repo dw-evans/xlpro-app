@@ -1567,7 +1567,7 @@ import xlpro.config
 
 CONFIG = xlpro.config.load()
 
-if CONFIG.MULTI_SERVER_EXPERIEMENT:
+if CONFIG.MULTI_SERVER_EXPERIMENT:
     logger.info("User has selected MULTI_SERVER_EXPERIMENT")
     logger.warning("MULTI_SERVER_EXPERIMENT behaviour is experimental")
     XLAPP_LOCK = FileLock((Path(sys.executable) / "../../../../../xlapp.lock").resolve())

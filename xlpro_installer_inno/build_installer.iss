@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "xlpro"
-#define MyAppVersion "0.0.8"
+#define MyAppVersion "0.0.9"
 #define MyAppPublisher "Daniel Evans"
 #define MyAppURL "https://xlpro.pages.dev"
 #define MyAppExeName "xlpro-cli.exe"
@@ -12,7 +12,7 @@
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 Uninstallable=yes
-AppId={{62D69F3D-C6AC-4122-A15B-020076C23696}
+AppId={{50523111-CDE6-44B8-A5B6-8BAA98FE43A3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -52,8 +52,8 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\xlpro_installer\install\*"; DestDir: {app}; Flags: recursesubdirs ignoreversion
-Source: "..\xlpro_installer\install\src\xlpro.xlam"; DestDir: {code:GetUserProfile}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
+Source: "..\xlpro_installer_inno\install\*"; DestDir: {app}; Flags: recursesubdirs ignoreversion
+Source: "..\xlpro_installer_inno\install\src\xlpro.xlam"; DestDir: {code:GetUserProfile}\AppData\Roaming\Microsoft\Excel\XLSTART; Flags: ignoreversion
 
 
 [Icons]
@@ -212,6 +212,13 @@ var
   PathValues: array of String;
   PathWarningLabel: TLabel;
   pathEditLabel: TLabel;
+  postInstallPage: TWizardPage;
+  postInstallBulletText: TNewStaticText;
+  openReadmeCheckbox: TNewCheckBox;
+  openExamplesCheckbox: TNewCheckBox;
+  errorCode: Integer;
+  confirmIReadTheInstructionsCheckbox: TNewCheckBox;
+  confirmIReadTheInstructionsText: TLabel;
 
 
 procedure PageClickHandler(Sender: TObject);
@@ -286,15 +293,64 @@ begin
 end;
 
 
+
+// Helper procedure to create a bullet-style row
+procedure CreateBullet(Page: TWizardPage; var Y: Integer; const Text: String);
+var
+  Bullet, Line: TNewStaticText;
+begin
+  // Bullet icon (simple Unicode dot or dash)
+  Bullet := TNewStaticText.Create(Page);
+  Bullet.Parent := Page.Surface;
+  Bullet.Caption := '•';
+  Bullet.Left := ScaleX(20);
+  Bullet.Top := Y;
+  Bullet.Width := ScaleX(10);
+
+  // Text next to it
+  Line := TNewStaticText.Create(Page);
+  Line.Parent := Page.Surface;
+  Line.Caption := Text;
+  Line.Left := ScaleX(35);
+  Line.Top := Y;
+  Line.Width := ScaleX(380);
+  Line.WordWrap := True;
+
+  // Adjust Y position for next bullet
+  Y := Y + Line.Height + ScaleY(6);
+end;
+
+procedure CreateLine(Page: TWizardPage; var Y: Integer; const Text: String);
+var
+  Line: TNewStaticText;
+begin
+  // Text next to it
+  Line := TNewStaticText.Create(Page);
+  Line.Parent := Page.Surface;
+  Line.Caption := Text;
+  Line.Left := ScaleX(10);
+  Line.Top := Y;
+  Line.Width := ScaleX(380);
+  Line.WordWrap := True;
+
+  // Adjust Y position for next bullet
+  Y := Y + Line.Height + ScaleY(12);
+end;
+
+
+
 procedure InitializeWizard;
 var
   Path1, Path2: string;
   Path3: string;
+  bulletLines: String;
+  Y: Integer;
+  
 
 begin
   Path3 := FindCodeExe();
   
-  Path1 := 'C:\Users\Daniel Evans\AppData\Local\Programs\Microsoft VS Code\Code.exe';  
+  Path1 := GetEnvVariable('LOCALAPPDATA') + '\Programs\Microsoft VS Code\Code.exe';  
   Path2 := ExpandConstant('{pf}') + '\Microsoft VS Code\Code.exe';
   
 
@@ -332,7 +388,7 @@ begin
 
     
   // Add "Custom path" option
-  Page.Add('[NOT RECOMMENDED] Continue without specifying a path. (Defaults to `code.exe`)');
+  Page.Add('[NOT RECOMMENDED] Continue without specifying a path. (Defaults to `code.exe`, but this was not found in your PATH)');
   SetArrayLength(PathValues, Length(PathValues) + 1);
   PathValues[High(PathValues)] := 'NO_PATH';
   
@@ -347,7 +403,6 @@ begin
     Page.SelectedValueIndex := 0;
     
   Page.CheckListBox.Height := ScaleY(128); // adjust height as needed
-    
     
   pathEditLabel := TLabel.Create(WizardForm);
   pathEditLabel.Parent := Page.Surface;
@@ -377,7 +432,80 @@ begin
   
   // Enable the edit box only when the last radio button is selected
   Page.CheckListBox.OnClickCheck := @PageClickHandler;       
+
+  postInstallPage := CreateCustomPage(
+    wpInstalling,
+    'Installation Complete',
+    'Next Steps'
+  );
+  
+
+
+  
+  Y := ScaleY(10);
+
+  CreateLine(postInstallPage, Y, 'Trust Access to the VBA Object Model:');
+
+  CreateBullet(postInstallPage, Y, 'Start Excel');
+  CreateBullet(postInstallPage, Y, 'Click File > Options');
+  CreateBullet(postInstallPage, Y, 'Navitage to the `Trust Center` tab');
+  CreateBullet(postInstallPage, Y, 'Click `Trust Center Settings...`');
+  CreateBullet(postInstallPage, Y, 'Navitage to the `Macro Settings` tab');
+  CreateBullet(postInstallPage, Y, 'Tick `Trust access to the VBA project object model`.');
+  CreateBullet(postInstallPage, Y, 'Ensure Macros are enabled while using xlpro.');
+
+
+  // Helper to create a "bullet" line
+  // CreateBullet(postInstallPage, Y, 'Launch MyApp from the Start menu.');
+  // CreateBullet(postInstallPage, Y, 'Visit our website for tutorials and updates.');
+  // CreateBullet(postInstallPage, Y, 'Join the community forum to ask questions.');
+  // CreateBullet(postInstallPage, Y, 'Explore example projects in the installation folder.');
+  
+  
+  confirmIReadTheInstructionsCheckbox := TNewCheckBox.Create(WizardForm);
+  Y := Y + ScaleY(16);
+  with confirmIReadTheInstructionsCheckbox do
+  begin
+    Parent := postInstallPage.Surface;
+    Caption := '';
+    Checked := False;
+    Width := ScaleX(25);
+    Left := ScaleX(25);
+    Top := Y;
+  end;
+  
+  confirmIReadTheInstructionsText := TLabel.Create(WizardForm);
+  with confirmIReadTheInstructionsText do
+  begin
+    Parent := postInstallPage.Surface;
+    Caption := 'I have completed the above [REQUIRED]';
+    Width := ScaleX(380);
+    Left := confirmIReadTheInstructionsCheckbox.Left + confirmIReadTheInstructionsCheckbox.Width;
+    Top := Y + ScaleY(2);
+  end;
+ 
+  openReadmeCheckbox := TNewCheckBox.Create(WizardForm);
+  with openReadmeCheckbox do
+  begin
+    Parent := WizardForm.FinishedPage;
+    Caption := 'Open the documentation at xlpro.pages.dev';
+    Checked := True;
+    Left := ScaleX(16);
+    Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(8);
+  end; 
+  
+  openExamplesCheckbox := TNewCheckBox.Create(WizardForm);
+  with openExamplesCheckbox do
+  begin
+    Parent := WizardForm.FinishedPage;
+    Caption := 'Open the example file.';
+    Checked := True;
+    Left := openReadmeCheckbox.Left;
+    Top := openReadmeCheckbox.Top + openReadmeCheckbox.Height + ScaleY(8);
+  end; 
+  
 end;
+
 
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -389,7 +517,7 @@ begin
   if CurPageID = Page.ID then
   begin
     if Page.SelectedValueIndex >= 0 then
-    begin
+      begin
       SelectedPath := PathValues[Page.SelectedValueIndex];
       if SelectedPath = 'CUSTOM_PATH' then
         begin
@@ -428,13 +556,25 @@ begin
         // MsgBox('User selected VS Code path: ' + SelectedPath, mbError, MB_OK);
         Result := True;
         end;
-    end
+      end
     else
-    begin
+      begin
       MsgBox('Please select a VS Code installation before continuing.', mbError, MB_OK);
       Result := False;
-    end;
-  end;
+      end
+    end
+  else if CurPageID = postInstallPage.ID then
+    begin
+    Log(' in here buddy pal');
+    if not confirmIReadTheInstructionsCheckbox.Checked then
+    begin
+      confirmIReadTheInstructionsText.Font.Color := $001414b8;
+      Result := False;
+      Log('User did not tick the box before continuing, sending em back')
+    end
+  else
+    Result := True;
+  end
 end;
 
 
@@ -475,4 +615,21 @@ begin
     NotifyEnvironmentChange;
   end;
 end;
+  
+  
+procedure DeinitializeSetup;
+var
+  errorCode: Integer;
+begin
+    if openReadmeCheckbox.Checked then
+    begin
+      ShellExec('', 'http://xlpro.pages.dev', '', '', SW_SHOWNORMAL, ewNoWait, errorCode);
+    end;
+    if openExamplesCheckbox.Checked then
+    begin
+      ShellExec('', ExpandConstant('{app}/xlpro_examples/xlpro-Showcase.xlsx'), '', '', SW_SHOWNORMAL, ewNoWait, errorCode);
+    end;
+end;
+
+
 

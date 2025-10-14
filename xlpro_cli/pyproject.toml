@@ -1,7 +1,7 @@
 
 [project]
 name = "xlpro_cli"
-version = "0.0.8" # Placeholder will be auto-synced
+version = "0.0.9" # Placeholder will be auto-synced
 description = "xlpro Command Line Interface"
 readme = "N/A"
 license = { text = "MIT License" }
