@@ -27,8 +27,7 @@ if not version in app_id_map:
         app_id_map = app_id_map | {version: str(pythoncom.CreateGuid())}
         f.write(json.dumps(app_id_map, indent=4))
 
-else:
-    version_guid = app_id_map[version]
+version_guid = app_id_map[version]
 
 pat = r'^#define MyAppVersion\s*".*"\s*$'
 x1a = re.search(pat, txt2, flags=re.MULTILINE)

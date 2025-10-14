@@ -5,7 +5,7 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/xlpro_module",
         "${workspaceFolder}/xlpro_cli",
-        "${workspaceFolder}/xlpro_installer",
+        // "${workspaceFolder}/xlpro_installer",
     ],
     "files.associations": {
         "*.bas": "vb",

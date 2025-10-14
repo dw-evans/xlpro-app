@@ -4,25 +4,24 @@
 from pathlib import Path
 import subprocess
 import shutil
+import os
 
 import xlpro
+import shutil
+import logging
 
 wd = Path(__file__).parent
 
-
 paths = [
     # (
-    #     "startfiles", 
+    #     "startfiles",
     #     "startfiles",
     # ),
     (
-        f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl", 
+        f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl",
         f"src/xlpro-{xlpro.__version__}-py3-none-any.whl",
     ),
-    (
-        f"../xlpro_module/config_production.toml",
-        "config.toml"
-    ),
+    (f"../xlpro_module/config_production.toml", "config.toml"),
     (
         f"../xlpro_addin/dist/xlpro.xlam",
         f"src/xlpro.xlam",
@@ -61,14 +60,13 @@ paths = [
         f".python-version-recommended",
     ),
     (
+        # https://github.com/astral-sh/uv/releases/download/0.6.10/uv-x86_64-pc-windows-msvc.zip
         f"uv/uv.exe",
         f"bin/uv.exe",
     ),
 ]
 
-
-
-PRE_BUILD_DIR = wd / "install"
+PRE_BUILD_DIR = wd / "build"
 
 
 def collect_examples():
@@ -84,16 +82,13 @@ def collect_examples():
         pass
     return r
 
+
 def collect_startfiles():
     return [x.relative_to(wd) for x in (wd / "startfiles").rglob("*")]
 
+
 paths += [(str(fp), str(Path("examples") / fp)) for fp in collect_examples()]
 paths += [(str(fp), str(fp)) for fp in collect_startfiles()]
-
-import os
-import shutil
-
-import xlpro
 
 
 def main():
@@ -108,13 +103,11 @@ def main():
         #             try:
         #                 os.remove(fp)
         #             except Exception as e:
-        #                 print(e)  
+        #                 print(e)
 
         if not p1.parent.exists():
             p1.parent.mkdir(parents=True)
         shutil.copy2(p0, p1)
-
-
 
 
 if __name__ == "__main__":
