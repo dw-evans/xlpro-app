@@ -1,3 +1,6 @@
 [submodule "xlpro"]
 	path = xlpro
 	url = https://github.com/dw-evans/xlpro.git
+[submodule "xlpro-releases"]
+	path = xlpro-releases
+	url = https://github.com/dw-evans/xlpro-releases.git
