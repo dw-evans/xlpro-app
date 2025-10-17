@@ -1,0 +1,3 @@
+[submodule "xlpro"]
+	path = xlpro
+	url = https://github.com/dw-evans/xlpro.git

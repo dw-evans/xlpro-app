@@ -18,10 +18,10 @@ paths = [
     #     "startfiles",
     # ),
     (
-        f"../xlpro_module/dist/xlpro-{xlpro.__version__}-py3-none-any.whl",
+        f"../xlpro/dist/xlpro-{xlpro.__version__}-py3-none-any.whl",
         f"src/xlpro-{xlpro.__version__}-py3-none-any.whl",
     ),
-    (f"../xlpro_module/config_production.toml", "config.toml"),
+    (f"../xlpro/config_production.toml", "config.toml"),
     (
         f"../xlpro_addin/dist/xlpro.xlam",
         f"src/xlpro.xlam",

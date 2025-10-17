@@ -1541,8 +1541,8 @@ def install_editable_default_reqs(py_interpreter_path):
     # Wait for the subprocess to finish
     process.wait()
 
-    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
-    path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro_module"
+    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro")
+    path_to_xlpro = Path(__file__).parent.parent.parent / "xlpro"
     process = subprocess.Popen(
         [
             # "xlpro-server.exe",
@@ -1617,7 +1617,7 @@ def get_xlpro_whl_fp():
 
 def install_default_requirements(py_interpreter_path: Path):
     # path_to_xlpro = Path().resolve()
-    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro_module")
+    # path_to_xlpro = Path(r"C:\Users\Daniel Evans\projects\xlpro\xlpro")
     # path_to_xlpro = get_xlpro_whl_fp()
     # reqs = [
     #     "pip",
@@ -1842,7 +1842,7 @@ def read_xlpro_debug_configuration_port(workbook_path: Path):
     return ret
 
 
-# XXX - todo unify this across xlpro_module...
+# XXX - todo unify this across xlpro...
 def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
     """Check if a process holding the lock is still running."""
     try:
@@ -1865,7 +1865,7 @@ def check_lockfile_get_contents_as_dict_if_alive(lock_file) -> dict:
     return {}
 
 
-# XXX - todo unify this across xlpro_module...
+# XXX - todo unify this across xlpro...
 def get_xlpro_lockfile_path(interpreter_path: Path = None) -> Path:
     if interpreter_path is not None:
         xlpro_dir = interpreter_path.parent.parent.parent / ".xlpro"
@@ -1881,7 +1881,7 @@ def get_running_pid_guid_port_for_workbook(
     xlpro_venv_root_path = get_valid_venv_root_path_used_for_workbook_from_map(workbook_path)
     interpreter_path = get_python_exe_from_xlpro_root_venv_path(xlpro_venv_root_path)
 
-    # the lockfile path will be set adjacent to the interpreter running the xlpro_module
+    # the lockfile path will be set adjacent to the interpreter running the xlpro
     # however when running using the debug venv interpreter, there will be a mismatch between the interpreter within xlpro-cli.exe and
     # the one which generated the lockfile.
     # manual run_server calls are therefore now non-functional, until xlpro-cli.exe and the xlpro create the lockfile at a consistent location.

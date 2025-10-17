@@ -3,7 +3,7 @@
     // "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
 
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/xlpro_module",
+        "${workspaceFolder}/xlpro",
         "${workspaceFolder}/xlpro_cli",
         // "${workspaceFolder}/xlpro_installer",
     ],
